@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { useMedia, MediaFile } from '@/contexts/MediaContext';
+import { useMedia } from '@/contexts/MediaContext';
+import type { MediaFile } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +30,6 @@ import {
 import { format } from 'date-fns';
 import { toast } from "@/hooks/use-toast";
 
-// Helper function to format file size
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -39,7 +38,6 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Helper function to format duration
 const formatDuration = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
@@ -57,7 +55,6 @@ const Dashboard = () => {
   const audioFiles = files.filter(file => file.type === 'audio');
   const videoFiles = files.filter(file => file.type === 'video');
   
-  // Filter files based on search term and type
   const filteredFiles = files.filter(file => {
     const matchesSearch = file.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (file.artist && file.artist.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -67,7 +64,6 @@ const Dashboard = () => {
     return matchesSearch && matchesType;
   });
   
-  // Sort files
   const sortedFiles = [...filteredFiles].sort((a, b) => {
     let valueA: any = a[sortField as keyof MediaFile] || '';
     let valueB: any = b[sortField as keyof MediaFile] || '';
@@ -139,9 +135,7 @@ const Dashboard = () => {
     setSelectedFiles([]);
   };
   
-  // Calculate stats
   const totalStorage = files.reduce((acc, file) => acc + (file.size || 0), 0);
-  const totalDuration = files.reduce((acc, file) => acc + (file.duration || 0), 0);
   
   return (
     <MainLayout>
