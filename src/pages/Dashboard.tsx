@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { useMedia } from '@/contexts/MediaContext';
@@ -135,7 +136,8 @@ const Dashboard = () => {
     setSelectedFiles([]);
   };
   
-  const totalStorage = files.reduce((acc, file) => acc + (file.size || 0), 0);
+  const totalStorage = files.reduce((acc, file) => acc + (file.size ?? 0), 0);
+  const totalDuration = files.reduce((acc, file) => acc + (file.duration ?? 0), 0);
   
   return (
     <MainLayout>
@@ -502,7 +504,7 @@ const Dashboard = () => {
                           <span>Audio Storage</span>
                         </div>
                         <span className="font-medium">
-                          {formatFileSize(audioFiles.reduce((acc, file) => acc + (file.size || 0), 0))}
+                          {formatFileSize(audioFiles.reduce((acc, file) => acc + (file.size ?? 0), 0))}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
@@ -510,7 +512,7 @@ const Dashboard = () => {
                           className="h-full bg-blue-500 rounded-full" 
                           style={{ 
                             width: `${totalStorage ? 
-                              (audioFiles.reduce((acc, file) => acc + (file.size || 0), 0) / totalStorage) * 100 : 0}%`
+                              (audioFiles.reduce((acc, file) => acc + (file.size ?? 0), 0) / totalStorage) * 100 : 0}%`
                           }}
                         />
                       </div>
@@ -523,7 +525,7 @@ const Dashboard = () => {
                           <span>Video Storage</span>
                         </div>
                         <span className="font-medium">
-                          {formatFileSize(videoFiles.reduce((acc, file) => acc + (file.size || 0), 0))}
+                          {formatFileSize(videoFiles.reduce((acc, file) => acc + (file.size ?? 0), 0))}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-purple-100 rounded-full overflow-hidden">
@@ -531,7 +533,7 @@ const Dashboard = () => {
                           className="h-full bg-purple-500 rounded-full" 
                           style={{ 
                             width: `${totalStorage ? 
-                              (videoFiles.reduce((acc, file) => acc + (file.size || 0), 0) / totalStorage) * 100 : 0}%`
+                              (videoFiles.reduce((acc, file) => acc + (file.size ?? 0), 0) / totalStorage) * 100 : 0}%`
                           }}
                         />
                       </div>
