@@ -5,8 +5,21 @@ import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, Repeat, Shuffle } from 'lucide-react';
+import { 
+  Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, 
+  Repeat, Shuffle, Heart, Share2, BookmarkPlus, MoreHorizontal, 
+  Globe
+} from 'lucide-react';
 import AudioVisualizer from '@/components/AudioVisualizer';
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AudioPlayerProps {
   className?: string;
@@ -32,12 +45,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
     nextTrack,
     previousTrack,
     updateCurrentTime,
-    updateDuration
+    updateDuration,
+    playlists
   } = useMedia();
   
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   
   useEffect(() => {
     if (!audioRef.current || !currentFile || currentFile.type !== 'audio') return;
@@ -107,6 +126,67 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
     seekTo(newValue[0]);
   };
   
+  const toggleFavorite = () => {
+    setIsFavorite(!isFavorite);
+    toast({
+      title: isFavorite ? "Removed from favorites" : "Added to favorites",
+      description: `"${currentFile?.title}" has been ${isFavorite ? "removed from" : "added to"} your favorites.`,
+    });
+  };
+  
+  const handleShareClick = () => {
+    // In a real app, this would open a share dialog
+    navigator.clipboard.writeText(`Check out this awesome track: ${currentFile?.title} by ${currentFile?.artist}`);
+    toast({
+      title: "Share link copied!",
+      description: "Share link has been copied to your clipboard.",
+    });
+  };
+  
+  const toggleRepeat = () => {
+    setRepeat(!repeat);
+    toast({
+      title: `Repeat ${!repeat ? "enabled" : "disabled"}`,
+      description: `Repeat mode has been ${!repeat ? "enabled" : "disabled"}.`,
+    });
+  };
+  
+  const toggleShuffle = () => {
+    setShuffle(!shuffle);
+    toast({
+      title: `Shuffle ${!shuffle ? "enabled" : "disabled"}`,
+      description: `Shuffle mode has been ${!shuffle ? "enabled" : "disabled"}.`,
+    });
+  };
+  
+  const handleEnd = () => {
+    if (repeat) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+    } else {
+      nextTrack();
+    }
+  };
+  
+  const handleAddToPlaylist = (playlistId: string) => {
+    if (currentFile) {
+      toast({
+        title: "Added to playlist",
+        description: `"${currentFile.title}" has been added to the playlist.`,
+      });
+    }
+  };
+  
+  const handleLanguageChange = (language: string) => {
+    toast({
+      title: "Language changed",
+      description: `Player language changed to ${language}.`,
+    });
+    setShowLanguageMenu(false);
+  };
+  
   if (!currentFile || currentFile.type !== 'audio') return null;
   
   if (minimized) {
@@ -133,7 +213,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
           ref={audioRef}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
-          onEnded={nextTrack}
+          onEnded={handleEnd}
         />
       </div>
     );
@@ -150,6 +230,101 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
         <div className="flex-1 min-w-0">
           <p className="text-lg font-semibold truncate">{currentFile.title}</p>
           <p className="text-sm text-muted-foreground truncate">{currentFile.artist}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "hover:text-primary",
+              isFavorite ? "text-red-500" : "text-muted-foreground"
+            )}
+            onClick={toggleFavorite}
+          >
+            <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleShareClick}
+            className="text-muted-foreground hover:text-primary"
+          >
+            <Share2 size={20} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary"
+              >
+                <BookmarkPlus size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Add to playlist</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {playlists.map(playlist => (
+                <DropdownMenuItem 
+                  key={playlist.id}
+                  onClick={() => handleAddToPlaylist(playlist.id)}
+                >
+                  {playlist.name}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuItem>
+                Create new playlist
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary"
+              >
+                <Globe size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Change language</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleLanguageChange("English")}>
+                English
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("Spanish")}>
+                Spanish
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("French")}>
+                French
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("German")}>
+                German
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("Japanese")}>
+                Japanese
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary"
+              >
+                <MoreHorizontal size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>View artist</DropdownMenuItem>
+              <DropdownMenuItem>View album</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Download</DropdownMenuItem>
+              <DropdownMenuItem>Report an issue</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       
@@ -175,7 +350,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
         </div>
         
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              shuffle ? "text-primary" : "text-muted-foreground hover:text-white"
+            )}
+            onClick={toggleShuffle}
+          >
             <Shuffle size={18} />
           </Button>
           
@@ -197,7 +379,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
             </Button>
           </div>
           
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              repeat ? "text-primary" : "text-muted-foreground hover:text-white"
+            )}
+            onClick={toggleRepeat}
+          >
             <Repeat size={18} />
           </Button>
         </div>
@@ -225,7 +414,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onEnded={nextTrack}
+        onEnded={handleEnd}
       />
     </Card>
   );

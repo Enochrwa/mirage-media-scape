@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import Library from "./pages/Library";
 import Upload from "./pages/Upload";
 import Playlists from "./pages/Playlists";
+import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/library" element={<Library />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/playlists" element={<Playlists />} />
+            <Route path="/favorites" element={<Favorites />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

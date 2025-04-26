@@ -1,10 +1,17 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/MainLayout';
 import { useMedia, MediaFile } from '@/contexts/MediaContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowRight, Play, Music, Film, ListMusic, Upload } from 'lucide-react';
+import { 
+  ArrowRight, Play, Music, Film, ListMusic, Upload, 
+  Clock, Heart, Bookmark, Share2, Shuffle, TrendingUp
+} from 'lucide-react';
+import { 
+  Tabs, TabsContent, TabsList, TabsTrigger 
+} from "@/components/ui/tabs";
 
 interface MediaCardProps {
   file: MediaFile;
@@ -14,7 +21,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ file }) => {
   const { playFile } = useMedia();
   
   return (
-    <Card className="group relative overflow-hidden">
+    <Card className="group relative overflow-hidden hover:shadow-lg transition-all duration-300">
       <div className="aspect-square">
         <img 
           src={file.cover || '/placeholder.svg'} 
@@ -22,7 +29,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ file }) => {
           className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
         
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <Button 
             className="rounded-full bg-primary hover:bg-primary/90 w-12 h-12"
             onClick={() => playFile(file)}
@@ -41,7 +48,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ file }) => {
 
 const StatCard: React.FC<{ icon: JSX.Element; label: string; count: number; bg: string }> = ({ icon, label, count, bg }) => {
   return (
-    <Card className={`${bg} hover:brightness-105 transition-all p-4 text-white flex flex-col`}>
+    <Card className={`${bg} hover:brightness-105 transition-all p-4 text-white flex flex-col hover:scale-105 duration-300`}>
       <div className="flex items-center justify-between mb-2">
         <div className="p-2 bg-white/20 rounded-md">
           {icon}
@@ -55,12 +62,15 @@ const StatCard: React.FC<{ icon: JSX.Element; label: string; count: number; bg: 
 
 const Home = () => {
   const { files, playlists } = useMedia();
+  const [activeTab, setActiveTab] = useState("discover");
   
   const audioFiles = files.filter(file => file.type === 'audio');
   const videoFiles = files.filter(file => file.type === 'video');
   
   const recentFiles = [...files].sort((a, b) => 0.5 - Math.random()).slice(0, 6);
   const featuredFiles = [...files].sort((a, b) => 0.5 - Math.random()).slice(0, 4);
+  const popularFiles = [...files].sort((a, b) => 0.5 - Math.random()).slice(0, 8);
+  const recommendedFiles = [...files].sort((a, b) => 0.5 - Math.random()).slice(0, 4);
   
   return (
     <MainLayout>
@@ -90,48 +100,93 @@ const Home = () => {
             bg="bg-gradient-to-br from-cyan-500 to-blue-600" 
           />
           <StatCard 
-            icon={<Music className="h-5 w-5" />} 
-            label="Total Media" 
-            count={files.length} 
+            icon={<Clock className="h-5 w-5" />} 
+            label="Recently Played" 
+            count={Math.min(4, files.length)} 
             bg="bg-gradient-to-br from-emerald-500 to-lime-600" 
           />
         </div>
         
-        {featuredFiles.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">Featured</h2>
-              <Link to="/library">
-                <Button variant="ghost" className="gap-1">
-                  View Library <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+        <Tabs defaultValue="discover" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-4 md:w-[400px] mb-6">
+            <TabsTrigger value="discover">Discover</TabsTrigger>
+            <TabsTrigger value="trending">Trending</TabsTrigger>
+            <TabsTrigger value="recommended">For You</TabsTrigger>
+            <TabsTrigger value="recent">Recent</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="discover" className="space-y-6">
+            {featuredFiles.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                    <Bookmark className="h-5 w-5 text-primary" /> Featured
+                  </h2>
+                  <Link to="/library">
+                    <Button variant="ghost" className="gap-1">
+                      View Library <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {featuredFiles.map(file => (
+                    <MediaCard key={file.id} file={file} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="trending" className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-pink-500" /> Popular Now
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {popularFiles.map(file => (
+                  <MediaCard key={file.id} file={file} />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {featuredFiles.map(file => (
-                <MediaCard key={file.id} file={file} />
-              ))}
+          </TabsContent>
+          
+          <TabsContent value="recommended" className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-red-500" /> Recommended For You
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {recommendedFiles.map(file => (
+                  <MediaCard key={file.id} file={file} />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        
-        {recentFiles.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">Recently Added</h2>
-              <Link to="/library">
-                <Button variant="ghost" className="gap-1">
-                  View All <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+          </TabsContent>
+          
+          <TabsContent value="recent" className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-blue-500" /> Recently Added
+                </h2>
+                <Link to="/library">
+                  <Button variant="ghost" className="gap-1">
+                    View All <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {recentFiles.map(file => (
+                  <MediaCard key={file.id} file={file} />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {recentFiles.map(file => (
-                <MediaCard key={file.id} file={file} />
-              ))}
-            </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
         
         <div className="mt-12 text-center p-8 rounded-lg bg-gradient-to-r from-purple-700/20 via-fuchsia-700/20 to-pink-700/20">
           <h2 className="text-2xl font-bold tracking-tight mb-2">Upload Your Own Media</h2>
