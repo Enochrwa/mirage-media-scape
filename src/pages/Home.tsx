@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/MainLayout';
 import { useMedia, MediaFile } from '@/contexts/MediaContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowRight, Play, Music, Film, ListMusic } from 'lucide-react';
+import { ArrowRight, Play, Music, Film, ListMusic, Upload } from 'lucide-react';
 
 interface MediaCardProps {
   file: MediaFile;
