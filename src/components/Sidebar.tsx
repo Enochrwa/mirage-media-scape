@@ -13,7 +13,7 @@ import { useMedia } from '@/contexts/MediaContext';
 import { 
   Search, Music, Film, ListMusic, Upload, Settings, 
   Home, ChevronLeft, ChevronRight, Menu, Heart, Globe, 
-  BookmarkPlus, Share2
+  LayoutDashboard, Share2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -63,7 +63,7 @@ type SidebarProps = {
   className?: string;
 };
 
-export type SidebarView = 'home' | 'music' | 'videos' | 'playlists' | 'upload' | 'settings' | 'favorites';
+export type SidebarView = 'home' | 'music' | 'videos' | 'playlists' | 'upload' | 'settings' | 'favorites' | 'dashboard';
 
 const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const location = useLocation();
@@ -82,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
     else if (path === '/upload') setView('upload');
     else if (path === '/settings') setView('settings');
     else if (path === '/favorites') setView('favorites');
+    else if (path === '/dashboard') setView('dashboard');
   }, [location.pathname, files]);
 
   const audioCount = files.filter(file => file.type === 'audio').length;
@@ -120,6 +121,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 label="Search" 
                 onClick={() => {}} 
               />
+              <SidebarItem
+                icon={<LayoutDashboard size={20} />}
+                label="Dashboard"
+                active={view === 'dashboard'}
+                to="/dashboard"
+              />
             </div>
             
             <Separator className="my-4 bg-sidebar-border" />
@@ -129,14 +136,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 icon={<Music size={20} />} 
                 label="Music" 
                 active={view === 'music'} 
-                to="/library"
+                to="/library#music"
                 badge={audioCount}
               />
               <SidebarItem 
                 icon={<Film size={20} />} 
                 label="Videos" 
                 active={view === 'videos'} 
-                to="/library"
+                to="/library#videos"
                 badge={videoCount}
               />
               <SidebarItem 
@@ -281,6 +288,33 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
             )}
           </TooltipProvider>
+          
+          <TooltipProvider>
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <SidebarItem 
+                      icon={<LayoutDashboard size={20} />} 
+                      label="" 
+                      active={view === 'dashboard'} 
+                      to="/dashboard" 
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  Dashboard
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <SidebarItem 
+                icon={<LayoutDashboard size={20} />} 
+                label="Dashboard" 
+                active={view === 'dashboard'} 
+                to="/dashboard" 
+              />
+            )}
+          </TooltipProvider>
         </div>
         
         <Separator className="my-4 bg-sidebar-border" />
@@ -295,7 +329,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                       icon={<Music size={20} />} 
                       label="" 
                       active={view === 'music'} 
-                      to="/library"
+                      to="/library#music"
                       badge={!collapsed ? audioCount : undefined}
                     />
                   </div>
@@ -309,7 +343,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 icon={<Music size={20} />} 
                 label="Music" 
                 active={view === 'music'} 
-                to="/library"
+                to="/library#music"
                 badge={audioCount}
               />
             )}
@@ -324,7 +358,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                       icon={<Film size={20} />} 
                       label="" 
                       active={view === 'videos'} 
-                      to="/library"
+                      to="/library#videos"
                     />
                   </div>
                 </TooltipTrigger>
@@ -337,7 +371,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 icon={<Film size={20} />} 
                 label="Videos" 
                 active={view === 'videos'} 
-                to="/library"
+                to="/library#videos"
                 badge={videoCount}
               />
             )}

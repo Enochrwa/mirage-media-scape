@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useMedia, MediaFile, MediaType } from '@/contexts/MediaContext';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -86,6 +87,24 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className }) => {
   const { files } = useMedia();
   const [searchTerm, setSearchTerm] = useState('');
   const [mediaType, setMediaType] = useState<MediaType | 'all'>('all');
+  const location = useLocation();
+  
+  // Set default tab based on the current URL path
+  useEffect(() => {
+    const path = location.pathname;
+    const hash = location.hash;
+    
+    // Check if there's a specific filter in the URL (e.g. #videos)
+    if (hash === '#videos') {
+      setMediaType('video');
+    } else if (hash === '#music') {
+      setMediaType('audio');
+    } else if (path.includes('videos')) {
+      setMediaType('video');
+    } else if (path.includes('music')) {
+      setMediaType('audio');
+    }
+  }, [location]);
   
   const filteredFiles = files.filter(file => {
     const matchesSearch = file.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -114,7 +133,12 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className }) => {
         </div>
       </div>
       
-      <Tabs defaultValue="all" className="w-full" onValueChange={(value) => setMediaType(value as MediaType | 'all')}>
+      <Tabs 
+        defaultValue={mediaType} 
+        value={mediaType}
+        className="w-full" 
+        onValueChange={(value) => setMediaType(value as MediaType | 'all')}
+      >
         <TabsList>
           <TabsTrigger value="all">All Media ({files.length})</TabsTrigger>
           <TabsTrigger value="audio">Music ({audioFiles.length})</TabsTrigger>
