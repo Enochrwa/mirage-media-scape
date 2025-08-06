@@ -8,6 +8,8 @@ import { MediaProvider } from '@/contexts/MediaContext';
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Library from "./pages/Library";
+import Music from "./pages/Music";
+import Videos from "./pages/Videos";
 import Upload from "./pages/Upload";
 import Playlists from "./pages/Playlists";
 import Favorites from "./pages/Favorites";
@@ -27,6 +29,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/library" element={<Library />} />
+            <Route path="/music" element={<Music />} />
+            <Route path="/videos" element={<Videos />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/playlists" element={<Playlists />} />
             <Route path="/favorites" element={<Favorites />} />

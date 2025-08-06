@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useMedia, MediaFile, MediaType } from '@/contexts/MediaContext';
@@ -27,6 +26,7 @@ const MediaItem: React.FC<MediaItemProps> = ({ file }) => {
         />
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <Button 
+            size="icon"
             className="rounded-full bg-primary hover:bg-primary/90 w-12 h-12"
             onClick={() => playFile(file)}
           >
@@ -35,32 +35,39 @@ const MediaItem: React.FC<MediaItemProps> = ({ file }) => {
         </div>
         {file.type === 'video' && (
           <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1">
-            <Film className="h-4 w-4" />
+            <Film className="h-4 w-4 text-white" />
           </div>
         )}
         {file.type === 'audio' && (
           <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1">
-            <Music className="h-4 w-4" />
+            <Music className="h-4 w-4 text-white" />
           </div>
         )}
       </div>
       <div className="p-3 flex items-center justify-between">
-        <div className="overflow-hidden">
+        <div className="flex-1 min-w-0 mr-2">
           <p className="font-medium truncate">{file.title}</p>
           <p className="text-sm text-muted-foreground truncate">{file.artist || 'Unknown Artist'}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-5 w-5" />
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">More options</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => playFile(file)}>Play</DropdownMenuItem>
-            <DropdownMenuItem>Add to Queue</DropdownMenuItem>
-            {playlists.length > 0 && (
+            <DropdownMenuItem onClick={() => playFile(file)}>
+              Play
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              Add to Queue
+            </DropdownMenuItem>
+            {playlists && playlists.length > 0 && (
               <>
-                <DropdownMenuItem className="font-medium">Add to Playlist:</DropdownMenuItem>
+                <DropdownMenuItem disabled className="font-medium">
+                  Add to Playlist:
+                </DropdownMenuItem>
                 {playlists.map(playlist => (
                   <DropdownMenuItem 
                     key={playlist.id} 
@@ -81,33 +88,35 @@ const MediaItem: React.FC<MediaItemProps> = ({ file }) => {
 
 interface MediaLibraryProps {
   className?: string;
+  mediaType?: MediaType;
 }
 
-const MediaLibrary: React.FC<MediaLibraryProps> = ({ className }) => {
+const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initialMediaType }) => {
   const { files } = useMedia();
   const [searchTerm, setSearchTerm] = useState('');
-  const [mediaType, setMediaType] = useState<MediaType | 'all'>('all');
+  const [mediaType, setMediaType] = useState<MediaType | 'all'>(initialMediaType || 'all');
   const location = useLocation();
-  
-  // Set default tab based on the current URL path
+
   useEffect(() => {
-    const path = location.pathname;
-    const hash = location.hash;
-    
-    // Check if there's a specific filter in the URL (e.g. #videos)
-    if (hash === '#videos') {
-      setMediaType('video');
-    } else if (hash === '#music') {
-      setMediaType('audio');
-    } else if (path.includes('videos')) {
-      setMediaType('video');
-    } else if (path.includes('music')) {
-      setMediaType('audio');
+    if (initialMediaType) {
+      setMediaType(initialMediaType);
+    } else {
+      const hash = location.hash;
+      if (hash === '#videos') {
+        setMediaType('video');
+      } else if (hash === '#music') {
+        setMediaType('audio');
+      } else {
+        setMediaType('all');
+      }
     }
-  }, [location]);
+  }, [location, initialMediaType]);
+
+  // Ensure files is an array before filtering
+  const safeFiles = Array.isArray(files) ? files : [];
   
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredFiles = safeFiles.filter(file => {
+    const matchesSearch = file.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (file.artist && file.artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (file.album && file.album.toLowerCase().includes(searchTerm.toLowerCase()));
     
@@ -116,8 +125,22 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className }) => {
     return matchesSearch && matchesType;
   });
   
-  const audioFiles = files.filter(file => file.type === 'audio');
-  const videoFiles = files.filter(file => file.type === 'video');
+  const audioFiles = safeFiles.filter(file => file.type === 'audio');
+  const videoFiles = safeFiles.filter(file => file.type === 'video');
+  
+  const renderMediaGrid = (filesToRender: MediaFile[]) => (
+    filesToRender.length > 0 ? (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filesToRender.map(file => (
+          <MediaItem key={file.id} file={file} />
+        ))}
+      </div>
+    ) : (
+      <p className="text-center text-muted-foreground py-10">
+        {searchTerm ? 'No matching files found.' : 'No media files found.'}
+      </p>
+    )
+  );
   
   return (
     <div className={cn("space-y-6", className)}>
@@ -133,54 +156,35 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className }) => {
         </div>
       </div>
       
-      <Tabs 
-        defaultValue={mediaType} 
-        value={mediaType}
-        className="w-full" 
-        onValueChange={(value) => setMediaType(value as MediaType | 'all')}
-      >
-        <TabsList>
-          <TabsTrigger value="all">All Media ({files.length})</TabsTrigger>
-          <TabsTrigger value="audio">Music ({audioFiles.length})</TabsTrigger>
-          <TabsTrigger value="video">Videos ({videoFiles.length})</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all" className="mt-6">
-          {filteredFiles.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredFiles.map(file => (
-                <MediaItem key={file.id} file={file} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-10">No media files found.</p>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="audio" className="mt-6">
-          {filteredFiles.filter(file => file.type === 'audio').length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredFiles.filter(file => file.type === 'audio').map(file => (
-                <MediaItem key={file.id} file={file} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-10">No audio files found.</p>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="video" className="mt-6">
-          {filteredFiles.filter(file => file.type === 'video').length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredFiles.filter(file => file.type === 'video').map(file => (
-                <MediaItem key={file.id} file={file} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-10">No video files found.</p>
-          )}
-        </TabsContent>
-      </Tabs>
+      {initialMediaType ? (
+        <div className="mt-6">
+          {renderMediaGrid(filteredFiles)}
+        </div>
+      ) : (
+        <Tabs
+          value={mediaType}
+          className="w-full"
+          onValueChange={(value) => setMediaType(value as MediaType | 'all')}
+        >
+          <TabsList>
+            <TabsTrigger value="all">All Media ({safeFiles.length})</TabsTrigger>
+            <TabsTrigger value="audio">Music ({audioFiles.length})</TabsTrigger>
+            <TabsTrigger value="video">Videos ({videoFiles.length})</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="mt-6">
+            {renderMediaGrid(filteredFiles)}
+          </TabsContent>
+
+          <TabsContent value="audio" className="mt-6">
+            {renderMediaGrid(filteredFiles.filter(f => f.type === 'audio'))}
+          </TabsContent>
+
+          <TabsContent value="video" className="mt-6">
+            {renderMediaGrid(filteredFiles.filter(f => f.type === 'video'))}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 };

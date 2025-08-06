@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuContent } from '@radix-ui/react-dropdown-menu';
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -67,6 +69,7 @@ export type SidebarView = 'home' | 'music' | 'videos' | 'playlists' | 'upload' |
 
 const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const location = useLocation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState<SidebarView>('home');
   const [collapsed, setCollapsed] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -110,77 +113,87 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           <div className="flex-1 overflow-y-auto px-2 py-4">
             {/* Same content as desktop sidebar */}
             <div className="mb-4">
-              <SidebarItem 
-                icon={<Home size={20} />} 
-                label="Home" 
-                active={view === 'home'} 
-                to="/" 
+              <SidebarItem
+                icon={<Home size={20} />}
+                label={t('Home')}
+                active={view === 'home'}
+                to="/"
               />
-              <SidebarItem 
-                icon={<Search size={20} />} 
-                label="Search" 
-                onClick={() => {}} 
+              <SidebarItem
+                icon={<Search size={20} />}
+                label={t('Search')}
+                onClick={() => {}}
               />
               <SidebarItem
                 icon={<LayoutDashboard size={20} />}
-                label="Dashboard"
+                label={t('Dashboard')}
                 active={view === 'dashboard'}
                 to="/dashboard"
               />
             </div>
-            
+
             <Separator className="my-4 bg-sidebar-border" />
-            
+
             <div className="space-y-1">
-              <SidebarItem 
-                icon={<Music size={20} />} 
-                label="Music" 
-                active={view === 'music'} 
-                to="/library#music"
+              <SidebarItem
+                icon={<Music size={20} />}
+                label={t('Music')}
+                active={view === 'music'}
+                to="/music"
                 badge={audioCount}
               />
-              <SidebarItem 
-                icon={<Film size={20} />} 
-                label="Videos" 
-                active={view === 'videos'} 
-                to="/library#videos"
+              <SidebarItem
+                icon={<Film size={20} />}
+                label={t('Videos')}
+                active={view === 'videos'}
+                to="/videos"
                 badge={videoCount}
               />
-              <SidebarItem 
-                icon={<ListMusic size={20} />} 
-                label="Playlists" 
-                active={view === 'playlists'} 
+              <SidebarItem
+                icon={<ListMusic size={20} />}
+                label={t('Playlists')}
+                active={view === 'playlists'}
                 to="/playlists"
                 badge={playlists.length}
               />
-              <SidebarItem 
-                icon={<Heart size={20} />} 
-                label="Favorites" 
-                active={view === 'favorites'} 
+              <SidebarItem
+                icon={<Heart size={20} />}
+                label={t('Favorites')}
+                active={view === 'favorites'}
                 to="/favorites"
               />
-              <SidebarItem 
-                icon={<Upload size={20} />} 
-                label="Upload" 
-                active={view === 'upload'} 
-                to="/upload" 
+              <SidebarItem
+                icon={<Upload size={20} />}
+                label={t('Upload')}
+                active={view === 'upload'}
+                to="/upload"
               />
-              <SidebarItem 
-                icon={<Globe size={20} />} 
-                label="Language" 
-                onClick={() => {}} 
-              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 px-3 font-normal"
+                  >
+                    <Globe size={20} />
+                    <span className="truncate">{t('Language')}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            
+
             <Separator className="my-4 bg-sidebar-border" />
-            
+
             <div className="mb-2">
-              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">YOUR PLAYLISTS</p>
+              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">{t('YOUR PLAYLISTS')}</p>
               <div className="space-y-1">
                 {playlists.map(playlist => (
-                  <Button 
-                    key={playlist.id} 
-                    variant="ghost" 
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
                     className="w-full justify-start px-3 font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
                     {playlist.name}
@@ -189,13 +202,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               </div>
             </div>
           </div>
-          
+
           <div className="p-2">
-            <SidebarItem 
-              icon={<Settings size={20} />} 
-              label="Settings" 
-              active={view === 'settings'} 
-              to="/settings" 
+            <SidebarItem
+              icon={<Settings size={20} />}
+              label={t('Settings')}
+              active={view === 'settings'}
+              to="/settings"
             />
           </div>
         </div>
@@ -255,11 +268,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Home size={20} />} 
-                label="Home" 
-                active={view === 'home'} 
-                to="/" 
+              <SidebarItem
+                icon={<Home size={20} />}
+                label={t('Home')}
+                active={view === 'home'}
+                to="/"
               />
             )}
           </TooltipProvider>
@@ -269,22 +282,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Search size={20} />} 
-                      label="" 
-                      onClick={() => {}} 
+                    <SidebarItem
+                      icon={<Search size={20} />}
+                      label=""
+                      onClick={() => {}}
                     />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Search
+                  {t('Search')}
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Search size={20} />} 
-                label="Search" 
-                onClick={() => {}} 
+              <SidebarItem
+                icon={<Search size={20} />}
+                label={t('Search')}
+                onClick={() => {}}
               />
             )}
           </TooltipProvider>
@@ -294,24 +307,24 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<LayoutDashboard size={20} />} 
-                      label="" 
-                      active={view === 'dashboard'} 
-                      to="/dashboard" 
+                    <SidebarItem
+                      icon={<LayoutDashboard size={20} />}
+                      label=""
+                      active={view === 'dashboard'}
+                      to="/dashboard"
                     />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Dashboard
+                  {t('Dashboard')}
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<LayoutDashboard size={20} />} 
-                label="Dashboard" 
-                active={view === 'dashboard'} 
-                to="/dashboard" 
+              <SidebarItem
+                icon={<LayoutDashboard size={20} />}
+                label={t('Dashboard')}
+                active={view === 'dashboard'}
+                to="/dashboard"
               />
             )}
           </TooltipProvider>
@@ -328,8 +341,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     <SidebarItem 
                       icon={<Music size={20} />} 
                       label="" 
-                      active={view === 'music'} 
-                      to="/library#music"
+                      active={view === 'music'}
+                      to="/music"
                       badge={!collapsed ? audioCount : undefined}
                     />
                   </div>
@@ -339,11 +352,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Music size={20} />} 
-                label="Music" 
-                active={view === 'music'} 
-                to="/library#music"
+              <SidebarItem
+                icon={<Music size={20} />}
+                label={t('Music')}
+                active={view === 'music'}
+                to="/music"
                 badge={audioCount}
               />
             )}
@@ -354,24 +367,24 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Film size={20} />} 
-                      label="" 
-                      active={view === 'videos'} 
-                      to="/library#videos"
+                    <SidebarItem
+                      icon={<Film size={20} />}
+                      label=""
+                      active={view === 'videos'}
+                      to="/videos"
                     />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Videos ({videoCount})
+                  {t('Videos')} ({videoCount})
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Film size={20} />} 
-                label="Videos" 
-                active={view === 'videos'} 
-                to="/library#videos"
+              <SidebarItem
+                icon={<Film size={20} />}
+                label={t('Videos')}
+                active={view === 'videos'}
+                to="/videos"
                 badge={videoCount}
               />
             )}
@@ -391,13 +404,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Playlists ({playlists.length})
+                  {t('Playlists')} ({playlists.length})
                 </TooltipContent>
               </Tooltip>
             ) : (
               <SidebarItem 
                 icon={<ListMusic size={20} />} 
-                label="Playlists" 
+                label={t('Playlists')}
                 active={view === 'playlists'} 
                 to="/playlists"
                 badge={playlists.length}
@@ -419,13 +432,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Favorites
+                  {t('Favorites')}
                 </TooltipContent>
               </Tooltip>
             ) : (
               <SidebarItem 
                 icon={<Heart size={20} />} 
-                label="Favorites" 
+                label={t('Favorites')}
                 active={view === 'favorites'} 
                 to="/favorites"
               />
@@ -446,13 +459,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Upload
+                  {t('Upload')}
                 </TooltipContent>
               </Tooltip>
             ) : (
               <SidebarItem 
                 icon={<Upload size={20} />} 
-                label="Upload" 
+                label={t('Upload')}
                 active={view === 'upload'} 
                 to="/upload"
               />
@@ -464,23 +477,42 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Globe size={20} />} 
-                      label="" 
-                      onClick={() => {}}
-                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-3 px-3 font-normal"
+                        >
+                          <Globe size={20} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Language
+                  {t('Language')}
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Globe size={20} />} 
-                label="Language" 
-                onClick={() => {}}
-              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 px-3 font-normal"
+                  >
+                    <Globe size={20} />
+                    <span className="truncate">{t('Language')}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </TooltipProvider>
         </div>
@@ -490,12 +522,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <Separator className="my-4 bg-sidebar-border" />
             
             <div className="mb-2">
-              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">YOUR PLAYLISTS</p>
+              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">{t('YOUR PLAYLISTS')}</p>
               <div className="space-y-1">
                 {playlists.map(playlist => (
-                  <Button 
-                    key={playlist.id} 
-                    variant="ghost" 
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
                     className="w-full justify-start px-3 font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
                     {playlist.name}
@@ -513,23 +545,23 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
-                  <SidebarItem 
-                    icon={<Settings size={20} />} 
-                    label="" 
-                    active={view === 'settings'} 
+                  <SidebarItem
+                    icon={<Settings size={20} />}
+                    label=""
+                    active={view === 'settings'}
                     to="/settings"
                   />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right">
-                Settings
+                {t('Settings')}
               </TooltipContent>
             </Tooltip>
           ) : (
-            <SidebarItem 
-              icon={<Settings size={20} />} 
-              label="Settings" 
-              active={view === 'settings'} 
+            <SidebarItem
+              icon={<Settings size={20} />}
+              label={t('Settings')}
+              active={view === 'settings'}
               to="/settings"
             />
           )}
