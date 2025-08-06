@@ -34,6 +34,51 @@ i18n
           "Dashboard": "Tablero",
           "YOUR PLAYLISTS": "TUS LISTAS DE REPRODUCCIÓN"
         }
+      },
+      fr: {
+        translation: {
+          "Music": "Musique",
+          "Videos": "Vidéos",
+          "Playlists": "Listes de lecture",
+          "Favorites": "Favoris",
+          "Upload": "Télécharger",
+          "Settings": "Paramètres",
+          "Language": "Langue",
+          "Search": "Rechercher",
+          "Home": "Accueil",
+          "Dashboard": "Tableau de bord",
+          "YOUR PLAYLISTS": "VOS LISTES DE LECTURE"
+        }
+      },
+      kin: {
+        translation: {
+          "Music": "Ummuziki",
+          "Videos": "Amashusho",
+          "Playlists": "Urutonde rw'indirimbo",
+          "Favorites": "Ibyakozwe",
+          "Upload": "Ohereza",
+          "Settings": "Igenamiterere",
+          "Language": "Ururimi",
+          "Search": "Shakisha",
+          "Home": "Ahabanza",
+          "Dashboard": "Ingingo",
+          "YOUR PLAYLISTS": "URUTONDE RW'INDIRIMBO ZACU"
+        }
+      },
+      sw: {
+        translation: {
+          "Music": "Muziki",
+          "Videos": "Video",
+          "Playlists": "Orodha za kucheza",
+          "Favorites": "Vipendwa",
+          "Upload": "Pakia",
+          "Settings": "Mipangilio",
+          "Language": "Lugha",
+          "Search": "Tafuta",
+          "Home": "Nyumbani",
+          "Dashboard": "Dashibodi",
+          "YOUR PLAYLISTS": "ORODHA ZAKO ZA KUCHEZA"
+        }
       }
     },
     lng: "en",

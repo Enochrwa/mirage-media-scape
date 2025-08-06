@@ -1,5 +1,7 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from "@/components/theme-provider";
 import MainLayout from '@/components/MainLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +14,9 @@ import { Globe, Moon, Sun, User, Bell, Shield, Download, Save } from 'lucide-rea
 import { toast } from "@/hooks/use-toast";
 
 const Settings = () => {
-  const [theme, setTheme] = useState("dark");
-  const [language, setLanguage] = useState("english");
+  const { i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
+  const [language, setLanguage] = useState(i18n.language);
   const [notifications, setNotifications] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
   const [downloadQuality, setDownloadQuality] = useState("high");
@@ -55,16 +58,19 @@ const Settings = () => {
                 <div className="grid gap-6">
                   <div className="grid gap-3">
                     <Label htmlFor="language">Language</Label>
-                    <Select value={language} onValueChange={setLanguage}>
+                    <Select value={language} onValueChange={(value) => {
+                      i18n.changeLanguage(value);
+                      setLanguage(value);
+                    }}>
                       <SelectTrigger id="language">
                         <SelectValue placeholder="Select language" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="english">English</SelectItem>
-                        <SelectItem value="spanish">Spanish</SelectItem>
-                        <SelectItem value="french">French</SelectItem>
-                        <SelectItem value="german">German</SelectItem>
-                        <SelectItem value="japanese">Japanese</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Spanish</SelectItem>
+                        <SelectItem value="fr">French</SelectItem>
+                        <SelectItem value="kin">Kinyarwanda</SelectItem>
+                        <SelectItem value="sw">Kiswahili</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -127,7 +133,7 @@ const Settings = () => {
                 <div className="grid gap-6">
                   <div className="grid gap-3">
                     <Label htmlFor="theme">Theme mode</Label>
-                    <Select value={theme} onValueChange={setTheme}>
+                    <Select value={theme} onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}>
                       <SelectTrigger id="theme">
                         <SelectValue placeholder="Select theme" />
                       </SelectTrigger>
