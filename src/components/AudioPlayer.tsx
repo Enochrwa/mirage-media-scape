@@ -261,14 +261,21 @@ const SpectrumAnalyzer = ({ isPlaying }) => {
   );
 };
 
-const AudioPlayer = () => {
+import { useMedia, MediaFile } from '@/contexts/MediaContext';
+
+interface AudioPlayerProps {
+  file?: MediaFile;
+}
+
+const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
+  const media = useMedia();
   // Core player state
-  const [currentFile] = useState(mockCurrentFile);
-  const [playlists] = useState(mockPlaylists);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.7);
-  const [currentTime, setCurrentTime] = useState(67);
-  const [duration] = useState(245);
+  const [currentFile] = useState(file || mockCurrentFile);
+  const [playlists] = useState(media.playlists || mockPlaylists);
+  const [isPlaying, setIsPlaying] = useState(media.isPlaying || false);
+  const [volume, setVolume] = useState(media.volume || 0.7);
+  const [currentTime, setCurrentTime] = useState(media.currentTime || 67);
+  const [duration] = useState(media.duration || 245);
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);

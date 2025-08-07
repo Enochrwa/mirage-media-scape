@@ -96,16 +96,23 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
   );
 };
 
-const ExtraordinaryVideoPlayer = () => {
+import { useMedia, MediaFile } from '@/contexts/MediaContext';
+
+interface VideoPlayerProps {
+  file?: MediaFile;
+}
+
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ file }) => {
+  const media = useMedia();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // State management
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(596.5);
-  const [volume, setVolume] = useState(0.8);
+  const [isPlaying, setIsPlaying] = useState(media.isPlaying || false);
+  const [currentTime, setCurrentTime] = useState(media.currentTime || 0);
+  const [duration, setDuration] = useState(media.duration || 596.5);
+  const [volume, setVolume] = useState(media.volume || 0.8);
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -442,7 +449,7 @@ const ExtraordinaryVideoPlayer = () => {
             "w-full h-full object-cover cursor-pointer transition-all duration-300",
             immersiveMode && "object-fill"
           )}
-          src={mockFile.file}
+          src={file ? file.file : mockFile.file}
           onClick={togglePlayback}
           style={{
             filter: `brightness(${aiEnhancement ? 1.1 : 1}) contrast(${aiEnhancement ? 1.2 : 1}) saturate(${aiEnhancement ? 1.3 : 1})`
@@ -459,8 +466,8 @@ const ExtraordinaryVideoPlayer = () => {
         )}>
           <div className="flex items-start justify-between">
             <div className="text-white space-y-1">
-              <h3 className="font-bold text-xl">{mockFile.title}</h3>
-              <p className="text-sm opacity-80">{mockFile.artist}</p>
+              <h3 className="font-bold text-xl">{file ? file.title : mockFile.title}</h3>
+              <p className="text-sm opacity-80">{file ? file.artist : mockFile.artist}</p>
               <div className="flex items-center gap-4 text-xs opacity-70">
                 <span>Quality: {qualityMode.toUpperCase()}</span>
                 <span>Rate: {playbackRate}x</span>
@@ -480,7 +487,7 @@ const ExtraordinaryVideoPlayer = () => {
               </button>
               
               <button
-                onClick={() => navigator.clipboard.writeText(mockFile.title)}
+                onClick={() => navigator.clipboard.writeText(file ? file.title : mockFile.title)}
                 className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm transition-all hover:scale-110"
               >
                 <Share2 size={20} />
@@ -833,8 +840,8 @@ const ExtraordinaryVideoPlayer = () => {
                 <button
                   onClick={() => {
                     const link = document.createElement('a');
-                    link.href = mockFile.file;
-                    link.download = `${mockFile.title}.mp4`;
+                    link.href = file ? file.file : mockFile.file;
+                    link.download = `${file ? file.title : mockFile.title}.mp4`;
                     link.click();
                   }}
                   className="p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"
@@ -1068,4 +1075,4 @@ const ExtraordinaryVideoPlayer = () => {
   );
 };
 
-export default ExtraordinaryVideoPlayer;
+export default VideoPlayer;

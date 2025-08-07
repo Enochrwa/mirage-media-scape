@@ -1,10 +1,7 @@
 
 import React from 'react';
-import Sidebar, { SidebarView } from '@/components/Sidebar';
-import AudioPlayer from '@/components/AudioPlayer';
-import VideoPlayer from '@/components/VideoPlayer';
-import { useMedia } from '@/contexts/MediaContext';
-import { Card } from '@/components/ui/card';
+import Sidebar from '@/components/Sidebar';
+import PlayerWrapper from '@/components/PlayerWrapper';
 import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
@@ -13,8 +10,6 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
-  const { currentFile, isPlaying, showPlayer, isPlayerFullscreen } = useMedia();
-  
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
@@ -25,32 +20,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
             {children}
           </div>
         </div>
-        
-        {showPlayer && currentFile && !isPlayerFullscreen && (
-          <div className="p-4 border-t border-border">
-            {currentFile.type === 'audio' ? (
-              <div className="mx-auto">
-                <AudioPlayer />
-              </div>
-            ) : (
-              <div className="mx-auto">
-                <VideoPlayer />
-              </div>
-            )}
-          </div>
-        )}
+        <PlayerWrapper />
       </main>
-      {showPlayer && currentFile && isPlayerFullscreen && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          <div className="w-full h-full">
-            {currentFile.type === 'audio' ? (
-              <AudioPlayer />
-            ) : (
-              <VideoPlayer />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

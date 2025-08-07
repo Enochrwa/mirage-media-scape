@@ -28,7 +28,6 @@ interface MediaContextType {
   volume: number;
   currentTime: number;
   duration: number;
-  showPlayer: boolean;
   addFile: (file: MediaFile) => void;
   removeFile: (id: string) => void;
   createPlaylist: (name: string) => void;
@@ -107,26 +106,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [volume, setVolumeState] = useState(0.8);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showPlayer, setShowPlayer] = useState(false);
   const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);
-  
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  
-  useEffect(() => {
-    // Initialize audio element
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.volume = volume;
-    }
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
   
   const addFile = (file: MediaFile) => {
     setFiles(prev => [...prev, file]);
@@ -185,80 +165,32 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
   
   const playFile = (file: MediaFile) => {
-    if (currentFile && currentFile.id === file.id) {
-      resumePlayback();
-      return;
-    }
-    
     setCurrentFile(file);
-    setShowPlayer(true);
-    
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
-    
-    // Audio handling
-    if (file.type === 'audio') {
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-      audioRef.current.src = file.file;
-      audioRef.current.volume = volume;
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(err => {
-        console.error('Error playing audio:', err);
-        setIsPlaying(false);
-      });
-    }
-    
-    // Video is handled by the VideoPlayer component
-    if (file.type === 'video') {
-      setIsPlaying(true);
-    }
+    setIsPlaying(true);
   };
   
   const pausePlayback = () => {
-    if (currentFile?.type === 'audio' && audioRef.current) {
-      audioRef.current.pause();
-    }
     setIsPlaying(false);
   };
   
   const resumePlayback = () => {
-    if (currentFile?.type === 'audio' && audioRef.current) {
-      audioRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch(err => {
-          console.error('Error resuming audio:', err);
-          setIsPlaying(false);
-        });
-    } else if (currentFile?.type === 'video') {
+    if (currentFile) {
       setIsPlaying(true);
     }
   };
   
   const togglePlayback = () => {
-    if (isPlaying) {
-      pausePlayback();
-    } else {
-      resumePlayback();
+    if (currentFile) {
+      setIsPlaying(prev => !prev);
     }
   };
   
   const seekTo = (time: number) => {
     setCurrentTime(time);
-    if (currentFile?.type === 'audio' && audioRef.current) {
-      audioRef.current.currentTime = time;
-    }
   };
   
   const setVolume = (newVolume: number) => {
     setVolumeState(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
   };
   
   const findCurrentFileIndex = () => {
@@ -296,7 +228,6 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     volume,
     currentTime,
     duration,
-    showPlayer,
     addFile,
     removeFile,
     createPlaylist,
