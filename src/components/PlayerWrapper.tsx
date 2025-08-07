@@ -2,19 +2,31 @@ import React from 'react';
 import { useMedia } from '@/contexts/MediaContext';
 import AudioPlayer from './AudioPlayer';
 import VideoPlayer from './VideoPlayer';
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog"
 
 const PlayerWrapper = () => {
-  const { currentFile } = useMedia();
+  const { currentFile, closePlayer } = useMedia();
 
   if (!currentFile) {
     return null;
   }
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      closePlayer();
+    }
+  };
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
-      {currentFile.type === 'audio' && <AudioPlayer file={currentFile} />}
-      {currentFile.type === 'video' && <VideoPlayer file={currentFile} />}
-    </div>
+    <Dialog open={!!currentFile} onOpenChange={handleOpenChange}>
+      <DialogContent className="p-0 border-0 bg-transparent w-full max-w-none h-full max-h-none">
+        {currentFile.type === 'audio' && <AudioPlayer file={currentFile} />}
+        {currentFile.type === 'video' && <VideoPlayer file={currentFile} />}
+      </DialogContent>
+    </Dialog>
   );
 };
 

@@ -6,7 +6,7 @@ import {
   Globe, Mic, Radio, Headphones, Settings, Zap, Music, Waves,
   Timer, Clock, Rewind, FastForward, Download, Upload, Star,
   TrendingUp, Activity, Sparkles, Eye, EyeOff, RotateCcw,
-  Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize
+  Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize, X
 } from 'lucide-react';
 
 // Simplified UI Components (since we don't have access to the full shadcn/ui library)
@@ -268,7 +268,7 @@ interface AudioPlayerProps {
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
-  const media = useMedia();
+  const { closePlayer, ...media } = useMedia();
   // Core player state
   const [currentFile] = useState(file || mockCurrentFile);
   const [playlists] = useState(media.playlists || mockPlaylists);
@@ -479,9 +479,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-cyan-900/20 p-4 flex items-center justify-center">
+    <div className="w-full mx-auto h-[95vh] bg-gradient-to-br from-slate-900 via-purple-900/20 to-cyan-900/20 p-4 flex items-center justify-center">
       <Card className={cn(
-        "relative overflow-hidden w-[80vw] max-w-none",
+        "relative overflow-hidden w-full h-full",
         "bg-gradient-to-br from-slate-900/95 via-purple-900/30 to-cyan-900/30",
         "backdrop-blur-xl border border-white/20 shadow-2xl",
         ambientMode && "ring-2 ring-purple-500/50 shadow-purple-500/25"
@@ -625,6 +625,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                 }}
               >
                 <Download size={24} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
+                onClick={closePlayer}
+              >
+                <X size={24} />
               </Button>
             </div>
           </div>

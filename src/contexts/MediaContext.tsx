@@ -45,6 +45,7 @@ interface MediaContextType {
   updateDuration: (duration: number) => void;
   isPlayerFullscreen: boolean;
   setPlayerFullscreen: (fullscreen: boolean) => void;
+  closePlayer: () => void;
 }
 
 export const MediaContext = createContext<MediaContextType | undefined>(undefined);
@@ -168,6 +169,11 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setCurrentFile(file);
     setIsPlaying(true);
   };
+
+  const closePlayer = () => {
+    setCurrentFile(null);
+    setIsPlaying(false);
+  };
   
   const pausePlayback = () => {
     setIsPlaying(false);
@@ -244,7 +250,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     updateCurrentTime,
     updateDuration,
     isPlayerFullscreen,
-    setPlayerFullscreen
+    setPlayerFullscreen,
+    closePlayer
   };
   
   return (
