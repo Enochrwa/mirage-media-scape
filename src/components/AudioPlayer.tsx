@@ -10,7 +10,7 @@ import {
   Globe, Mic, Radio, Headphones, Settings, Zap, Music, Waves,
   Timer, Clock, Rewind, FastForward, Download, Upload, Star,
   TrendingUp, Activity, Sparkles, Eye, EyeOff, RotateCcw,
-  Wind, Sun, Moon, Palette, Filter, SlidersHorizontal
+  Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -217,6 +217,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
   const [rating, setRating] = useState(0);
   const [showSpectrum, setShowSpectrum] = useState(false);
   const [recordingMode, setRecordingMode] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
   // Refs
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -296,6 +297,92 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
     setIsFavorite(!isFavorite);
     showToast(isFavorite ? "Removed from favorites" : "Added to favorites");
   };
+
+  if (isFullScreen) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-between p-8 text-white">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-white hover:bg-white/10"
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = currentFile.file;
+              link.download = `${currentFile.title}.mp3`;
+              link.click();
+            }}
+          >
+            <Download size={20} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-white hover:bg-white/10"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              showToast("Link copied to clipboard!");
+            }}
+          >
+            <Share2 size={20} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-white hover:bg-white/10"
+            onClick={() => setIsFullScreen(false)}
+          >
+            <Minimize size={20} />
+          </Button>
+        </div>
+
+        <div className="flex flex-col items-center gap-4 text-center">
+          <img src={currentFile.cover} alt={currentFile.title} className="w-48 h-48 rounded-full shadow-lg animate-pulse-slow" />
+          <h1 className="text-4xl font-bold">{currentFile.title}</h1>
+          <p className="text-xl text-gray-400">{currentFile.artist}</p>
+        </div>
+
+        <div className="w-full max-w-4xl h-48 my-8">
+          <AdvancedVisualizer isPlaying={isPlaying} mode={visualizerMode} intensity={visualizerIntensity} />
+        </div>
+
+        <div className="w-full max-w-2xl space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400 w-12 text-center font-mono">
+              {formatTime(currentTime)}
+            </span>
+            <div className="flex-1 relative">
+              <Slider
+                value={[currentTime]}
+                max={duration}
+                step={1}
+                onValueChange={handleProgressChange}
+                className="w-full"
+              />
+            </div>
+            <span className="text-sm text-gray-400 w-12 text-center font-mono">
+              {formatTime(duration)}
+            </span>
+          </div>
+          <div className="flex items-center justify-center gap-4">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+              <SkipBack size={24} />
+            </Button>
+            <Button
+              size="icon"
+              className="w-20 h-20 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 rounded-full shadow-lg transition-all duration-300 hover:scale-105"
+              onClick={togglePlayback}
+            >
+              {isPlaying ? <Pause size={32} /> : <Play size={32} className="ml-1" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+              <SkipForward size={24} />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (minimized) {
     return (
@@ -415,7 +502,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
               variant="ghost"
               size="icon"
               className="text-gray-400 hover:text-white hover:bg-white/10"
-              onClick={() => showToast("Shared to social media!")}
+              onClick={() => {
+                navigator.clipboard.writeText(`${currentFile.title} by ${currentFile.artist}`);
+                showToast("Copied to clipboard!");
+              }}
             >
               <Share2 size={20} />
             </Button>
@@ -460,7 +550,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
               variant="ghost"
               size="icon"
               className="text-gray-400 hover:text-white hover:bg-white/10"
-              onClick={() => showToast("Downloaded to your library")}
+              onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = currentFile.file;
+                  link.download = `${currentFile.title}.mp3`;
+                  link.click();
+                }}
             >
               <Download size={20} />
             </Button>
@@ -734,6 +829,15 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
               onClick={() => setAmbientMode(!ambientMode)}
             >
               <Eye size={18} />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-gray-400 hover:text-white hover:bg-white/10"
+              onClick={() => setIsFullScreen(true)}
+            >
+              <Maximize size={18} />
             </Button>
           </div>
         </div>

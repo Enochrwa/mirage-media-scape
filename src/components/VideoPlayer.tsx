@@ -403,14 +403,15 @@ const VideoPlayer = () => {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4">
+    <div className={cn("w-full", !isFullscreen && "max-w-6xl mx-auto p-4")}>
       <div 
         className={cn(
-          "relative overflow-hidden rounded-2xl transition-all duration-500",
-          deviceFrames[devicePreview as keyof typeof deviceFrames],
+          "relative overflow-hidden bg-black shadow-2xl transition-all duration-500",
+          isFullscreen
+            ? "w-full h-full rounded-none"
+            : `rounded-2xl ${deviceFrames[devicePreview as keyof typeof deviceFrames]}`,
           immersiveMode && "rounded-none",
-          ambientLighting && "transition-shadow duration-300",
-          "bg-black shadow-2xl"
+          ambientLighting && "transition-shadow duration-300"
         )}
         ref={videoContainerRef}
         onMouseMove={handleMouseMove}

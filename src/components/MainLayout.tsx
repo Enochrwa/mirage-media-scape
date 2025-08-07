@@ -13,7 +13,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
-  const { currentFile, isPlaying, showPlayer } = useMedia();
+  const { currentFile, isPlaying, showPlayer, isPlayerFullscreen } = useMedia();
   
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -26,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
           </div>
         </div>
         
-        {showPlayer && currentFile && (
+        {showPlayer && currentFile && !isPlayerFullscreen && (
           <div className="p-4 border-t border-border">
             {currentFile.type === 'audio' ? (
               <div className="max-w-3xl mx-auto">
@@ -40,6 +40,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
           </div>
         )}
       </main>
+      {showPlayer && currentFile && isPlayerFullscreen && (
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          <div className="w-full h-full">
+            {currentFile.type === 'audio' ? (
+              <AudioPlayer />
+            ) : (
+              <VideoPlayer />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
