@@ -44,6 +44,8 @@ interface MediaContextType {
   previousTrack: () => void;
   updateCurrentTime: (time: number) => void;
   updateDuration: (duration: number) => void;
+  isPlayerFullscreen: boolean;
+  setPlayerFullscreen: (fullscreen: boolean) => void;
 }
 
 export const MediaContext = createContext<MediaContextType | undefined>(undefined);
@@ -106,6 +108,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);
   
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -308,7 +311,9 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     nextTrack,
     previousTrack,
     updateCurrentTime,
-    updateDuration
+    updateDuration,
+    isPlayerFullscreen,
+    setPlayerFullscreen
   };
   
   return (

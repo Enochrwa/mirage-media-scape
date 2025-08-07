@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useMedia } from '@/contexts/MediaContext';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -217,7 +218,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
   const [rating, setRating] = useState(0);
   const [showSpectrum, setShowSpectrum] = useState(false);
   const [recordingMode, setRecordingMode] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const { isPlayerFullscreen, setPlayerFullscreen } = useMedia();
   
   // Refs
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -298,7 +299,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
     showToast(isFavorite ? "Removed from favorites" : "Added to favorites");
   };
 
-  if (isFullScreen) {
+  if (isPlayerFullscreen) {
     return (
       <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-between p-8 text-white">
         <div className="absolute top-4 right-4 flex gap-2">
@@ -330,7 +331,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
             variant="ghost"
             size="icon"
             className="text-gray-400 hover:text-white hover:bg-white/10"
-            onClick={() => setIsFullScreen(false)}
+            onClick={() => setPlayerFullscreen(false)}
           >
             <Minimize size={20} />
           </Button>
@@ -835,7 +836,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ className, minimized = false 
               variant="ghost"
               size="icon"
               className="text-gray-400 hover:text-white hover:bg-white/10"
-              onClick={() => setIsFullScreen(true)}
+              onClick={() => setPlayerFullscreen(true)}
             >
               <Maximize size={18} />
             </Button>

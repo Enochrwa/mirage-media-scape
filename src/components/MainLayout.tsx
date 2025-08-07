@@ -29,11 +29,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ className, children }) => {
         {showPlayer && currentFile && !isPlayerFullscreen && (
           <div className="p-4 border-t border-border">
             {currentFile.type === 'audio' ? (
-              <div className="max-w-3xl mx-auto">
+              <div className="mx-auto">
                 <AudioPlayer />
               </div>
             ) : (
-              <div className="max-w-3xl mx-auto">
+              <div className="mx-auto">
                 <VideoPlayer />
               </div>
             )}
