@@ -1,4 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import WaveSurfer from 'wavesurfer.js';
+import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
+import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpeg';
 import { cn } from '@/lib/utils';
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, 
@@ -8,6 +11,8 @@ import {
   TrendingUp, Activity, Sparkles, Eye, EyeOff, RotateCcw,
   Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize, X
 } from 'lucide-react';
+
+
 
 // Simplified UI Components (since we don't have access to the full shadcn/ui library)
 const Button = ({ children, variant = "default", size = "default", className = "", onClick, ...props }) => (
@@ -118,7 +123,7 @@ const mockCurrentFile = {
   artist: "Cosmic Orchestra",
   album: "Celestial Sounds",
   cover: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop",
-  file: "https://www.soundjay.com/misc/sounds-667.mp3",
+  file: "https://wavesurfer-js.org/examples/audio/audio.wav",
   type: 'audio',
   duration: 245,
   genre: "Electronic",
@@ -139,128 +144,6 @@ const formatTime = (seconds) => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-// Advanced Audio Visualizer Component
-const AdvancedVisualizer = ({ isPlaying, mode, intensity }) => {
-  const canvasRef = useRef(null);
-  const animationRef = useRef();
-  const [bars] = useState(() => Array(64).fill(0).map(() => Math.random() * 100));
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      if (isPlaying) {
-        bars.forEach((bar, i) => {
-          bars[i] = Math.max(5, bars[i] + (Math.random() - 0.5) * 20 * intensity);
-          if (bars[i] > 100) bars[i] = 100;
-        });
-      } else {
-        bars.forEach((bar, i) => {
-          bars[i] = Math.max(0, bars[i] - 2);
-        });
-      }
-
-      const barWidth = canvas.width / bars.length;
-      
-      bars.forEach((height, i) => {
-        const x = i * barWidth;
-        const normalizedHeight = (height / 100) * canvas.height;
-        
-        // Create gradient based on mode
-        const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - normalizedHeight);
-        switch (mode) {
-          case 'cosmic':
-            gradient.addColorStop(0, '#8B5CF6');
-            gradient.addColorStop(0.5, '#06B6D4');
-            gradient.addColorStop(1, '#10B981');
-            break;
-          case 'fire':
-            gradient.addColorStop(0, '#F59E0B');
-            gradient.addColorStop(0.5, '#EF4444');
-            gradient.addColorStop(1, '#DC2626');
-            break;
-          case 'ocean':
-            gradient.addColorStop(0, '#0EA5E9');
-            gradient.addColorStop(0.5, '#3B82F6');
-            gradient.addColorStop(1, '#1E40AF');
-            break;
-          default:
-            gradient.addColorStop(0, '#6366F1');
-            gradient.addColorStop(1, '#8B5CF6');
-        }
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, canvas.height - normalizedHeight, barWidth - 1, normalizedHeight);
-        
-        // Add glow effect
-        ctx.shadowColor = gradient;
-        ctx.shadowBlur = 10;
-        ctx.fillRect(x, canvas.height - normalizedHeight, barWidth - 1, normalizedHeight);
-        ctx.shadowBlur = 0;
-      });
-
-      if (isPlaying) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    animate();
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying, mode, intensity, bars]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={800}
-      height={120}
-      className="w-full h-full rounded-lg"
-      style={{ background: 'rgba(0,0,0,0.1)' }}
-    />
-  );
-};
-
-// Spectrum Analyzer Component
-const SpectrumAnalyzer = ({ isPlaying }) => {
-  const [frequencies] = useState(() => Array(32).fill(0).map(() => Math.random() * 50));
-
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const interval = setInterval(() => {
-      frequencies.forEach((_, i) => {
-        frequencies[i] = Math.random() * 50;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, frequencies]);
-
-  return (
-    <div className="flex items-end justify-center gap-1 h-16 px-4">
-      {frequencies.map((height, i) => (
-        <div
-          key={i}
-          className="bg-gradient-to-t from-purple-600 to-cyan-400 rounded-t-sm transition-all duration-150"
-          style={{
-            width: '6px',
-            height: isPlaying ? `${Math.max(4, height)}%` : '4px',
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
 import { useMedia, MediaFile } from '@/contexts/MediaContext';
 
 interface AudioPlayerProps {
@@ -272,10 +155,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   // Core player state
   const [currentFile] = useState(file || mockCurrentFile);
   const [playlists] = useState(media.playlists || mockPlaylists);
-  const [isPlaying, setIsPlaying] = useState(media.isPlaying || false);
-  const [volume, setVolume] = useState(media.volume || 0.7);
-  const [currentTime, setCurrentTime] = useState(media.currentTime || 67);
-  const [duration] = useState(media.duration || 245);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(0.7);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);
@@ -292,59 +175,123 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const [surroundSound, setSurroundSound] = useState(false);
   const [noiseReduction, setNoiseReduction] = useState(false);
   const [autoGain, setAutoGain] = useState(true);
-  const [visualizerMode, setVisualizerMode] = useState('cosmic');
-  const [visualizerIntensity, setVisualizerIntensity] = useState(0.7);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
   const [particleEffect, setParticleEffect] = useState(true);
   const [moodLighting, setMoodLighting] = useState('auto');
   const [rating, setRating] = useState(0);
-  const [showSpectrum, setShowSpectrum] = useState(false);
   const [recordingMode, setRecordingMode] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showMoodMenu, setShowMoodMenu] = useState(false);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const [trimRegion, setTrimRegion] = useState<{ start: number, end: number } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [volumeBoost, setVolumeBoost] = useState(0);
+  const [fadeInDuration, setFadeInDuration] = useState(0);
+  const [fadeOutDuration, setFadeOutDuration] = useState(0);
   
   // Refs
-  const audioRef = useRef(null);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const regionsRef = useRef(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Simulate audio time updates
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!waveformRef.current) return;
+    
+    if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+    }
 
-    const interval = setInterval(() => {
-      setCurrentTime(prev => {
-        if (prev >= duration) {
-          if (repeat) return 0;
-          setIsPlaying(false);
-          return duration;
+    const ws = WaveSurfer.create({
+      container: waveformRef.current,
+      waveColor: 'rgb(167, 139, 250)',
+      progressColor: 'rgb(79, 70, 229)',
+      url: currentFile.file,
+      barWidth: 3,
+      barGap: 2,
+      barRadius: 3,
+      height: 120,
+      cursorWidth: 2,
+      cursorColor: '#fff',
+    });
+
+    wavesurferRef.current = ws;
+    
+    const wsRegions = ws.registerPlugin(RegionsPlugin.create());
+    regionsRef.current = wsRegions;
+
+    wsRegions.on('region-updated', (region) => {
+        const regions = wsRegions.getRegions();
+        if (Object.keys(regions).length > 1) {
+            const firstRegionKey = Object.keys(regions)[0];
+            if (regions[firstRegionKey].id !== region.id) {
+                regions[firstRegionKey].remove();
+            }
         }
-        return prev + 1;
-      });
-    }, 1000);
+        setTrimRegion({ start: region.start, end: region.end });
+    });
 
-    return () => clearInterval(interval);
-  }, [isPlaying, duration, repeat]);
+    ws.on('ready', () => {
+      setDuration(ws.getDuration());
+      setIsPlaying(false);
+    });
 
-  const togglePlayback = () => setIsPlaying(!isPlaying);
+    ws.on('audioprocess', (time) => {
+      setCurrentTime(time);
+    });
+
+    ws.on('play', () => setIsPlaying(true));
+    ws.on('pause', () => setIsPlaying(false));
+
+    ws.on('finish', () => {
+      if (repeat) {
+        ws.seekTo(0);
+        ws.play();
+      } else {
+        setIsPlaying(false);
+        setCurrentTime(0);
+        ws.seekTo(0);
+      }
+    });
+
+    return () => {
+      ws.destroy();
+    };
+  }, [currentFile.file]);
+
+
+  const togglePlayback = useCallback(() => {
+    if (wavesurferRef.current) {
+      wavesurferRef.current.playPause();
+    }
+  }, []);
 
   const handleVolumeClick = () => {
-    if (muted) {
-      setMuted(false);
-      setVolume(prevVolume);
-    } else {
-      setPrevVolume(volume);
-      setMuted(true);
-      setVolume(0);
+    if (wavesurferRef.current) {
+        if (muted) {
+            setMuted(false);
+            setVolume(prevVolume);
+            wavesurferRef.current.setVolume(prevVolume);
+        } else {
+            setPrevVolume(volume);
+            setMuted(true);
+            setVolume(0);
+            wavesurferRef.current.setVolume(0);
+        }
     }
   };
 
-  const handleVolumeChange = (newVolume) => {
+  const handleVolumeChange = (newVolume: number[]) => {
     const vol = newVolume[0];
     setVolume(vol);
+    if (wavesurferRef.current) {
+      wavesurferRef.current.setVolume(vol);
+    }
     if (vol > 0 && muted) {
       setMuted(false);
     } else if (vol === 0) {
@@ -358,12 +305,19 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return <Volume2 size={20} />;
   };
 
-  const handleProgressChange = (newValue) => {
-    setCurrentTime(newValue[0]);
+  const handleProgressChange = (newValue: number[]) => {
+    const time = newValue[0];
+    setCurrentTime(time);
+    if (wavesurferRef.current) {
+      wavesurferRef.current.seekTo(time / wavesurferRef.current.getDuration());
+    }
   };
 
-  const handleSpeedChange = (speed) => {
+  const handleSpeedChange = (speed: number) => {
     setPlaybackSpeed(speed);
+    if (wavesurferRef.current) {
+      wavesurferRef.current.setPlaybackRate(speed);
+    }
     setShowSpeedMenu(false);
   };
 
@@ -386,6 +340,135 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
     showToast(isFavorite ? "Removed from favorites" : "Added to favorites");
+  };
+
+  const toggleTrimming = () => {
+    if (regionsRef.current) {
+        // Clear any existing regions when toggling mode
+        regionsRef.current.clearRegions();
+        setTrimRegion(null);
+
+        if (!isTrimming) {
+            // Enable region creation by dragging
+            regionsRef.current.enableDragSelection({
+                color: 'rgba(255, 100, 0, 0.15)',
+            });
+        } else {
+            // Disable region creation
+            regionsRef.current.disableDragSelection();
+        }
+        setIsTrimming(!isTrimming);
+    }
+  };
+
+  const handleConfirmTrim = async () => {
+    if (!trimRegion || !currentFile) return;
+
+    setIsProcessing(true);
+    showToast('Starting trim process... This may take a moment.');
+
+    try {
+        const trimmedAudioBlob = await trimAudio(
+            currentFile.file,
+            trimRegion.start,
+            trimRegion.end
+        );
+
+        // Create a downloadable link
+        const url = URL.createObjectURL(trimmedAudioBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trimmed_${currentFile.title}.wav`; // Assuming wav
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('Trim successful! Check your downloads.');
+    } catch (error) {
+        console.error('Error trimming audio:', error);
+        showToast('An error occurred during the trim process.');
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
+  const handleNormalize = async () => {
+    if (!currentFile) return;
+    setIsProcessing(true);
+    showToast('Normalizing volume... This may take a moment.');
+    try {
+        const normalizedBlob = await normalizeVolume(currentFile.file);
+        const url = URL.createObjectURL(normalizedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `normalized_${currentFile.title}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Normalization successful! Check your downloads.');
+    } catch (error) {
+        console.error('Error normalizing volume:', error);
+        showToast('An error occurred during normalization.');
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
+  const handleVolumeBoost = async () => {
+      if (!currentFile || volumeBoost === 0) return;
+      setIsProcessing(true);
+      showToast(`Changing volume by ${volumeBoost}dB...`);
+      try {
+          const boostedBlob = await changeVolume(currentFile.file, volumeBoost);
+          const url = URL.createObjectURL(boostedBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `volume_boost_${volumeBoost}dB_${currentFile.title}.wav`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Volume change successful! Check your downloads.');
+      } catch (error) {
+          console.error('Error changing volume:', error);
+          showToast('An error occurred while changing volume.');
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
+  const handleApplyFades = async () => {
+    if (!currentFile || (fadeInDuration === 0 && fadeOutDuration === 0)) {
+        showToast("Please specify a fade-in or fade-out duration.");
+        return;
+    }
+    if (fadeInDuration + fadeOutDuration > duration) {
+        showToast("Total fade duration cannot exceed the audio length.");
+        return;
+    }
+
+    setIsProcessing(true);
+    showToast('Applying fade effects...');
+
+    try {
+        const fadedBlob = await applyFade(currentFile.file, duration, fadeInDuration, fadeOutDuration);
+        const url = URL.createObjectURL(fadedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `faded_${currentFile.title}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Fade effects applied successfully!');
+    } catch (error) {
+        console.error('Error applying fades:', error);
+        showToast('An error occurred while applying fades.');
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   if (isPlayerFullscreen) {
@@ -437,7 +520,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
         </div>
 
         <div className="w-full max-w-5xl h-48 my-8">
-          <AdvancedVisualizer isPlaying={isPlaying} mode={visualizerMode} intensity={visualizerIntensity} />
+          {/* Intentionally left blank for now, waveform is in the main view */}
         </div>
 
         <div className="w-full max-w-3xl space-y-6">
@@ -637,38 +720,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
           </div>
 
-          {/* Advanced Visualizer */}
-          <div className="relative h-32 rounded-2xl overflow-hidden bg-black/20 border border-white/10">
-            {showSpectrum ? (
-              <div className="h-full flex items-center justify-center">
-                <SpectrumAnalyzer isPlaying={isPlaying} />
-              </div>
-            ) : (
-              <AdvancedVisualizer 
-                isPlaying={isPlaying} 
-                mode={visualizerMode} 
-                intensity={visualizerIntensity}
-              />
-            )}
-            
-            <div className="absolute top-3 right-3 flex gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-8 h-8 text-white/70 hover:text-white hover:bg-white/10"
-                onClick={() => setShowSpectrum(!showSpectrum)}
-              >
-                <Activity size={18} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-8 h-8 text-white/70 hover:text-white hover:bg-white/10"
-                onClick={() => setParticleEffect(!particleEffect)}
-              >
-                <Sparkles size={18} />
-              </Button>
-            </div>
+          {/* Waveform Display */}
+          <div ref={waveformRef} className="relative h-32 rounded-2xl overflow-hidden bg-black/20 border border-white/10">
+            {/* Wavesurfer will mount here */}
           </div>
 
           {/* Progress Bar */}
@@ -970,44 +1024,91 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                     className="w-full"
                   />
                 </div>
+              </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base text-gray-300">Visualizer Intensity</span>
-                    <span className="text-sm text-gray-400">{Math.round(visualizerIntensity * 100)}%</span>
-                  </div>
-                  <Slider
-                    value={[visualizerIntensity]}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    onValueChange={(value) => setVisualizerIntensity(value[0])}
-                    className="w-full"
-                  />
+              <div className="pt-4 border-t border-white/10">
+                <h4 className="text-base font-semibold text-white mb-3">Audio Editing</h4>
+                <div className="flex items-center gap-4">
+                    <Button onClick={toggleTrimming} variant="outline">
+                        {isTrimming ? 'Cancel Trimming' : 'Trim Audio'}
+                    </Button>
+                    {isTrimming && trimRegion && (
+                        <div className="flex items-center gap-4 text-white">
+                            <span>
+                                Start: {formatTime(trimRegion.start)}
+                            </span>
+                            <span>
+                                End: {formatTime(trimRegion.end)}
+                            </span>
+                            <Button
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={handleConfirmTrim}
+                                disabled={isProcessing}
+                            >
+                                {isProcessing ? 'Processing...' : 'Confirm Trim'}
+                            </Button>
+                        </div>
+                    )}
                 </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base text-gray-300">Visualizer Mode</span>
-                  </div>
-                  <div className="flex gap-3">
-                    {['cosmic', 'fire', 'ocean'].map(mode => (
-                      <Button
-                        key={mode}
-                        variant={visualizerMode === mode ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setVisualizerMode(mode)}
-                        className={cn(
-                          "capitalize",
-                          visualizerMode === mode 
-                            ? "bg-purple-600 hover:bg-purple-700" 
-                            : "text-gray-400 hover:text-white hover:bg-white/10"
-                        )}
-                      >
-                        {mode}
-                      </Button>
-                    ))}
-                  </div>
+                {isTrimming && !trimRegion && (
+                    <p className="text-sm text-gray-400 mt-2">Click and drag on the waveform to select a region to trim.</p>
+                )}
+                <div className="flex items-center gap-4 mt-4">
+                    <Button onClick={handleNormalize} disabled={isProcessing} variant="outline">
+                        {isProcessing ? 'Processing...' : 'Normalize Volume'}
+                    </Button>
+                </div>
+                <div className="mt-4">
+                    <div className="flex items-center justify-between">
+                        <span className="text-base text-gray-300">Volume Boost</span>
+                        <span className="text-sm text-gray-400">{volumeBoost > 0 ? '+' : ''}{volumeBoost}dB</span>
+                    </div>
+                    <Slider
+                        value={[volumeBoost]}
+                        min={-12}
+                        max={12}
+                        step={1}
+                        onValueChange={(value) => setVolumeBoost(value[0])}
+                        className="w-full"
+                    />
+                    <Button onClick={handleVolumeBoost} disabled={isProcessing || volumeBoost === 0} className="mt-2">
+                        {isProcessing ? 'Processing...' : 'Apply Volume Boost'}
+                    </Button>
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/10">
+                    <h4 className="text-base font-semibold text-white mb-3">Fade Effects</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm text-gray-300">Fade In (seconds)</label>
+                            <input
+                                type="number"
+                                value={fadeInDuration}
+                                onChange={(e) => setFadeInDuration(Math.max(0, parseFloat(e.target.value) || 0))}
+                                className="w-full bg-gray-700 text-white rounded p-2 mt-1"
+                                min="0"
+                                step="0.1"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-300">Fade Out (seconds)</label>
+                            <input
+                                type="number"
+                                value={fadeOutDuration}
+                                onChange={(e) => setFadeOutDuration(Math.max(0, parseFloat(e.target.value) || 0))}
+                                className="w-full bg-gray-700 text-white rounded p-2 mt-1"
+                                min="0"
+                                step="0.1"
+                            />
+                        </div>
+                    </div>
+                    <Button
+                        onClick={handleApplyFades}
+                        disabled={isProcessing || (fadeInDuration === 0 && fadeOutDuration === 0)}
+                        className="mt-3"
+                    >
+                        {isProcessing ? 'Processing...' : 'Apply Fades'}
+                    </Button>
                 </div>
               </div>
 
