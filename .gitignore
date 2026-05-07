@@ -123,3 +123,7 @@ build
 target
 native/target
 server/dist
+*.node
+*.db
+*.db-wal
+*.db-shm

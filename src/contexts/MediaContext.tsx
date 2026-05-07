@@ -1,5 +1,6 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { playbackEngine } from '@/lib/PlaybackEngine';
 
 export type MediaType = 'audio' | 'video';
 
@@ -165,9 +166,27 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }));
   };
   
-  const playFile = (file: MediaFile) => {
+  const playFile = async (file: MediaFile) => {
     setCurrentFile(file);
     setIsPlaying(true);
+
+    if (file.type === 'audio') {
+      try {
+        const response = await fetch(file.file);
+        const arrayBuffer = await response.arrayBuffer();
+        // Decode in the background
+        const audioBuffer = await (playbackEngine as any).ctx.decodeAudioData(arrayBuffer);
+        playbackEngine.play(audioBuffer);
+
+        // Preload next track if available
+        const currentIndex = files.findIndex(f => f.id === file.id);
+        if (currentIndex < files.length - 1) {
+          playbackEngine.preloadNext(files[currentIndex + 1].file);
+        }
+      } catch (error) {
+        console.error('Playback Engine Error:', error);
+      }
+    }
   };
 
   const closePlayer = () => {
@@ -177,17 +196,25 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const pausePlayback = () => {
     setIsPlaying(false);
+    playbackEngine.pause();
   };
   
   const resumePlayback = () => {
     if (currentFile) {
       setIsPlaying(true);
+      playbackEngine.resume();
     }
   };
   
   const togglePlayback = () => {
     if (currentFile) {
-      setIsPlaying(prev => !prev);
+      const nextState = !isPlaying;
+      setIsPlaying(nextState);
+      if (nextState) {
+        playbackEngine.resume();
+      } else {
+        playbackEngine.pause();
+      }
     }
   };
   
@@ -226,6 +253,61 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setDuration(newDuration);
   };
   
+  // Media Session API integration
+  useEffect(() => {
+    if (!currentFile || !('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentFile.title,
+      artist: currentFile.artist,
+      album: currentFile.album,
+      artwork: [
+        { src: currentFile.cover || '/placeholder.svg', sizes: '96x96', type: 'image/svg+xml' },
+        { src: currentFile.cover || '/placeholder.svg', sizes: '512x512', type: 'image/svg+xml' },
+      ]
+    });
+
+    navigator.mediaSession.setActionHandler('play', resumePlayback);
+    navigator.mediaSession.setActionHandler('pause', pausePlayback);
+    navigator.mediaSession.setActionHandler('previoustrack', previousTrack);
+    navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined) seekTo(details.seekTime);
+    });
+
+    return () => {
+      navigator.mediaSession.setActionHandler('play', null);
+      navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      navigator.mediaSession.setActionHandler('nexttrack', null);
+      navigator.mediaSession.setActionHandler('seekto', null);
+    };
+  }, [currentFile]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          togglePlayback();
+          break;
+        case 'ArrowRight':
+          if (e.ctrlKey || e.metaKey) nextTrack();
+          break;
+        case 'ArrowLeft':
+          if (e.ctrlKey || e.metaKey) previousTrack();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlayback, nextTrack, previousTrack]);
+
   const value = {
     files,
     playlists,

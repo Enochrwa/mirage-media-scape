@@ -1,0 +1,23 @@
+{
+  "name": "sonic-native",
+  "version": "0.1.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "sonic-native",
+    "triples": {
+      "defaults": true,
+      "additional": []
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "version": "napi version"
+  }
+}
