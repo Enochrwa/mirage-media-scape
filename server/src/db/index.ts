@@ -64,6 +64,16 @@ db.exec(`
         updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS play_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        track_id TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        position REAL,
+        completed BOOLEAN DEFAULT 0,
+        FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tracks_mtime ON tracks(mtime);
     CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
 
