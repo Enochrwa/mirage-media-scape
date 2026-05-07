@@ -92,11 +92,15 @@ export class PlaybackEngine {
     private nextGainNode: GainNode;
     private normalizationGain: GainNode;
     private masterGain: GainNode;
+    private panner: PannerNode;
     private analyser: AnalyserNode;
     private eq: ParametricEQ;
     public abLoop: ABLoop;
+    private spatialAudioEnabled: boolean = false;
     private nextStartTime: number = 0;
     private isPlaying: boolean = false;
+    private currentTrackId: string | null = null;
+    private currentEventId: number | null = null;
     private fadeDuration: number = 2; // Default 2s crossfade
     private sleepTimerTimeout: NodeJS.Timeout | null = null;
 
@@ -106,6 +110,17 @@ export class PlaybackEngine {
         this.nextGainNode = this.ctx.createGain();
         this.normalizationGain = this.ctx.createGain();
         this.masterGain = this.ctx.createGain();
+
+        this.panner = this.ctx.createPanner();
+        this.panner.panningModel = 'HRTF';
+        this.panner.distanceModel = 'inverse';
+        this.panner.refDistance = 1;
+        this.panner.maxDistance = 10000;
+        this.panner.rolloffFactor = 1;
+        this.panner.positionX.value = 0;
+        this.panner.positionY.value = 0;
+        this.panner.positionZ.value = 0;
+
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 2048;
 
@@ -120,11 +135,79 @@ export class PlaybackEngine {
         for (let i = 0; i < this.eq.bands.length - 1; i++) {
             this.eq.bands[i].connect(this.eq.bands[i+1]);
         }
-        this.eq.bands[this.eq.bands.length - 1].connect(this.analyser);
+        this.eq.bands[this.eq.bands.length - 1].connect(this.panner);
+        this.panner.connect(this.analyser);
         this.analyser.connect(this.ctx.destination);
     }
 
-    play(buffer: AudioBuffer, startTime: number = 0, loudness?: number) {
+    setSpatialAudioEnabled(enabled: boolean) {
+        this.spatialAudioEnabled = enabled;
+        this.panner.panningModel = enabled ? 'HRTF' : 'equalpower';
+        if (!enabled) {
+            this.panner.positionX.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+            this.panner.positionY.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+            this.panner.positionZ.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+        }
+    }
+
+    isSpatialAudioEnabled() {
+        return this.spatialAudioEnabled;
+    }
+
+    setSpatialPosition(x: number, y: number, z: number) {
+        if (!this.spatialAudioEnabled) return;
+        const now = this.ctx.currentTime;
+        this.panner.positionX.setTargetAtTime(x, now, 0.1);
+        this.panner.positionY.setTargetAtTime(y, now, 0.1);
+        this.panner.positionZ.setTargetAtTime(z, now, 0.1);
+    }
+
+    updateListenerOrientation(forward: {x: number, y: number, z: number}, up: {x: number, y: number, z: number}) {
+        const listener = this.ctx.listener;
+        const now = this.ctx.currentTime;
+        if (listener.forwardX) {
+            listener.forwardX.setTargetAtTime(forward.x, now, 0.1);
+            listener.forwardY.setTargetAtTime(forward.y, now, 0.1);
+            listener.forwardZ.setTargetAtTime(forward.z, now, 0.1);
+            listener.upX.setTargetAtTime(up.x, now, 0.1);
+            listener.upY.setTargetAtTime(up.y, now, 0.1);
+            listener.upZ.setTargetAtTime(up.z, now, 0.1);
+        } else {
+            // Fallback for older browsers
+            (listener as any).setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+        }
+    }
+
+    private async reportEvent(type: 'start' | 'end', data: any) {
+        try {
+            const response = await fetch(`${(window as any).API_BASE || 'http://localhost:3001'}/api/stats/event`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...data,
+                    type,
+                    timestamp: Date.now(),
+                })
+            });
+            if (response.ok) {
+                const result = await response.json();
+                if (type === 'start') this.currentEventId = result.id;
+            }
+        } catch (error) {
+            console.error('Failed to report stats event:', error);
+        }
+    }
+
+    play(buffer: AudioBuffer, startTime: number = 0, loudness?: number, trackId?: string) {
+        if (this.isPlaying && this.currentTrackId) {
+            this.reportEvent('end', {
+                track_id: this.currentTrackId,
+                event_id: this.currentEventId,
+                position: this.currentTime,
+                completed: false
+            });
+        }
+
         if (loudness !== undefined) {
             this.applyReplayGain(loudness);
         } else {
@@ -146,6 +229,14 @@ export class PlaybackEngine {
         this.currentSource = source;
         this.nextStartTime = playTime + buffer.duration - startTime;
         this.isPlaying = true;
+        this.currentTrackId = trackId || null;
+
+        if (trackId) {
+            this.reportEvent('start', {
+                track_id: trackId,
+                position: startTime
+            });
+        }
     }
 
     async scheduleNext(buffer: AudioBuffer, startTime: number) {
@@ -217,7 +308,16 @@ export class PlaybackEngine {
         }, this.fadeDuration * 1000);
     }
 
-    stop() {
+    stop(completed: boolean = false) {
+        if (this.isPlaying && this.currentTrackId) {
+            this.reportEvent('end', {
+                track_id: this.currentTrackId,
+                event_id: this.currentEventId,
+                position: this.currentTime,
+                completed
+            });
+        }
+
         if (this.currentSource) {
             try { this.currentSource.stop(); } catch(e) {}
             this.currentSource = null;

@@ -1,6 +1,7 @@
 import {
   Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
-  Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart, Activity
+  Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart, Activity,
+  Globe2
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,26 @@ import { useMedia } from "@/contexts/MediaContext";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/utils";
 import WaveformSeekBar from "./WaveformSeekBar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { playbackEngine } from "@/lib/PlaybackEngine";
+import { resourceMonitor, ResourceState } from "@/lib/ResourceMonitor";
 import { EqualizerControls } from "./EqualizerControls";
 
 export function PlaybackController() {
   const [showEQ, setShowEQ] = useState(false);
+  const [spatialAudio, setSpatialAudio] = useState(playbackEngine.isSpatialAudioEnabled());
+  const [resourceState, setResourceState] = useState<ResourceState>(resourceMonitor.getState());
+
+  useEffect(() => {
+    return resourceMonitor.subscribe(setResourceState);
+  }, []);
+
+  const toggleSpatialAudio = () => {
+    const newState = !spatialAudio;
+    setSpatialAudio(newState);
+    playbackEngine.setSpatialAudioEnabled(newState);
+  };
+
   const {
     currentFile,
     isPlaying,
@@ -156,6 +172,15 @@ export function PlaybackController() {
         <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
           <ListMusic className="w-4 h-4" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("text-gray-400 hover:text-white", spatialAudio && "text-cyan-400")}
+          onClick={toggleSpatialAudio}
+          title="Toggle Spatial Audio (HRTF)"
+        >
+          <Globe2 className="w-4 h-4" />
+        </Button>
         <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
           <MonitorSpeaker className="w-4 h-4" />
         </Button>
@@ -172,6 +197,15 @@ export function PlaybackController() {
         <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
           <Maximize2 className="w-4 h-4" />
         </Button>
+
+        {resourceState !== 'normal' && (
+          <div className="absolute -top-6 right-4 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
+            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+            <span className="text-[9px] font-bold text-yellow-400 uppercase tracking-widest">
+              {resourceState === 'critical' ? 'Critical Power' : 'Low Power Mode'}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
