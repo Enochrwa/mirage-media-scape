@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { playbackEngine } from '@/lib/PlaybackEngine';
+import { API_BASE } from '@/lib/utils';
 
 export type MediaType = 'audio' | 'video';
 
@@ -20,11 +21,13 @@ export interface Playlist {
   id: string;
   name: string;
   files: MediaFile[];
+  rules?: any;
 }
 
 interface MediaContextType {
   files: MediaFile[];
   playlists: Playlist[];
+  smartPlaylists: Playlist[];
   currentFile: MediaFile | null;
   isPlaying: boolean;
   volume: number;
@@ -33,6 +36,7 @@ interface MediaContextType {
   addFile: (file: MediaFile) => void;
   removeFile: (id: string) => void;
   createPlaylist: (name: string) => void;
+  fetchSmartPlaylists: () => Promise<void>;
   addToPlaylist: (playlistId: string, fileId: string) => void;
   removeFromPlaylist: (playlistId: string, fileId: string) => void;
   playFile: (file: MediaFile) => void;
@@ -106,6 +110,7 @@ const samplePlaylists: Playlist[] = [
 export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [files, setFiles] = useState<MediaFile[]>([...sampleAudio, ...sampleVideo]);
   const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
+  const [smartPlaylists, setSmartPlaylists] = useState<Playlist[]>([]);
   const [currentFile, setCurrentFile] = useState<MediaFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
@@ -139,6 +144,22 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     setPlaylists(prev => [...prev, newPlaylist]);
   };
+
+  const fetchSmartPlaylists = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/playlists/smart`);
+      if (response.ok) {
+        const data = await response.json();
+        setSmartPlaylists(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch smart playlists:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSmartPlaylists();
+  }, []);
   
   const addToPlaylist = (playlistId: string, fileId: string) => {
     const file = files.find(f => f.id === fileId);
@@ -314,6 +335,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const value = {
     files,
     playlists,
+    smartPlaylists,
+    fetchSmartPlaylists,
     currentFile,
     isPlaying,
     volume,

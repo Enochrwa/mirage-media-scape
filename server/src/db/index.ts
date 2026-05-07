@@ -56,8 +56,41 @@ db.exec(`
         FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS smart_playlists (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        rules_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tracks_mtime ON tracks(mtime);
     CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
+
+    -- Create FTS5 virtual table for tracks
+    -- We don't use content='tracks' because our ID is TEXT, and FTS rowid must be INTEGER.
+    -- Instead, we'll store the string ID in the FTS table to join back.
+    CREATE VIRTUAL TABLE IF NOT EXISTS tracks_fts USING fts5(
+        id UNINDEXED,
+        title, artist, album, genre,
+        tokenize='unicode61'
+    );
+
+    -- Triggers to keep FTS index in sync
+    CREATE TRIGGER IF NOT EXISTS tracks_ai AFTER INSERT ON tracks BEGIN
+        INSERT INTO tracks_fts(id, title, artist, album, genre)
+        VALUES (new.id, new.title, new.artist, new.album, new.genre);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS tracks_ad AFTER DELETE ON tracks BEGIN
+        DELETE FROM tracks_fts WHERE id = old.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS tracks_au AFTER UPDATE ON tracks BEGIN
+        DELETE FROM tracks_fts WHERE id = old.id;
+        INSERT INTO tracks_fts(id, title, artist, album, genre)
+        VALUES (new.id, new.title, new.artist, new.album, new.genre);
+    END;
 `);
 
 export default db;
