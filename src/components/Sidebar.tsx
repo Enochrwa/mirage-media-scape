@@ -15,8 +15,9 @@ import { useMedia } from '@/contexts/MediaContext';
 import { 
   Search, Music, Film, ListMusic, Upload, Settings, 
   Home, ChevronLeft, ChevronRight, Menu, Heart, Globe, 
-  LayoutDashboard, Share2
+  LayoutDashboard, Share2, Sparkles
 } from 'lucide-react';
+import { SmartPlaylistModal } from './discovery/SmartPlaylistModal';
 import { Badge } from '@/components/ui/badge';
 import { 
   Tooltip, 
@@ -73,7 +74,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const [view, setView] = useState<SidebarView>('home');
   const [collapsed, setCollapsed] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const { playlists, files } = useMedia();
+  const [isSmartPlaylistModalOpen, setIsSmartPlaylistModalOpen] = useState(false);
+  const { playlists, smartPlaylists, fetchSmartPlaylists, files } = useMedia();
   
   useEffect(() => {
     // Set active view based on current route
@@ -188,7 +190,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <Separator className="my-4 bg-sidebar-border" />
 
             <div className="mb-2">
-              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">{t('YOUR PLAYLISTS')}</p>
+              <div className="flex items-center justify-between px-4 mb-1">
+                <p className="text-xs text-sidebar-foreground/60 font-medium">{t('YOUR PLAYLISTS')}</p>
+                <button
+                  onClick={() => setIsSmartPlaylistModalOpen(true)}
+                  className="text-zinc-500 hover:text-purple-400 transition-colors"
+                  title="Create Smart Playlist"
+                >
+                  <Sparkles size={14} />
+                </button>
+              </div>
               <div className="space-y-1">
                 {playlists.map(playlist => (
                   <Button
@@ -196,6 +207,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     variant="ghost"
                     className="w-full justify-start px-3 font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
+                    {playlist.name}
+                  </Button>
+                ))}
+                {smartPlaylists.map(playlist => (
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
+                    className="w-full justify-start px-3 font-normal text-purple-400 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <Sparkles size={14} className="mr-2" />
                     {playlist.name}
                   </Button>
                 ))}
@@ -522,7 +543,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <Separator className="my-4 bg-sidebar-border" />
             
             <div className="mb-2">
-              <p className="px-4 text-xs text-sidebar-foreground/60 font-medium mb-1">{t('YOUR PLAYLISTS')}</p>
+              <div className="flex items-center justify-between px-4 mb-1">
+                <p className="text-xs text-sidebar-foreground/60 font-medium">{t('YOUR PLAYLISTS')}</p>
+                <button
+                  onClick={() => setIsSmartPlaylistModalOpen(true)}
+                  className="text-zinc-500 hover:text-purple-400 transition-colors"
+                  title="Create Smart Playlist"
+                >
+                  <Sparkles size={14} />
+                </button>
+              </div>
               <div className="space-y-1">
                 {playlists.map(playlist => (
                   <Button
@@ -572,6 +602,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       <div className="md:hidden fixed top-4 left-4 z-50">
         <MobileMenu />
       </div>
+
+      <SmartPlaylistModal
+        isOpen={isSmartPlaylistModalOpen}
+        onClose={() => setIsSmartPlaylistModalOpen(false)}
+        onSave={(playlist) => {
+          fetchSmartPlaylists();
+        }}
+      />
     </div>
   );
 };

@@ -1,0 +1,178 @@
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Plus, Trash2, Save } from 'lucide-react';
+import { API_BASE } from '@/lib/utils';
+
+interface SmartPlaylistModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (playlist: any) => void;
+}
+
+const FIELDS = [
+  { value: 'title', label: 'Title' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'album', label: 'Album' },
+  { value: 'bpm', label: 'BPM' },
+  { value: 'added_at', label: 'Date Added' },
+];
+
+const OPERATORS = [
+  { value: 'is', label: 'is' },
+  { value: 'contains', label: 'contains' },
+  { value: 'gt', label: 'greater than' },
+  { value: 'lt', label: 'less than' },
+];
+
+export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [name, setName] = useState('');
+  const [matchMode, setMatchMode] = useState<'all' | 'any'>('all');
+  const [conditions, setConditions] = useState([{ field: 'title', operator: 'contains', value: '' }]);
+
+  const addCondition = () => {
+    setConditions([...conditions, { field: 'title', operator: 'contains', value: '' }]);
+  };
+
+  const removeCondition = (index: number) => {
+    setConditions(conditions.filter((_, i) => i !== index));
+  };
+
+  const updateCondition = (index: number, updates: any) => {
+    const newConditions = [...conditions];
+    newConditions[index] = { ...newConditions[index], ...updates };
+    setConditions(newConditions);
+  };
+
+  const handleSave = async () => {
+    const playlist = {
+      name,
+      rules: {
+        matchMode,
+        conditions
+      }
+    };
+
+    try {
+      const response = await fetch(`${API_BASE}/api/playlists/smart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(playlist)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        onSave(data);
+        onClose();
+      }
+    } catch (error) {
+      console.error('Failed to save smart playlist:', error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] bg-zinc-900 text-white border-zinc-800">
+        <DialogHeader>
+          <DialogTitle>Create Smart Playlist</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <Label>Playlist Name</Label>
+            <Input
+              placeholder="My Awesome Mix"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="bg-zinc-800 border-zinc-700 focus:ring-purple-500"
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Rules</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-zinc-400">Match</span>
+                <Select value={matchMode} onValueChange={(v: any) => setMatchMode(v)}>
+                  <SelectTrigger className="w-24 bg-zinc-800 border-zinc-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">all</SelectItem>
+                    <SelectItem value="any">any</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-zinc-400">of these rules:</span>
+              </div>
+            </div>
+
+            {conditions.map((condition, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Select
+                  value={condition.field}
+                  onValueChange={v => updateCondition(index, { field: v })}
+                >
+                  <SelectTrigger className="flex-1 bg-zinc-800 border-zinc-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={condition.operator}
+                  onValueChange={v => updateCondition(index, { operator: v })}
+                >
+                  <SelectTrigger className="flex-1 bg-zinc-800 border-zinc-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPERATORS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  placeholder="Value..."
+                  value={condition.value}
+                  onChange={e => updateCondition(index, { value: e.target.value })}
+                  className="flex-1 bg-zinc-800 border-zinc-700"
+                />
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeCondition(index)}
+                  disabled={conditions.length === 1}
+                  className="text-zinc-500 hover:text-red-400"
+                >
+                  <Trash2 size={18} />
+                </Button>
+              </div>
+            ))}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addCondition}
+              className="w-full border-dashed border-zinc-700 hover:bg-zinc-800"
+            >
+              <Plus size={16} className="mr-2" />
+              Add Rule
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} className="bg-purple-600 hover:bg-purple-700">
+            <Save size={16} className="mr-2" />
+            Save Playlist
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

@@ -5,8 +5,10 @@ import {
   Maximize, Minimize, Heart, Share2, BookmarkPlus, Globe, MoreHorizontal,
   Settings, Zap, Eye, Palette, Rewind, FastForward, RotateCcw, RotateCw,
   Monitor, Smartphone, Tablet, PictureInPicture, Download, Subtitles,
-  Filter, Sparkles, Wind, Waves, Sun, Moon, Star, Camera, Mic, X
+  Filter, Sparkles, Wind, Waves, Sun, Moon, Star, Camera, Mic, X,
+  Repeat
 } from 'lucide-react';
+import { SubtitleCue, parseSRT } from '@/lib/utils';
 
 // Mock data for demo
 const mockFile = {
@@ -114,7 +116,11 @@ const VideoPlayer: React.FC = () => {
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [ambientLighting, setAmbientLighting] = useState(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cues, setCues] = useState<SubtitleCue[]>([]);
+  const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
   const [isPiP, setIsPiP] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
   const [gestureControl, setGestureControl] = useState(false);
   const [smartRewind, setSmartRewind] = useState(false);
   const [qualityMode, setQualityMode] = useState('auto');
@@ -337,6 +343,34 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
+  const toggleLoop = () => {
+    playbackEngine.abLoop.toggle();
+    setIsLooping(playbackEngine.abLoop.isActive);
+  };
+
+  const setPointA = () => {
+    playbackEngine.abLoop.setA(currentTime);
+    setIsLooping(playbackEngine.abLoop.isActive);
+  };
+  const setPointB = () => {
+    playbackEngine.abLoop.setB(currentTime);
+    setIsLooping(playbackEngine.abLoop.isActive);
+  };
+
+  const handleSubtitleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const parsedCues = parseSRT(content);
+      setCues(parsedCues);
+      setSubtitlesEnabled(true);
+    };
+    reader.readAsText(file);
+  };
+
   const togglePiP = async () => {
     if (!videoRef.current) return;
     
@@ -387,7 +421,21 @@ const VideoPlayer: React.FC = () => {
     const video = videoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      const time = video.currentTime;
+      setCurrentTime(time);
+
+      // Handle A-B Loop
+      playbackEngine.abLoop.check(time, (seekTo) => {
+        video.currentTime = seekTo;
+      });
+
+      // Handle Subtitles
+      if (subtitlesEnabled && cues.length > 0) {
+        const cue = cues.find(c => time >= c.start && time <= c.end);
+        setActiveCue(cue || null);
+      }
+    };
     const handleLoadedMetadata = () => setDuration(video.duration);
     const handleEnded = () => setIsPlaying(false);
 
@@ -725,17 +773,68 @@ const VideoPlayer: React.FC = () => {
                   {/* Additional Controls */}
                   {!isMobile && (
                     <>
+                      {/* A-B Loop */}
+                      <div className="flex items-center bg-white/5 rounded-full px-1">
+                        <button
+                          onClick={setPointA}
+                          className={cn(
+                            "px-2 py-1 text-[10px] font-bold rounded-full transition-all",
+                            playbackEngine.abLoop.pointA !== null ? "text-purple-400" : "text-white/40"
+                          )}
+                        >
+                          A
+                        </button>
+                        <button
+                          onClick={setPointB}
+                          className={cn(
+                            "px-2 py-1 text-[10px] font-bold rounded-full transition-all",
+                            playbackEngine.abLoop.pointB !== null ? "text-purple-400" : "text-white/40"
+                          )}
+                        >
+                          B
+                        </button>
+                        <button
+                          onClick={toggleLoop}
+                          disabled={playbackEngine.abLoop.pointA === null || playbackEngine.abLoop.pointB === null}
+                          className={cn(
+                            "p-1.5 rounded-full transition-all",
+                            isLooping ? "text-purple-400" : "text-white/60 disabled:opacity-30"
+                          )}
+                        >
+                          <Repeat size={14} />
+                        </button>
+                      </div>
+
                       {/* Subtitles */}
-                      <button
-                        onClick={() => setSubtitlesEnabled(!subtitlesEnabled)}
-                        className={cn(
-                          "p-1.5 sm:p-2 rounded-full transition-all hover:scale-110",
-                          subtitlesEnabled ? "bg-yellow-500/20 text-yellow-400" : "text-white hover:bg-white/10"
-                        )}
-                        title="Toggle Subtitles"
-                      >
-                        <Subtitles size={16} />
-                      </button>
+                      <div className="relative group">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          className="hidden"
+                          accept=".srt,.vtt"
+                          onChange={handleSubtitleFileChange}
+                        />
+                        <button
+                          onClick={() => {
+                            if (cues.length === 0) {
+                              fileInputRef.current?.click();
+                            } else {
+                              setSubtitlesEnabled(!subtitlesEnabled);
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            fileInputRef.current?.click();
+                          }}
+                          className={cn(
+                            "p-1.5 sm:p-2 rounded-full transition-all hover:scale-110",
+                            subtitlesEnabled ? "bg-yellow-500/20 text-yellow-400" : "text-white hover:bg-white/10"
+                          )}
+                          title={cues.length === 0 ? "Load Subtitles" : "Toggle Subtitles (Right-click to change)"}
+                        >
+                          <Subtitles size={16} />
+                        </button>
+                      </div>
                       
                       {/* Picture in Picture */}
                       <button
@@ -834,6 +933,15 @@ const VideoPlayer: React.FC = () => {
             </div>
           )}
           
+          {/* Active Subtitle */}
+          {subtitlesEnabled && activeCue && (
+            <div className="absolute bottom-24 left-0 right-0 flex justify-center pointer-events-none px-4">
+              <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded text-white text-lg sm:text-2xl font-medium text-center shadow-2xl border border-white/10 max-w-[80%]">
+                {activeCue.text}
+              </div>
+            </div>
+          )}
+
           {/* Feature Indicators */}
           <div className="absolute top-4 left-4 flex flex-col gap-2">
             {aiEnhancement && (

@@ -50,6 +50,40 @@ export class ParametricEQ {
     }
 }
 
+export class ABLoop {
+    public pointA: number | null = null;
+    public pointB: number | null = null;
+    public isActive: boolean = false;
+
+    setA(time: number) {
+        this.pointA = time;
+    }
+
+    setB(time: number) {
+        this.pointB = time;
+    }
+
+    toggle() {
+        if (this.pointA !== null && this.pointB !== null) {
+            this.isActive = !this.isActive;
+        }
+    }
+
+    reset() {
+        this.pointA = null;
+        this.pointB = null;
+        this.isActive = false;
+    }
+
+    check(currentTime: number, onLoop: (seekTo: number) => void) {
+        if (this.isActive && this.pointA !== null && this.pointB !== null) {
+            if (currentTime >= this.pointB) {
+                onLoop(this.pointA);
+            }
+        }
+    }
+}
+
 export class PlaybackEngine {
     public ctx: AudioContext;
     private currentSource: AudioBufferSourceNode | null = null;
@@ -60,6 +94,7 @@ export class PlaybackEngine {
     private masterGain: GainNode;
     private analyser: AnalyserNode;
     private eq: ParametricEQ;
+    public abLoop: ABLoop;
     private nextStartTime: number = 0;
     private isPlaying: boolean = false;
     private fadeDuration: number = 2; // Default 2s crossfade
@@ -75,6 +110,7 @@ export class PlaybackEngine {
         this.analyser.fftSize = 2048;
 
         this.eq = new ParametricEQ(this.ctx);
+        this.abLoop = new ABLoop();
 
         this.currentGainNode.connect(this.normalizationGain);
         this.nextGainNode.connect(this.normalizationGain);

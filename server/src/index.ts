@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import db from './db';
 import scannerRouter from './routes/scanner';
 import tracksRouter from './routes/tracks';
+import playlistsRouter from './routes/playlists';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use(express.json());
 
 app.use('/api/scanner', scannerRouter);
 app.use('/api/tracks', tracksRouter);
+app.use('/api/playlists/smart', playlistsRouter);
 
 const PORT = process.env.PORT || 3001;
 

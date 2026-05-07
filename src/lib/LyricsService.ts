@@ -5,11 +5,11 @@ export interface LyricLine {
 }
 
 export class LyricsService {
-    private static API_BASE = 'https://lrclib.net/api';
+    private static LRCLIB_API = 'https://lrclib.net/api';
 
     static async getLyrics(artist: string, title: string): Promise<LyricLine[] | null> {
         try {
-            const url = `${this.API_BASE}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
+            const url = `${this.LRCLIB_API}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
             const response = await fetch(url);
 
             if (!response.ok) return null;

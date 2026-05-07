@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMedia } from '@/contexts/MediaContext';
+import { API_BASE } from '@/lib/utils';
 
 interface WaveformSeekBarProps {
   trackId: string;
@@ -15,7 +16,7 @@ const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ trackId, className })
   useEffect(() => {
     const fetchWaveform = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/tracks/${trackId}/waveform`);
+        const response = await fetch(`${API_BASE}/api/tracks/${trackId}/waveform`);
         const data = await response.json();
         if (data.peaks) {
           setPeaks(data.peaks);
