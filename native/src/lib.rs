@@ -2,6 +2,7 @@ use napi_derive::napi;
 use ffmpeg_next as ffmpeg;
 use std::path::Path;
 use ffmpeg::util::frame::audio::Audio;
+use stratum_dsp::{analyze_audio as stratum_analyze, compute_confidence, AnalysisConfig};
 
 #[napi(object)]
 pub struct AudioMetadata {
@@ -16,14 +17,19 @@ pub struct AudioMetadata {
     pub channels: i32,
     pub format: String,
     pub loudness: Option<f64>,
+    pub bpm: Option<f64>,
+    pub key: Option<String>,
+    pub camelot_key: Option<String>,
+    pub bpm_confidence: Option<f64>,
 }
+
 
 #[napi]
 pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
     ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
 
     let path_buf = Path::new(&path);
-    let context = ffmpeg::format::input(&path_buf)
+    let mut context = ffmpeg::format::input(&path_buf)
         .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
 
     let duration = context.duration() as f64 / ffmpeg::ffi::AV_TIME_BASE as f64;
@@ -53,24 +59,7 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
 
     let mut sample_rate = 0;
     let mut channels = 0;
-
-    for stream in context.streams() {
-        let params = stream.parameters();
-        if params.medium() == ffmpeg::media::Type::Audio {
-            if let Ok(codec_context) = ffmpeg::codec::context::Context::from_parameters(params) {
-                if let Ok(audio) = codec_context.decoder().audio() {
-                    sample_rate = audio.rate() as i32;
-                    channels = audio.channels() as i32;
-                }
-            }
-        }
-    }
-
-    // Calculate a rough loudness (RMS to dBFS)
-    // In a production environment, we would use a proper EBU R128 filter
-    let mut loudness = None;
-    let mut sum_sq = 0.0f64;
-    let mut count = 0usize;
+    let mut samples_f32: Vec<f32> = Vec::with_capacity(1_000_000);
 
     if let Some(stream) = context.streams().best(ffmpeg::media::Type::Audio) {
         let stream_index = stream.index();
@@ -80,67 +69,64 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
             .audio()
             .map_err(|e| napi::Error::from_reason(format!("Failed to get audio decoder: {}", e)))?;
 
-        // We'll analyze the first 30 seconds for a quick integrated loudness estimate
-        let max_analyze_duration = 30.0;
-        let time_base = stream.time_base();
+        sample_rate = decoder.rate() as i32;
+        channels = decoder.channels() as i32;
+
+        let mut resampler = ffmpeg::software::resampling::context::Context::get(
+            decoder.format(),
+            decoder.channel_layout(),
+            decoder.rate(),
+            ffmpeg::util::format::sample::Sample::F32(ffmpeg::util::format::sample::Type::Packed),
+            ffmpeg::util::channel_layout::ChannelLayout::MONO,
+            decoder.rate(),
+        ).map_err(|e| napi::Error::from_reason(format!("Resampler error: {}", e)))?;
+
+        // Limit analysis to 60 seconds or first 5 million samples for speed and memory
+        let max_samples = 5_000_000;
 
         for (stream, packet) in context.packets() {
             if stream.index() == stream_index {
-                if let Ok(_) = decoder.send_packet(&packet) {
+                if decoder.send_packet(&packet).is_ok() {
                     let mut decoded = Audio::empty();
                     while decoder.receive_frame(&mut decoded).is_ok() {
-                        let pts = decoded.pts().unwrap_or(0) as f64 * f64::from(time_base);
-
-                        // Get samples and calculate energy
-                        // We use the decoded data based on its format.
-                        // FFmpeg-next's Audio frame provides data in planes.
-                        // For simplicity and speed, we only look at the first plane.
-                        let format = decoded.format();
-                        let data = decoded.data(0);
-
-                        match format {
-                            ffmpeg::util::format::sample::Sample::F32(ffmpeg::util::format::sample::Type::Packed) |
-                            ffmpeg::util::format::sample::Sample::F32(ffmpeg::util::format::sample::Type::Planar) => {
-                                let samples: &[f32] = unsafe {
-                                    std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
-                                };
-                                for &s in samples {
-                                    sum_sq += (s as f64).powi(2);
-                                    count += 1;
-                                }
-                            }
-                            ffmpeg::util::format::sample::Sample::I16(ffmpeg::util::format::sample::Type::Packed) |
-                            ffmpeg::util::format::sample::Sample::I16(ffmpeg::util::format::sample::Type::Planar) => {
-                                let samples: &[i16] = unsafe {
-                                    std::slice::from_raw_parts(data.as_ptr() as *const i16, data.len() / 2)
-                                };
-                                for &s in samples {
-                                    let s_f = s as f64 / 32768.0;
-                                    sum_sq += s_f.powi(2);
-                                    count += 1;
-                                }
-                            }
-                            _ => {
-                                // Fallback for other formats: treat as bytes but don't do the wrong math
-                                // Ideally use a resampler here.
-                            }
+                        let mut resampled = Audio::empty();
+                        if resampler.run(&decoded, &mut resampled).is_ok() {
+                            let data = resampled.data(0);
+                            let samples: &[f32] = unsafe {
+                                std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
+                            };
+                            samples_f32.extend_from_slice(samples);
                         }
-
-                        if pts > max_analyze_duration {
-                            break;
-                        }
+                        if samples_f32.len() >= max_samples { break; }
                     }
                 }
             }
-            if count > 1_000_000 { break; }
+            if samples_f32.len() >= max_samples { break; }
+        }
+    }
+
+    let mut loudness = None;
+    let mut bpm = None;
+    let mut key = None;
+    let mut camelot_key = None;
+    let mut bpm_confidence = None;
+
+    if !samples_f32.is_empty() {
+        // Loudness
+        let sum_sq: f64 = samples_f32.iter().map(|&s| (s as f64).powi(2)).sum();
+        let rms = (sum_sq / samples_f32.len() as f64).sqrt();
+        let db = 20.0 * rms.log10();
+        if db.is_finite() {
+            loudness = Some(db);
         }
 
-        if count > 0 {
-            let rms = (sum_sq / count as f64).sqrt();
-            let db = 20.0 * rms.log10();
-            if db.is_finite() {
-                loudness = Some(db);
-            }
+        // Stratum DSP Analysis
+        if let Ok(result) = stratum_analyze(&samples_f32, sample_rate as u32, AnalysisConfig::default()) {
+            bpm = Some(result.bpm as f64);
+            key = Some(result.key.name());
+            camelot_key = Some(result.key.numerical());
+            let conf = compute_confidence(&result);
+            bpm_confidence = Some(conf.bpm_confidence as f64);
         }
     }
 
@@ -156,6 +142,10 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
         channels,
         format: format_name,
         loudness,
+        bpm,
+        key,
+        camelot_key,
+        bpm_confidence,
     })
 }
 

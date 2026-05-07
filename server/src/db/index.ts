@@ -34,6 +34,10 @@ db.exec(`
         mtime INTEGER NOT NULL,
         added_at INTEGER NOT NULL,
         loudness REAL,
+        bpm REAL,
+        key TEXT,
+        camelot_key TEXT,
+        bpm_confidence REAL,
         metadata_json TEXT
     );
 

@@ -8,6 +8,10 @@ describe('Database', () => {
         expect(columnNames).toContain('file_path');
         expect(columnNames).toContain('mtime');
         expect(columnNames).toContain('loudness');
+        expect(columnNames).toContain('bpm');
+        expect(columnNames).toContain('key');
+        expect(columnNames).toContain('camelot_key');
+        expect(columnNames).toContain('bpm_confidence');
     });
 
     it('should be in WAL mode', () => {

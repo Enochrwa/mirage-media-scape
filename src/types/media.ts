@@ -11,4 +11,9 @@ export interface MediaFile {
   type: MediaType;
   duration?: number;
   size?: number;
+  bpm?: number;
+  key?: string;
+  camelot_key?: string;
+  bpm_confidence?: number;
+  loudness?: number;
 }
