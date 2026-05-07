@@ -17,6 +17,8 @@ import Favorites from "./pages/Favorites";
 import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import { ArtistProfile } from "./pages/ArtistProfile";
+import { SonicLayout } from "./components/SonicLayout";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +31,9 @@ const App = () => (
         <MediaProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<SonicLayout><ArtistProfile /></SonicLayout>} />
+              <Route path="/artist" element={<SonicLayout><ArtistProfile /></SonicLayout>} />
+              <Route path="/home" element={<Home />} />
               <Route path="/library" element={<Library />} />
               <Route path="/music" element={<Music />} />
               <Route path="/videos" element={<Videos />} />
