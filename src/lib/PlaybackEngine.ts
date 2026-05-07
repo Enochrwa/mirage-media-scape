@@ -64,6 +64,7 @@ export class PlaybackEngine {
     private nextSource: AudioBufferSourceNode | null = null;
     private currentGainNode: GainNode;
     private nextGainNode: GainNode;
+    private normalizationGain: GainNode;
     private masterGain: GainNode;
     private eq: ParametricEQ;
     private nextStartTime: number = 0;
@@ -74,15 +75,23 @@ export class PlaybackEngine {
         this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.currentGainNode = this.ctx.createGain();
         this.nextGainNode = this.ctx.createGain();
+        this.normalizationGain = this.ctx.createGain();
         this.masterGain = this.ctx.createGain();
         this.eq = new ParametricEQ(this.ctx);
 
-        this.currentGainNode.connect(this.masterGain);
-        this.nextGainNode.connect(this.masterGain);
+        this.currentGainNode.connect(this.normalizationGain);
+        this.nextGainNode.connect(this.normalizationGain);
+        this.normalizationGain.connect(this.masterGain);
         this.eq.connect(this.masterGain, this.ctx.destination);
     }
 
-    play(buffer: AudioBuffer, startTime: number = 0) {
+    play(buffer: AudioBuffer, startTime: number = 0, loudness?: number) {
+        if (loudness !== undefined) {
+            this.applyReplayGain(loudness);
+        } else {
+            this.normalizationGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+        }
+
         this.stop();
 
         const source = this.ctx.createBufferSource();
@@ -160,8 +169,23 @@ export class PlaybackEngine {
         this.masterGain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
     }
 
+    applyReplayGain(loudness: number) {
+        const targetLUFS = -16;
+        const adjustment = targetLUFS - loudness;
+        const gainMultiplier = Math.pow(10, adjustment / 20);
+
+        // Cap the gain to avoid extreme boosting
+        const cappedGain = Math.min(gainMultiplier, 4.0);
+        this.normalizationGain.gain.setTargetAtTime(cappedGain, this.ctx.currentTime, 0.1);
+    }
+
     setEQBand(index: number, gain: number) {
         this.eq.setBand(index, gain);
+    }
+
+    preloadNext(url: string) {
+        // Pre-decoding logic for gapless playback would go here
+        console.log(`Preloading: ${url}`);
     }
 
     get currentTime() {

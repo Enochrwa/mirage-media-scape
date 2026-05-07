@@ -33,6 +33,7 @@ db.exec(`
         file_size INTEGER NOT NULL,
         mtime INTEGER NOT NULL,
         added_at INTEGER NOT NULL,
+        loudness REAL,
         metadata_json TEXT
     );
 

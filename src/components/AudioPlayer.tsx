@@ -1223,6 +1223,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
 
             <div className="flex items-center gap-4 text-sm text-gray-400">
+              {currentFile.loudness !== undefined && <Badge variant="outline" className="text-sm border-blue-400 text-blue-400">ReplayGain</Badge>}
               {crossfadeEnabled && <Badge variant="outline" className="text-sm">Crossfade</Badge>}
               {surroundSound && <Badge variant="outline" className="text-sm">3D Audio</Badge>}
               {noiseReduction && <Badge variant="outline" className="text-sm">Clean</Badge>}

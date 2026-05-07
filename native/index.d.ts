@@ -14,6 +14,7 @@ export interface AudioMetadata {
   sampleRate: number
   channels: number
   format: string
+  loudness?: number
 }
 export declare function analyzeAudio(path: string): AudioMetadata
 export declare function generateWaveform(path: string): Array<number>
