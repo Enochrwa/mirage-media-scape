@@ -13,6 +13,7 @@ export interface MediaFile {
   file: string;
   type: MediaType;
   duration?: number;
+  loudness?: number;
 }
 
 export interface Playlist {
@@ -176,7 +177,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const arrayBuffer = await response.arrayBuffer();
         // Decode in the background
         const audioBuffer = await (playbackEngine as any).ctx.decodeAudioData(arrayBuffer);
-        playbackEngine.play(audioBuffer);
+        playbackEngine.play(audioBuffer, 0, file.loudness);
 
         // Preload next track if available
         const currentIndex = files.findIndex(f => f.id === file.id);

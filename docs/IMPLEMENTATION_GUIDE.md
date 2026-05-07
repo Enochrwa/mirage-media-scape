@@ -25,10 +25,24 @@ This document provides a technical roadmap and implementation details for the ne
     *   **Crossfade:** Use two `GainNode`s. As the current track approaches its end, ramp its gain to 0 while simultaneously ramping the next track's gain to 1 over a 1-12s period.
 
 ### 1.4 ReplayGain / R128
-*   **Goal:** Consistent volume across the library.
+*   **Goal:** Consistent volume across the library so users don't have to adjust the knob between tracks.
 *   **Implementation:**
-    *   **Analysis:** During the library scan, use Rust to calculate the EBU R128 LUFS value.
-    *   **Playback:** Read the LUFS value and apply a compensational gain using a `GainNode` before the EQ.
+    *   **Standard:** Use EBU R128 (Integrated Loudness) targeting -16 LUFS for web/mobile playback.
+    *   **Analysis:** Update `native/src/lib.rs` to use a loudness normalization filter or manually calculate energy using the `realfft` crate. For a simpler approach, calculate the Root Mean Square (RMS) of samples and convert to dBFS.
+    *   **Database:** Store the `loudness` value in the `tracks` table.
+    *   **Playback:**
+        ```typescript
+        const targetLUFS = -16;
+        const adjustment = targetLUFS - track.loudness;
+        const gainMultiplier = Math.pow(10, adjustment / 20);
+        gainNode.gain.setTargetAtTime(gainMultiplier, ctx.currentTime, 0.1);
+        ```
+
+### 1.5 Hardware Video Decode
+*   **Goal:** 4K playback with < 10% CPU usage.
+*   **Implementation:**
+    *   **Web:** Use `hls.js` with `video` element which leverages `WebCodecs` or native browser hardware acceleration.
+    *   **Desktop:** In Tauri, ensure `webkit2gtk` (Linux) or `WebView2` (Windows) has hardware acceleration enabled.
 
 ---
 
@@ -41,10 +55,24 @@ This document provides a technical roadmap and implementation details for the ne
     *   **Native:** Alternatively, use the `essentia-rust` bindings or similar DSP crates in the `native/` module for even faster server-side indexing.
 
 ### 2.2 Synced Lyrics
-*   **Goal:** Karaoke-style lyrics.
+*   **Goal:** Immersive karaoke-style lyrics that scroll with the music.
 *   **Implementation:**
-    *   **Source:** Integrate with [LRCLIB](https://lrclib.net/) to fetch `.lrc` files.
-    *   **Sync:** Parse timestamps and use `requestAnimationFrame` to highlight the current line based on `playbackEngine.currentTime`.
+    *   **Source:** Use `https://lrclib.net/api/get?artist_name=${artist}&track_name=${title}`.
+    *   **Parsing:** Convert `[mm:ss.xx] Lyric text` into an array of `{ time: number, text: string }`.
+    *   **UI:** Render lyrics in a scrollable container. Use `scrollIntoView({ behavior: 'smooth', block: 'center' })` for the active line.
+    *   **Code:**
+        ```typescript
+        function parseLRC(lrc: string) {
+          return lrc.split('\n').map(line => {
+            const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
+            if (!match) return null;
+            return {
+              time: parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 1000,
+              text: match[4].trim()
+            };
+          }).filter(Boolean);
+        }
+        ```
 
 ### 2.3 AI Recommendations
 *   **Goal:** "Addictive" discovery.

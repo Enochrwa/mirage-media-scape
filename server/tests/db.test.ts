@@ -7,6 +7,7 @@ describe('Database', () => {
         const columnNames = tableInfo.map((c: any) => c.name);
         expect(columnNames).toContain('file_path');
         expect(columnNames).toContain('mtime');
+        expect(columnNames).toContain('loudness');
     });
 
     it('should be in WAL mode', () => {
