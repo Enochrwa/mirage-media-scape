@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import db from './db';
 import scannerRouter from './routes/scanner';
+import tracksRouter from './routes/tracks';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/scanner', scannerRouter);
+app.use('/api/tracks', tracksRouter);
 
 const PORT = process.env.PORT || 3001;
 
