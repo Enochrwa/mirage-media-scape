@@ -1,4 +1,5 @@
 import { Clock, Play, Heart, MoreHorizontal } from "lucide-react";
+import { useMedia } from "@/contexts/MediaContext";
 
 const tracks = [
   { id: 1, title: "Physical", artist: "Dua Lipa", album: "Future Nostalgia", duration: "3:13", added: "2 days ago" },
@@ -9,6 +10,7 @@ const tracks = [
 ];
 
 export function TrackTable() {
+  const { playFile } = useMedia();
   return (
     <div className="text-gray-400 px-8 py-4">
       <div className="grid grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] gap-4 px-4 py-2 border-b border-white/10 text-sm font-medium uppercase tracking-wider mb-4">
@@ -23,6 +25,16 @@ export function TrackTable() {
         {tracks.map((track, i) => (
           <div
             key={track.id}
+            onClick={() => playFile({
+              id: track.id.toString(),
+              title: track.title,
+              artist: track.artist,
+              album: track.album,
+              file: "https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3",
+              type: 'audio',
+              bpm: 124,
+              camelot_key: '8A'
+            })}
             className="grid grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] gap-4 px-4 py-2 rounded-md hover:bg-white/5 group items-center cursor-pointer transition-colors"
           >
             <div className="text-sm">

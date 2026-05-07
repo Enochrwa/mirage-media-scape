@@ -1,14 +1,18 @@
 import {
   Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
-  Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart
+  Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart, Activity
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useMedia } from "@/contexts/MediaContext";
+import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/utils";
 import WaveformSeekBar from "./WaveformSeekBar";
+import { useState } from "react";
+import { EqualizerControls } from "./EqualizerControls";
 
 export function PlaybackController() {
+  const [showEQ, setShowEQ] = useState(false);
   const {
     currentFile,
     isPlaying,
@@ -50,12 +54,26 @@ export function PlaybackController() {
           />
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-semibold hover:underline cursor-pointer truncate">
-            {currentFile.title}
-          </span>
-          <span className="text-xs text-gray-400 hover:underline cursor-pointer truncate">
-            {currentFile.artist || "Unknown Artist"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold hover:underline cursor-pointer truncate">
+              {currentFile.title}
+            </span>
+            {currentFile.camelot_key && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 shrink-0">
+                {currentFile.camelot_key}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 hover:underline cursor-pointer truncate">
+              {currentFile.artist || "Unknown Artist"}
+            </span>
+            {currentFile.bpm && (
+              <span className="text-[10px] text-zinc-500 font-mono">
+                {Math.round(currentFile.bpm)} BPM
+              </span>
+            )}
+          </div>
         </div>
         <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white shrink-0">
           <Heart className="w-5 h-5" />
@@ -113,7 +131,25 @@ export function PlaybackController() {
       </div>
 
       {/* Volume & Extras */}
-      <div className="flex items-center justify-end gap-3 w-[30%]">
+      <div className="flex items-center justify-end gap-3 w-[30%] relative">
+        {showEQ && (
+          <div className="absolute bottom-full right-0 mb-4 z-50">
+            <EqualizerControls onClose={() => setShowEQ(false)} />
+          </div>
+        )}
+        <div className="flex flex-col items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("text-gray-400 hover:text-white", showEQ && "text-purple-500")}
+            onClick={(e) => { e.stopPropagation(); setShowEQ(!showEQ); }}
+          >
+            <Activity className="w-4 h-4" />
+          </Button>
+          {currentFile.bpm && (
+            <span className="text-[9px] font-mono text-zinc-500">{Math.round(currentFile.bpm)}</span>
+          )}
+        </div>
         <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
           <Mic2 className="w-4 h-4" />
         </Button>

@@ -78,8 +78,8 @@ export class ScannerService {
                 INSERT OR REPLACE INTO tracks (
                     id, title, artist, album, genre, year, duration,
                     bitrate, sample_rate, channels, file_path, file_size,
-                    mtime, added_at, loudness, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                added_at, loudness, bpm, key, camelot_key, bpm_confidence, metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
                 id,
                 metadata.title || path.basename(filePath),
@@ -96,6 +96,10 @@ export class ScannerService {
                 mtime,
                 Date.now(),
                 metadata.loudness || null,
+            metadata.bpm || null,
+            metadata.key || null,
+            metadata.camelotKey || null,
+            metadata.bpmConfidence || null,
                 JSON.stringify(metadata)
             );
         } catch (error) {

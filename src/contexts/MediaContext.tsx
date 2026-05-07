@@ -62,7 +62,9 @@ const sampleAudio: MediaFile[] = [
     cover: '/placeholder.svg',
     file: 'https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3',
     type: 'audio',
-    duration: 214
+    duration: 214,
+    bpm: 124,
+    camelot_key: '8A'
   },
   {
     id: '2',

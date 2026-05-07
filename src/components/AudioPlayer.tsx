@@ -11,6 +11,8 @@ import {
   TrendingUp, Activity, Sparkles, Eye, EyeOff, RotateCcw,
   Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize, X
 } from 'lucide-react';
+import { EqualizerControls } from './player/EqualizerControls';
+import { LyricsDisplay } from './player/LyricsDisplay';
 
 
 
@@ -187,6 +189,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showMoodMenu, setShowMoodMenu] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   const [trimRegion, setTrimRegion] = useState<{ start: number, end: number } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -608,6 +611,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                 <span>{currentFile.year}</span>
                 <span>{currentFile.bitrate}</span>
                 <span>{currentFile.sampleRate}</span>
+                {currentFile.bpm && (
+                  <span className="flex items-center gap-1.5 font-mono text-purple-400">
+                    <Activity size={16} />
+                    {Math.round(currentFile.bpm)} BPM
+                  </span>
+                )}
+                {currentFile.camelot_key && (
+                  <span className="flex items-center gap-1.5 font-bold text-cyan-400">
+                    <Zap size={16} />
+                    {currentFile.camelot_key} ({currentFile.key})
+                  </span>
+                )}
               </div>
               
               {/* Star Rating */}
@@ -720,9 +735,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
           </div>
 
-          {/* Waveform Display */}
-          <div ref={waveformRef} className="relative h-32 rounded-2xl overflow-hidden bg-black/20 border border-white/10">
-            {/* Wavesurfer will mount here */}
+          {/* Waveform Display / Lyrics */}
+          <div className="relative h-64 rounded-2xl overflow-hidden bg-black/20 border border-white/10">
+            {showLyrics ? (
+              <LyricsDisplay
+                artist={currentFile.artist || ''}
+                title={currentFile.title}
+                currentTime={currentTime}
+                className="h-full"
+              />
+            ) : (
+              <div ref={waveformRef} className="h-full w-full" />
+            )}
           </div>
 
           {/* Progress Bar */}
@@ -960,6 +984,15 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
               <Button
                 variant="ghost"
                 size="sm"
+                className={cn("text-gray-400 hover:text-white hover:bg-white/10", showEqualizer && "text-purple-400")}
+                onClick={() => setShowEqualizer(!showEqualizer)}
+              >
+                <Activity size={20} />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
                 className="text-gray-400 hover:text-white hover:bg-white/10"
                 onClick={() => setShowAdvancedControls(!showAdvancedControls)}
               >
@@ -988,6 +1021,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
               </Button>
             </div>
           </div>
+
+          {/* Equalizer Panel */}
+          {showEqualizer && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center p-8 bg-black/60 backdrop-blur-md">
+              <EqualizerControls onClose={() => setShowEqualizer(false)} />
+            </div>
+          )}
 
           {/* Advanced Audio Controls (Expandable) */}
           {showAdvancedControls && (

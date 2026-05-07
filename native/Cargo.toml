@@ -12,6 +12,8 @@ napi-derive = "2.12.2"
 ffmpeg-next = "6.0.0"
 hound = "3.5.0"
 realfft = "3.3.0"
+stratum-dsp = "1.0"
+itertools = "0.12"
 
 [build-dependencies]
 napi-build = "2.0.1"
