@@ -242,26 +242,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
     ws.on('ready', () => {
       setDuration(ws.getDuration());
-      setIsPlaying(false);
+      media.updateDuration(ws.getDuration());
     });
 
     ws.on('audioprocess', (time) => {
       setCurrentTime(time);
+      media.updateCurrentTime(time);
     });
 
     ws.on('play', () => setIsPlaying(true));
     ws.on('pause', () => setIsPlaying(false));
-
-    ws.on('finish', () => {
-      if (repeat) {
-        ws.seekTo(0);
-        ws.play();
-      } else {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        ws.seekTo(0);
-      }
-    });
 
     return () => {
       ws.destroy();
@@ -270,10 +260,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
 
   const togglePlayback = useCallback(() => {
-    if (wavesurferRef.current) {
-      wavesurferRef.current.playPause();
-    }
-  }, []);
+    media.togglePlayback();
+  }, [media.togglePlayback]);
+
+  useEffect(() => {
+    setIsPlaying(media.isPlaying);
+  }, [media.isPlaying]);
 
   const handleVolumeClick = () => {
     if (wavesurferRef.current) {

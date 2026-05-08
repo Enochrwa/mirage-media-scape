@@ -36,6 +36,10 @@ interface MediaContextType {
   smartPlaylists: Playlist[];
   currentFile: MediaFile | null;
   isPlaying: boolean;
+  shuffle: boolean;
+  setShuffle: (shuffle: boolean) => void;
+  repeat: boolean;
+  setRepeat: (repeat: boolean) => void;
   volume: number;
   currentTime: number;
   duration: number;
@@ -71,6 +75,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [smartPlaylists, setSmartPlaylists] = useState<Playlist[]>([]);
   const [currentFile, setCurrentFile] = useState<MediaFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -288,17 +294,24 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const playFile = async (file: MediaFile) => {
     setCurrentFile(file);
-    setIsPlaying(true);
 
     if (file.type === 'audio') {
+      setIsPlaying(true);
+      playbackEngine.setState('LOADING');
       try {
         const response = await fetch(file.file);
         const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await (playbackEngine as any).ctx.decodeAudioData(arrayBuffer);
-        playbackEngine.play(audioBuffer, 0, file.loudness);
+        const audioBuffer = await playbackEngine.ctx.decodeAudioData(arrayBuffer);
+        playbackEngine.play(audioBuffer, 0, file.loudness, file.id);
       } catch (error) {
         console.error('Playback Engine Error:', error);
+        playbackEngine.setState('ERROR');
+        setIsPlaying(false);
       }
+    } else {
+      // For video, we let the VideoPlayer component handle it via currentFile
+      setIsPlaying(true);
+      playbackEngine.setState('PLAYING');
     }
   };
 
@@ -341,16 +354,34 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
   
   const nextTrack = useCallback(() => {
+    if (files.length === 0) return;
     const currentIndex = files.findIndex(file => file.id === currentFile?.id);
-    if (currentIndex < 0 || currentIndex >= files.length - 1) return;
-    playFile(files[currentIndex + 1]);
-  }, [files, currentFile]);
+
+    if (shuffle) {
+        let nextIndex;
+        do {
+            nextIndex = Math.floor(Math.random() * files.length);
+        } while (nextIndex === currentIndex && files.length > 1);
+        playFile(files[nextIndex]);
+    } else {
+        if (currentIndex < files.length - 1) {
+            playFile(files[currentIndex + 1]);
+        } else if (repeat) {
+            playFile(files[0]);
+        }
+    }
+  }, [files, currentFile, shuffle, repeat]);
   
   const previousTrack = useCallback(() => {
+    if (files.length === 0) return;
     const currentIndex = files.findIndex(file => file.id === currentFile?.id);
-    if (currentIndex <= 0) return;
-    playFile(files[currentIndex - 1]);
-  }, [files, currentFile]);
+
+    if (currentIndex > 0) {
+      playFile(files[currentIndex - 1]);
+    } else if (repeat) {
+      playFile(files[files.length - 1]);
+    }
+  }, [files, currentFile, repeat]);
   
   const updateCurrentTime = (time: number) => {
     setCurrentTime(time);
@@ -405,6 +436,17 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Global keyboard shortcuts
   useEffect(() => {
+    const unsubscribe = playbackEngine.subscribe((state) => {
+      setIsPlaying(state === 'PLAYING');
+      if (state === 'ENDED') {
+        nextTrack();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [nextTrack]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -433,6 +475,10 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     fetchSmartPlaylists,
     currentFile,
     isPlaying,
+    shuffle,
+    setShuffle,
+    repeat,
+    setRepeat,
     volume,
     currentTime,
     duration,

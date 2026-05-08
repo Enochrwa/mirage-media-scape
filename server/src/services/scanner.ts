@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
-import chokidar from 'chokidar';
+import * as chokidar from 'chokidar';
 import db from '../db';
 import { Server } from 'socket.io';
 import os from 'os';

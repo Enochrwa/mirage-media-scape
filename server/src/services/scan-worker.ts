@@ -50,6 +50,17 @@ async function scan() {
             }
 
             const metadata: TrackMetadata = native.extractMetadata(filePath);
+
+            // Perform deep analysis for audio files
+            let analysis = null;
+            if (!filePath.endsWith('.mp4') && !filePath.endsWith('.mkv')) {
+                try {
+                    analysis = native.analyzeAudio(filePath);
+                } catch (e) {
+                    console.warn(`Audio analysis failed for ${filePath}:`, e);
+                }
+            }
+
             const id = existing?.id || crypto.createHash('md5').update(filePath).digest('hex');
 
             let coverCachePath = null;
@@ -73,23 +84,31 @@ async function scan() {
                 file_size: fileSize,
                 mtime: mtime,
                 added_at: Date.now(),
+                loudness: analysis?.loudness || null,
+                bpm: analysis?.bpm || null,
+                key: analysis?.key || null,
+                camelot_key: analysis?.camelotKey || null,
+                bpm_confidence: analysis?.bpmConfidence || null,
                 cover_cache_path: coverCachePath,
                 missing: 0,
-                metadata_json: JSON.stringify(metadata)
+                metadata_json: JSON.stringify({ ...metadata, analysis })
             };
 
             db.prepare(`
                 INSERT OR REPLACE INTO tracks (
                     id, title, artist, album, genre, year, duration,
                     bitrate, sample_rate, channels, file_path, file_size,
-                    mtime, added_at, cover_cache_path, missing, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    mtime, added_at, loudness, bpm, key, camelot_key,
+                    bpm_confidence, cover_cache_path, thumbnail_path, missing, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
                 trackData.id, trackData.title, trackData.artist, trackData.album,
                 trackData.genre, trackData.year, trackData.duration, trackData.bitrate,
                 trackData.sample_rate, trackData.channels, trackData.file_path,
                 trackData.file_size, trackData.mtime, trackData.added_at,
-                trackData.cover_cache_path, trackData.missing, trackData.metadata_json
+                trackData.loudness, trackData.bpm, trackData.key, trackData.camelot_key,
+                trackData.bpm_confidence, trackData.cover_cache_path, null, trackData.missing,
+                trackData.metadata_json
             );
 
             newTracks.push(trackData);

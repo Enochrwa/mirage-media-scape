@@ -57,6 +57,10 @@ export function PlaybackController() {
   const {
     currentFile,
     isPlaying,
+    shuffle,
+    setShuffle,
+    repeat,
+    setRepeat,
     togglePlayback,
     nextTrack,
     previousTrack,
@@ -124,7 +128,12 @@ export function PlaybackController() {
       {/* Player Controls */}
       <div className="flex flex-col items-center gap-2 max-w-[40%] w-full">
         <div className="flex items-center gap-6">
-          <Button variant="ghost" size="icon" className="text-purple-500 hover:text-purple-400" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("text-purple-500 hover:text-purple-400", shuffle && "bg-purple-500/10")}
+            onClick={(e) => { e.stopPropagation(); setShuffle(!shuffle); }}
+          >
             <Shuffle className="w-4 h-4" />
           </Button>
           <Button
@@ -154,7 +163,12 @@ export function PlaybackController() {
           >
             <SkipForward className="w-5 h-5 fill-current" />
           </Button>
-          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("text-gray-400 hover:text-white", repeat && "text-purple-400 bg-purple-500/10")}
+            onClick={(e) => { e.stopPropagation(); setRepeat(!repeat); }}
+          >
             <Repeat className="w-4 h-4" />
           </Button>
           <div className="flex items-center bg-zinc-900 rounded-md p-0.5 border border-white/5">
