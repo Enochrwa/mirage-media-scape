@@ -23,6 +23,292 @@ pub struct AudioMetadata {
     pub bpm_confidence: Option<f64>,
 }
 
+#[napi(object)]
+pub struct SubtitleTrackInfo {
+    pub index: u32,
+    pub codec: String,
+    pub language: Option<String>,
+    pub title: Option<String>,
+}
+
+#[napi(object)]
+pub struct TrackMetadata {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<i32>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub duration: f64,
+    pub bitrate: i64,
+    pub sample_rate: Option<i32>,
+    pub channels: Option<i32>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub format: String,
+    pub cover_art: Option<Vec<u8>>,
+}
+
+#[napi]
+pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let context = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let duration = context.duration() as f64 / ffmpeg::ffi::AV_TIME_BASE as f64;
+    let bitrate = context.bit_rate();
+    let format_name = context.format().name().to_string();
+
+    let mut title = None;
+    let mut artist = None;
+    let mut album = None;
+    let mut genre = None;
+    let mut year = None;
+    let mut track_number = None;
+    let mut disc_number = None;
+
+    for (key, value) in context.metadata().iter() {
+        match key.to_lowercase().as_str() {
+            "title" => title = Some(value.to_string()),
+            "artist" => artist = Some(value.to_string()),
+            "album" => album = Some(value.to_string()),
+            "genre" => genre = Some(value.to_string()),
+            "date" | "year" => {
+                if let Some(first_four) = value.get(0..4) {
+                    year = first_four.parse::<i32>().ok();
+                }
+            },
+            "track" => {
+                track_number = value.split('/').next().and_then(|s| s.parse::<i32>().ok());
+            },
+            "disc" => {
+                disc_number = value.split('/').next().and_then(|s| s.parse::<i32>().ok());
+            },
+            _ => {}
+        }
+    }
+
+    let mut sample_rate = None;
+    let mut channels = None;
+    let mut width = None;
+    let mut height = None;
+    let mut cover_art = None;
+
+    for stream in context.streams() {
+        match stream.parameters().medium() {
+            ffmpeg::media::Type::Audio => {
+                if sample_rate.is_none() {
+                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(stream.parameters()) {
+                        if let Ok(audio) = codec_ctx.decoder().audio() {
+                            sample_rate = Some(audio.rate() as i32);
+                            channels = Some(audio.channels() as i32);
+                        }
+                    }
+                }
+            },
+            ffmpeg::media::Type::Video => {
+                if stream.disposition().contains(ffmpeg::format::stream::Disposition::ATTACHED_PIC) {
+                    // Extract cover art
+                    // For attached pictures, the data is in the first packet of the stream
+                    let mut ictx = ffmpeg::format::input(&path_buf).unwrap();
+                    let stream_index = stream.index();
+                    for (s, packet) in ictx.packets() {
+                        if s.index() == stream_index {
+                            cover_art = Some(packet.data().unwrap().to_vec());
+                            break;
+                        }
+                    }
+                } else if width.is_none() {
+                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(stream.parameters()) {
+                        if let Ok(video) = codec_ctx.decoder().video() {
+                            width = Some(video.width() as i32);
+                            height = Some(video.height() as i32);
+                        }
+                    }
+                }
+            },
+            _ => {}
+        }
+    }
+
+    Ok(TrackMetadata {
+        title,
+        artist,
+        album,
+        genre,
+        year,
+        track_number,
+        disc_number,
+        duration,
+        bitrate,
+        sample_rate,
+        channels,
+        width,
+        height,
+        format: format_name,
+        cover_art,
+    })
+}
+
+#[napi]
+pub fn generate_thumbnail(path: String, time_seconds: f64, output_path: String) -> Result<(), napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let mut context = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let stream = context.streams().best(ffmpeg::media::Type::Video)
+        .ok_or_else(|| napi::Error::from_reason("No video stream found"))?;
+
+    let stream_index = stream.index();
+    let context_parameters = stream.parameters();
+    let mut decoder = ffmpeg::codec::context::Context::from_parameters(context_parameters)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get codec context: {}", e)))?
+        .decoder()
+        .video()
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get video decoder: {}", e)))?;
+
+    let position = (time_seconds * ffmpeg::ffi::AV_TIME_BASE as f64) as i64;
+    context.seek(position, ..position).map_err(|e| napi::Error::from_reason(format!("Seek error: {}", e)))?;
+
+    let mut scaler = ffmpeg::software::scaling::context::Context::get(
+        decoder.format(),
+        decoder.width(),
+        decoder.height(),
+        ffmpeg::util::format::Pixel::RGB24,
+        decoder.width(),
+        decoder.height(),
+        ffmpeg::software::scaling::flag::Flags::BILINEAR,
+    ).map_err(|e| napi::Error::from_reason(format!("Scaler error: {}", e)))?;
+
+    let mut frame_decoded = ffmpeg::util::frame::Video::empty();
+    let mut thumbnail_generated = false;
+
+    for (stream, packet) in context.packets() {
+        if stream.index() == stream_index {
+            if decoder.send_packet(&packet).is_ok() {
+                if decoder.receive_frame(&mut frame_decoded).is_ok() {
+                    let mut frame_rgb = ffmpeg::util::frame::Video::empty();
+                    scaler.run(&frame_decoded, &mut frame_rgb).map_err(|e| napi::Error::from_reason(format!("Scaling error: {}", e)))?;
+
+                    // Save as JPEG - using a simple approach for now, maybe we should use a proper JPEG encoder
+                    // Since I don't have an easy way to write JPEG from raw RGB here without adding a dependency
+                    // and I'm not allowed to add dependencies easily if I can avoid it.
+                    // Wait, I can use FFmpeg to encode to JPEG!
+
+                    let codec = ffmpeg::encoder::find(ffmpeg::codec::Id::MJPEG)
+                        .ok_or_else(|| napi::Error::from_reason("MJPEG encoder not found"))?;
+
+                    let mut encoder_ctx = ffmpeg::codec::context::Context::new();
+                    let mut encoder = encoder_ctx.encoder().video()
+                        .map_err(|_| napi::Error::from_reason("Failed to get video encoder"))?;
+
+                    encoder.set_width(decoder.width());
+                    encoder.set_height(decoder.height());
+                    encoder.set_format(ffmpeg::util::format::Pixel::YUVJ420P);
+                    encoder.set_time_base(ffmpeg_next::Rational(1, 25));
+
+                    let mut encoder = encoder.open_as(codec).map_err(|e| napi::Error::from_reason(format!("Failed to open encoder: {}", e)))?;
+
+                    let mut sws = ffmpeg::software::scaling::context::Context::get(
+                        ffmpeg::util::format::Pixel::RGB24,
+                        decoder.width(),
+                        decoder.height(),
+                        ffmpeg::util::format::Pixel::YUVJ420P,
+                        decoder.width(),
+                        decoder.height(),
+                        ffmpeg::software::scaling::flag::Flags::BILINEAR,
+                    ).map_err(|e| napi::Error::from_reason(format!("Scaler error: {}", e)))?;
+
+                    let mut frame_j = ffmpeg::util::frame::Video::empty();
+                    sws.run(&frame_rgb, &mut frame_j).map_err(|e| napi::Error::from_reason(format!("Scaling error: {}", e)))?;
+
+                    let mut packet = ffmpeg::Packet::empty();
+                    if encoder.send_frame(&frame_j).is_ok() {
+                        if encoder.receive_packet(&mut packet).is_ok() {
+                            std::fs::write(output_path, packet.data().unwrap()).map_err(|e| napi::Error::from_reason(format!("Failed to write file: {}", e)))?;
+                            thumbnail_generated = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !thumbnail_generated {
+        return Err(napi::Error::from_reason("Failed to generate thumbnail"));
+    }
+
+    Ok(())
+}
+
+#[napi]
+pub fn get_subtitle_tracks(path: String) -> Result<Vec<SubtitleTrackInfo>, napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let context = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let mut tracks = Vec::new();
+    for stream in context.streams() {
+        if stream.parameters().medium() == ffmpeg::media::Type::Subtitle {
+            let mut language = None;
+            let mut title = None;
+
+            for (key, value) in stream.metadata().iter() {
+                match key.to_lowercase().as_str() {
+                    "language" => language = Some(value.to_string()),
+                    "title" => title = Some(value.to_string()),
+                    _ => {}
+                }
+            }
+
+            tracks.push(SubtitleTrackInfo {
+                index: stream.index() as u32,
+                codec: stream.parameters().id().name().to_string(),
+                language,
+                title,
+            });
+        }
+    }
+
+    Ok(tracks)
+}
+
+#[napi]
+pub fn extract_subtitle_stream(path: String, stream_index: u32) -> Result<String, napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let mut context = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let stream = context.streams().best(ffmpeg::media::Type::Subtitle)
+        .ok_or_else(|| napi::Error::from_reason(format!("Subtitle stream not found")))?;
+
+    if stream.parameters().medium() != ffmpeg::media::Type::Subtitle {
+        return Err(napi::Error::from_reason("Stream is not a subtitle stream"));
+    }
+
+    // This is a simplified extraction - many subtitle formats are text-based
+    // For bitmapped subtitles, this would return garbage.
+    let mut result = String::new();
+    for (s, packet) in context.packets() {
+        if s.index() == stream_index as usize {
+            if let Some(data) = packet.data() {
+                result.push_str(&String::from_utf8_lossy(data));
+            }
+        }
+    }
+
+    Ok(result)
+}
 
 #[napi]
 pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {

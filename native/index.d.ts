@@ -20,5 +20,32 @@ export interface AudioMetadata {
   camelotKey?: string
   bpmConfidence?: number
 }
+export interface SubtitleTrackInfo {
+  index: number
+  codec: string
+  language?: string
+  title?: string
+}
+export interface TrackMetadata {
+  title?: string
+  artist?: string
+  album?: string
+  genre?: string
+  year?: number
+  trackNumber?: number
+  discNumber?: number
+  duration: number
+  bitrate: number
+  sampleRate?: number
+  channels?: number
+  width?: number
+  height?: number
+  format: string
+  coverArt?: Array<number>
+}
+export declare function extractMetadata(path: string): TrackMetadata
+export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void
+export declare function getSubtitleTracks(path: string): Array<SubtitleTrackInfo>
+export declare function extractSubtitleStream(path: string, streamIndex: number): string
 export declare function analyzeAudio(path: string): AudioMetadata
 export declare function generateWaveform(path: string): Array<number>

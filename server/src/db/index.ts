@@ -38,7 +38,15 @@ db.exec(`
         key TEXT,
         camelot_key TEXT,
         bpm_confidence REAL,
+        cover_cache_path TEXT,
+        thumbnail_path TEXT,
+        missing INTEGER DEFAULT 0,
         metadata_json TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS watched_folders (
+        path TEXT PRIMARY KEY,
+        added_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS playlists (

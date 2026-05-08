@@ -6,15 +6,13 @@ const router = Router();
 router.post('/scan', async (req, res) => {
     const { directory } = req.body;
     if (!directory) {
-        return res.status(400).json({ error: 'Directory path is required' });
+        // If no directory, scan all existing watched folders
+        scannerService.scanAll();
+        return res.json({ message: 'Global scan started' });
     }
 
-    // Run scan in background
-    scannerService.scanDirectory(directory, (progress) => {
-        console.log(`Scan progress: ${progress.processed}/${progress.total} - ${progress.currentFile}`);
-    });
-
-    res.json({ message: 'Scan started' });
+    await scannerService.addFolder(directory);
+    res.json({ message: 'Folder added and scan started' });
 });
 
 export default router;

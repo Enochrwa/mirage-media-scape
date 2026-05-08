@@ -1,7 +1,10 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { API_BASE } from '@/lib/utils';
+import { io, Socket } from 'socket.io-client';
+import { openDB, IDBPDatabase } from 'idb';
+import * as mm from 'music-metadata';
 
 export type MediaType = 'audio' | 'video';
 
@@ -11,10 +14,13 @@ export interface MediaFile {
   artist?: string;
   album?: string;
   cover?: string;
-  file: string;
+  file: string; // This can be a path or an object URL/blob URL
   type: MediaType;
   duration?: number;
   loudness?: number;
+  bpm?: number;
+  camelot_key?: string;
+  file_path?: string;
 }
 
 export interface Playlist {
@@ -33,8 +39,8 @@ interface MediaContextType {
   volume: number;
   currentTime: number;
   duration: number;
-  addFile: (file: MediaFile) => void;
-  removeFile: (id: string) => void;
+  scanProgress: { scanned: number, total: number, percentage: number } | null;
+  addFolder: () => Promise<void>;
   createPlaylist: (name: string) => void;
   fetchSmartPlaylists: () => Promise<void>;
   addToPlaylist: (playlistId: string, fileId: string) => void;
@@ -56,60 +62,12 @@ interface MediaContextType {
 
 export const MediaContext = createContext<MediaContextType | undefined>(undefined);
 
-// Sample data
-const sampleAudio: MediaFile[] = [
-  {
-    id: '1',
-    title: 'Electric Dreams',
-    artist: 'Synthwave Artist',
-    album: 'Retro Futures',
-    cover: '/placeholder.svg',
-    file: 'https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3',
-    type: 'audio',
-    duration: 214,
-    bpm: 124,
-    camelot_key: '8A'
-  },
-  {
-    id: '2',
-    title: 'Neon Twilight',
-    artist: 'Digital Rain',
-    album: 'Cyber City',
-    cover: '/placeholder.svg',
-    file: 'https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3',
-    type: 'audio',
-    duration: 187
-  }
-];
-
-const sampleVideo: MediaFile[] = [
-  {
-    id: '3',
-    title: 'Cosmic Journey',
-    artist: 'Visual Arts',
-    cover: '/placeholder.svg',
-    file: 'https://storage.googleapis.com/media-session/elephants-dream/progressive-hevc.mp4',
-    type: 'video',
-    duration: 280
-  }
-];
-
-const samplePlaylists: Playlist[] = [
-  {
-    id: 'playlist-1',
-    name: 'Favorites',
-    files: [sampleAudio[0], sampleVideo[0]]
-  },
-  {
-    id: 'playlist-2',
-    name: 'Chill Vibes',
-    files: [sampleAudio[1]]
-  }
-];
+const DB_NAME = 'sonic-web-db';
+const STORE_NAME = 'tracks';
 
 export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [files, setFiles] = useState<MediaFile[]>([...sampleAudio, ...sampleVideo]);
-  const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
+  const [files, setFiles] = useState<MediaFile[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [smartPlaylists, setSmartPlaylists] = useState<Playlist[]>([]);
   const [currentFile, setCurrentFile] = useState<MediaFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -117,31 +75,169 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);
-  
-  const addFile = (file: MediaFile) => {
-    setFiles(prev => [...prev, file]);
-  };
-  
-  const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(file => file.id !== id));
-    setPlaylists(prev => prev.map(playlist => ({
-      ...playlist,
-      files: playlist.files.filter(file => file.id !== id)
-    })));
-    
-    if (currentFile?.id === id) {
-      setCurrentFile(null);
-      setIsPlaying(false);
+  const [scanProgress, setScanProgress] = useState<{ scanned: number, total: number, percentage: number } | null>(null);
+  const [db, setDb] = useState<IDBPDatabase | null>(null);
+
+  // Initialize DB
+  useEffect(() => {
+    const initDb = async () => {
+      const database = await openDB(DB_NAME, 1, {
+        upgrade(db) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        },
+      });
+      setDb(database);
+
+      // Load cached tracks
+      const cachedTracks = await database.getAll(STORE_NAME);
+      if (cachedTracks.length > 0) {
+        setFiles(cachedTracks);
+      }
+    };
+    initDb();
+  }, []);
+
+  // Native WebSocket setup
+  useEffect(() => {
+    const socket: Socket = io(API_BASE.replace('/api', ''));
+
+    socket.on('SCAN_START', (data) => {
+        setScanProgress({ scanned: 0, total: data.total, percentage: 0 });
+    });
+
+    socket.on('SCAN_PROGRESS', (data) => {
+        setScanProgress({
+            scanned: data.scanned,
+            total: data.total,
+            percentage: Math.round((data.scanned / data.total) * 100)
+        });
+    });
+
+    socket.on('NEW_TRACKS', (data) => {
+        setFiles(prev => {
+            const newFiles = [...prev];
+            data.tracks.forEach((track: any) => {
+                if (!newFiles.find(f => f.id === track.id)) {
+                    newFiles.push({
+                        ...track,
+                        file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
+                        type: 'audio' // Default for now
+                    });
+                }
+            });
+            return newFiles;
+        });
+    });
+
+    socket.on('SCAN_COMPLETE', () => {
+        setScanProgress(null);
+    });
+
+    return () => {
+        socket.disconnect();
+    };
+  }, []);
+
+  // Initial load from backend (Native)
+  useEffect(() => {
+    const fetchNativeTracks = async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/tracks`);
+            if (response.ok) {
+                const data = await response.json();
+                const mappedTracks = data.map((track: any) => ({
+                    ...track,
+                    file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
+                    type: track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv') ? 'video' : 'audio'
+                }));
+                setFiles(mappedTracks);
+            }
+        } catch (e) {
+            console.error('Failed to fetch native tracks', e);
+        }
+    };
+    fetchNativeTracks();
+  }, []);
+
+  const addFolder = async () => {
+    // Native path (handled by Tauri if applicable, but here we just prompt for a path)
+    // For this environment, we'll implement both Web and a mock Native folder add.
+
+    if ('showDirectoryPicker' in window) {
+        try {
+            const handle = await (window as any).showDirectoryPicker();
+            // Store handle in IndexedDB for persistence
+            // Web implementation: scan handles
+            await scanWebDirectory(handle);
+        } catch (e) {
+            console.error('Directory picker failed', e);
+        }
+    } else {
+        // Native fallback: prompt for string path
+        const path = prompt("Enter media folder path:");
+        if (path) {
+            await fetch(`${API_BASE}/api/scanner/scan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ directory: path })
+            });
+        }
     }
   };
-  
+
+  const scanWebDirectory = async (handle: any) => {
+    const tracks: MediaFile[] = [];
+    
+    async function walk(h: any) {
+        for await (const entry of h.values()) {
+            if (entry.kind === 'directory') {
+                await walk(entry);
+            } else if (entry.kind === 'file') {
+                const file = await entry.getFile();
+                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                    const id = btoa(entry.name + file.lastModified + file.size);
+
+                    // Check cache
+                    if (db) {
+                        const cached = await db.get(STORE_NAME, id);
+                        if (cached) {
+                            tracks.push({ ...cached, file: URL.createObjectURL(file) });
+                            continue;
+                        }
+                    }
+
+                    try {
+                        const metadata = await mm.parseBlob(file);
+                        const track: MediaFile = {
+                            id,
+                            title: metadata.common.title || entry.name,
+                            artist: metadata.common.artist || 'Unknown Artist',
+                            album: metadata.common.album || 'Unknown Album',
+                            duration: metadata.format.duration,
+                            file: URL.createObjectURL(file),
+                            type: file.type.startsWith('video/') ? 'video' : 'audio',
+                            cover: metadata.common.picture?.[0] ? URL.createObjectURL(new Blob([metadata.common.picture[0].data], { type: metadata.common.picture[0].format })) : undefined
+                        };
+                        tracks.push(track);
+                        if (db) await db.put(STORE_NAME, track);
+                    } catch (e) {
+                        console.error('Failed to parse metadata for', entry.name, e);
+                    }
+                }
+            }
+        }
+    }
+
+    await walk(handle);
+    setFiles(prev => [...prev, ...tracks]);
+  };
+
   const createPlaylist = (name: string) => {
     const newPlaylist: Playlist = {
       id: `playlist-${Date.now()}`,
       name,
       files: []
     };
-    
     setPlaylists(prev => [...prev, newPlaylist]);
   };
 
@@ -198,15 +294,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
         const response = await fetch(file.file);
         const arrayBuffer = await response.arrayBuffer();
-        // Decode in the background
         const audioBuffer = await (playbackEngine as any).ctx.decodeAudioData(arrayBuffer);
         playbackEngine.play(audioBuffer, 0, file.loudness);
-
-        // Preload next track if available
-        const currentIndex = files.findIndex(f => f.id === file.id);
-        if (currentIndex < files.length - 1) {
-          playbackEngine.preloadNext(files[currentIndex + 1].file);
-        }
       } catch (error) {
         console.error('Playback Engine Error:', error);
       }
@@ -230,7 +319,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
   
-  const togglePlayback = () => {
+  const togglePlayback = useCallback(() => {
     if (currentFile) {
       const nextState = !isPlaying;
       setIsPlaying(nextState);
@@ -240,7 +329,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         playbackEngine.pause();
       }
     }
-  };
+  }, [currentFile, isPlaying]);
   
   const seekTo = (time: number) => {
     setCurrentTime(time);
@@ -248,26 +337,20 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const setVolume = (newVolume: number) => {
     setVolumeState(newVolume);
+    playbackEngine.setVolume(newVolume);
   };
   
-  const findCurrentFileIndex = () => {
-    if (!currentFile) return -1;
-    return files.findIndex(file => file.id === currentFile.id);
-  };
-  
-  const nextTrack = () => {
-    const currentIndex = findCurrentFileIndex();
+  const nextTrack = useCallback(() => {
+    const currentIndex = files.findIndex(file => file.id === currentFile?.id);
     if (currentIndex < 0 || currentIndex >= files.length - 1) return;
-    
     playFile(files[currentIndex + 1]);
-  };
+  }, [files, currentFile]);
   
-  const previousTrack = () => {
-    const currentIndex = findCurrentFileIndex();
+  const previousTrack = useCallback(() => {
+    const currentIndex = files.findIndex(file => file.id === currentFile?.id);
     if (currentIndex <= 0) return;
-    
     playFile(files[currentIndex - 1]);
-  };
+  }, [files, currentFile]);
   
   const updateCurrentTime = (time: number) => {
     setCurrentTime(time);
@@ -286,8 +369,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       artist: currentFile.artist,
       album: currentFile.album,
       artwork: [
-        { src: currentFile.cover || '/placeholder.svg', sizes: '96x96', type: 'image/svg+xml' },
-        { src: currentFile.cover || '/placeholder.svg', sizes: '512x512', type: 'image/svg+xml' },
+        { src: currentFile.cover || '/placeholder.svg', sizes: '512x512' },
       ]
     });
 
@@ -295,23 +377,18 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     navigator.mediaSession.setActionHandler('pause', pausePlayback);
     navigator.mediaSession.setActionHandler('previoustrack', previousTrack);
     navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined) seekTo(details.seekTime);
-    });
 
     return () => {
       navigator.mediaSession.setActionHandler('play', null);
       navigator.mediaSession.setActionHandler('pause', null);
       navigator.mediaSession.setActionHandler('previoustrack', null);
       navigator.mediaSession.setActionHandler('nexttrack', null);
-      navigator.mediaSession.setActionHandler('seekto', null);
     };
-  }, [currentFile]);
+  }, [currentFile, nextTrack, previousTrack]);
 
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input or textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       switch (e.code) {
@@ -342,8 +419,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     volume,
     currentTime,
     duration,
-    addFile,
-    removeFile,
+    scanProgress,
+    addFolder,
     createPlaylist,
     addToPlaylist,
     removeFromPlaylist,

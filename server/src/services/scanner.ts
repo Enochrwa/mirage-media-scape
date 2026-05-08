@@ -1,110 +1,114 @@
-import { AudioMetadata } from '../sonic-native';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
+import { Worker } from 'worker_threads';
+import chokidar from 'chokidar';
 import db from '../db';
+import { Server } from 'socket.io';
+import os from 'os';
 
-// Use require for the native module as it's a .node file
-const native = require('../../sonic-native.node');
-
-export interface ScanProgress {
-    total: number;
-    processed: number;
-    currentFile: string;
-}
+const COVERS_DIR = path.join(os.homedir(), '.sonic', 'covers');
 
 export class ScannerService {
+    private io?: Server;
+    private watchers: Map<string, chokidar.FSWatcher> = new Map();
     private isScanning = false;
 
-    async scanDirectory(dirPath: string, onProgress?: (progress: ScanProgress) => void) {
+    setIo(io: Server) {
+        this.io = io;
+    }
+
+    async init() {
+        const folders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+        for (const folder of folders) {
+            this.startWatcher(folder.path);
+        }
+    }
+
+    async addFolder(folderPath: string) {
+        try {
+            db.prepare('INSERT OR IGNORE INTO watched_folders (path, added_at) VALUES (?, ?)').run(folderPath, Date.now());
+            this.startWatcher(folderPath);
+            this.scanFolders([folderPath]);
+        } catch (error) {
+            console.error('Failed to add folder:', error);
+        }
+    }
+
+    private startWatcher(folderPath: string) {
+        if (this.watchers.has(folderPath)) return;
+
+        const watcher = chokidar.watch(folderPath, {
+            ignored: /(^|[\/\\])\../, // ignore dotfiles
+            persistent: true,
+            ignoreInitial: true
+        });
+
+        watcher
+            .on('add', filePath => this.processChangedFile(filePath))
+            .on('change', filePath => this.processChangedFile(filePath))
+            .on('unlink', filePath => this.markAsMissing(filePath));
+
+        this.watchers.set(folderPath, watcher);
+    }
+
+    private async processChangedFile(filePath: string) {
+        console.log(`File added/changed: ${filePath}`);
+        // For simplicity, we trigger a small scan for this file
+        // In a real implementation, we'd reuse the worker logic
+        this.scanFolders([path.dirname(filePath)]);
+    }
+
+    private markAsMissing(filePath: string) {
+        console.log(`File removed: ${filePath}`);
+        db.prepare('UPDATE tracks SET missing = 1 WHERE file_path = ?').run(filePath);
+        this.io?.emit('TRACK_MISSING', { filePath });
+    }
+
+    async scanAll() {
         if (this.isScanning) return;
+        const folders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+        if (folders.length === 0) return;
+        this.scanFolders(folders.map(f => f.path));
+    }
+
+    private scanFolders(folderPaths: string[]) {
         this.isScanning = true;
 
-        try {
-            const files = this.getAllFiles(dirPath);
-            const total = files.length;
-            let processed = 0;
+        // We use the transpiled .js file in production, but .ts in dev with ts-node
+        const workerPath = path.resolve(__dirname, './scan-worker.ts');
 
-            for (const filePath of files) {
-                processed++;
-                if (onProgress) {
-                    onProgress({ total, processed, currentFile: path.basename(filePath) });
-                }
-
-                await this.processFile(filePath);
+        const worker = new Worker(`
+            require('ts-node').register();
+            require('${workerPath}');
+        `, {
+            eval: true,
+            workerData: {
+                dbPath: path.resolve(__dirname, '../../sonic.db'),
+                folders: folderPaths,
+                coversDir: COVERS_DIR
             }
-        } finally {
+        });
+
+        worker.on('message', (msg) => {
+            if (this.io) {
+                this.io.emit(msg.type, msg);
+            }
+            if (msg.type === 'SCAN_COMPLETE') {
+                this.isScanning = false;
+            }
+        });
+
+        worker.on('error', (err) => {
+            console.error('Worker error:', err);
             this.isScanning = false;
-        }
-    }
+        });
 
-    private getAllFiles(dirPath: string, files: string[] = []): string[] {
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-            const fullPath = path.join(dirPath, entry.name);
-            if (entry.isDirectory()) {
-                this.getAllFiles(fullPath, files);
-            } else if (this.isMediaFile(entry.name)) {
-                files.push(fullPath);
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                console.error(`Worker stopped with exit code ${code}`);
             }
-        }
-
-        return files;
-    }
-
-    private isMediaFile(filename: string): boolean {
-        const extensions = ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.mp4', '.mkv', '.avi'];
-        return extensions.includes(path.extname(filename).toLowerCase());
-    }
-
-    private async processFile(filePath: string) {
-        const stats = fs.statSync(filePath);
-        const mtime = stats.mtimeMs;
-        const fileSize = stats.size;
-
-        // Check if file is already in DB and hasn't changed
-        const existing = db.prepare('SELECT mtime FROM tracks WHERE file_path = ?').get(filePath) as { mtime: number } | undefined;
-
-        if (existing && existing.mtime === mtime) {
-            return; // Skip unchanged file
-        }
-
-        try {
-            const metadata: AudioMetadata = native.analyzeAudio(filePath);
-            const id = crypto.createHash('md5').update(filePath).digest('hex');
-
-            db.prepare(`
-                INSERT OR REPLACE INTO tracks (
-                    id, title, artist, album, genre, year, duration,
-                    bitrate, sample_rate, channels, file_path, file_size,
-                added_at, loudness, bpm, key, camelot_key, bpm_confidence, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-                id,
-                metadata.title || path.basename(filePath),
-                metadata.artist || 'Unknown Artist',
-                metadata.album || 'Unknown Album',
-                metadata.genre || 'Unknown Genre',
-                metadata.year || null,
-                metadata.duration,
-                metadata.bitrate,
-                metadata.sampleRate,
-                metadata.channels,
-                filePath,
-                fileSize,
-                mtime,
-                Date.now(),
-                metadata.loudness || null,
-            metadata.bpm || null,
-            metadata.key || null,
-            metadata.camelotKey || null,
-            metadata.bpmConfidence || null,
-                JSON.stringify(metadata)
-            );
-        } catch (error) {
-            console.error(`Failed to process file ${filePath}:`, error);
-        }
+            this.isScanning = false;
+        });
     }
 }
 
