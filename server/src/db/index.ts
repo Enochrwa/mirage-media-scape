@@ -67,7 +67,7 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS smart_playlists (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        rules_json TEXT NOT NULL,
+        definition TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
     );
@@ -80,6 +80,33 @@ db.exec(`
         position REAL,
         completed BOOLEAN DEFAULT 0,
         FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS fingerprint_cache (
+        fingerprint TEXT PRIMARY KEY,
+        result TEXT NOT NULL,
+        fetched_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS lyrics_cache (
+        track_id TEXT PRIMARY KEY,
+        synced_lyrics TEXT,
+        plain_lyrics TEXT,
+        source TEXT,
+        fetched_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_log (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        timestamp INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_tracks_mtime ON tracks(mtime);

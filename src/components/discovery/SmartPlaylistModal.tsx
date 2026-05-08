@@ -17,21 +17,34 @@ const FIELDS = [
   { value: 'title', label: 'Title' },
   { value: 'artist', label: 'Artist' },
   { value: 'album', label: 'Album' },
+  { value: 'genre', label: 'Genre' },
   { value: 'bpm', label: 'BPM' },
   { value: 'added_at', label: 'Date Added' },
+  { value: 'year', label: 'Year' },
+  { value: 'duration', label: 'Duration (sec)' },
+  { value: 'key', label: 'Key' },
+  { value: 'camelot_key', label: 'Camelot Key' },
+  { value: 'play_count', label: 'Play Count' },
+  { value: 'last_played', label: 'Last Played' },
 ];
 
 const OPERATORS = [
   { value: 'is', label: 'is' },
+  { value: 'isNot', label: 'is not' },
   { value: 'contains', label: 'contains' },
-  { value: 'gt', label: 'greater than' },
-  { value: 'lt', label: 'less than' },
+  { value: 'notContains', label: 'does not contain' },
+  { value: 'gt', label: 'is greater than' },
+  { value: 'lt', label: 'is less than' },
+  { value: 'gte', label: 'is greater than or equal' },
+  { value: 'lte', label: 'is less than or equal' },
+  { value: 'inLastDays', label: 'in the last (days)' },
 ];
 
 export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [matchMode, setMatchMode] = useState<'all' | 'any'>('all');
   const [conditions, setConditions] = useState([{ field: 'title', operator: 'contains', value: '' }]);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
 
   const addCondition = () => {
     setConditions([...conditions, { field: 'title', operator: 'contains', value: '' }]);
@@ -45,12 +58,27 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
     const newConditions = [...conditions];
     newConditions[index] = { ...newConditions[index], ...updates };
     setConditions(newConditions);
+    fetchPreview(newConditions, matchMode);
+  };
+
+  const fetchPreview = async (conds: any[], mode: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/playlists/smart/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conditions: conds, matchMode: mode })
+      });
+      if (res.ok) {
+        const { count } = await res.json();
+        setPreviewCount(count);
+      }
+    } catch (e) {}
   };
 
   const handleSave = async () => {
     const playlist = {
       name,
-      rules: {
+      definition: {
         matchMode,
         conditions
       }
@@ -76,7 +104,14 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] bg-zinc-900 text-white border-zinc-800">
         <DialogHeader>
-          <DialogTitle>Create Smart Playlist</DialogTitle>
+          <div className="flex justify-between items-center pr-8">
+            <DialogTitle>Create Smart Playlist</DialogTitle>
+            {previewCount !== null && (
+              <span className="bg-purple-500/20 text-purple-400 text-xs px-2 py-1 rounded-full font-bold">
+                {previewCount} tracks match
+              </span>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6 py-4">

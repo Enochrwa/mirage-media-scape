@@ -49,31 +49,48 @@ export class SmartPlaylistService {
         return db.prepare(sql).all(...params);
     }
 
-    private static buildClause(condition: SmartPlaylistRule, params: any[]): string | null {
+    private static buildClause(condition: any, params: any[]): string | null {
         const field = condition.field;
         // Basic validation of field names to prevent SQL injection
-        const allowedFields = ['title', 'artist', 'album', 'genre', 'year', 'bpm', 'duration', 'loudness', 'added_at'];
+        const allowedFields = ['title', 'artist', 'album', 'genre', 'year', 'bpm', 'duration', 'loudness', 'added_at', 'key', 'camelot_key', 'play_count', 'last_played'];
         if (!allowedFields.includes(field)) return null;
+
+        let sqlField = field;
+        if (field === 'title' || field === 'artist' || field === 'album' || field === 'genre') {
+            sqlField = `LOWER(${field})`;
+        }
 
         switch (condition.operator) {
             case 'is':
                 params.push(condition.value);
-                return `${field} = ?`;
+                return `${sqlField} = ?`;
+            case 'isNot':
+                params.push(condition.value);
+                return `${sqlField} != ?`;
             case 'contains':
-                params.push(`%${condition.value}%`);
-                return `${field} LIKE ?`;
+                params.push(`%${condition.value.toLowerCase()}%`);
+                return `${sqlField} LIKE ?`;
+            case 'notContains':
+                params.push(`%${condition.value.toLowerCase()}%`);
+                return `${sqlField} NOT LIKE ?`;
             case 'gt':
+            case 'gte':
                 params.push(condition.value);
-                return `${field} > ?`;
+                return `${field} ${condition.operator === 'gt' ? '>' : '>='} ?`;
             case 'lt':
+            case 'lte':
                 params.push(condition.value);
-                return `${field} < ?`;
+                return `${field} ${condition.operator === 'lt' ? '<' : '<='} ?`;
             case 'between':
                 if (Array.isArray(condition.value) && condition.value.length === 2) {
                     params.push(condition.value[0], condition.value[1]);
                     return `${field} BETWEEN ? AND ?`;
                 }
                 return null;
+            case 'inLastDays':
+                const cutoff = Date.now() - (condition.value * 86400000);
+                params.push(cutoff);
+                return `${field} > ?`;
             default:
                 return null;
         }

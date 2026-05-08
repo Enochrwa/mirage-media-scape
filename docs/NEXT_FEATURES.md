@@ -38,7 +38,7 @@ This document serves as the comprehensive engineering and design reference for t
 *   **Implementation:**
     *   **Engine:** Use `PannerNode` with `panningModel = 'HRTF'`.
     *   **Control:** Expose `setPosition(x, y, z)` for the panner and update `AudioListener` orientation for head tracking.
-*   **Status:** **IN PROGRESS (Next Step)**
+*   **Status:** **IMPLEMENTED** (`src/lib/PlaybackEngine.ts`, `src/components/SpatialAudioControls.tsx`)
 
 ---
 
@@ -73,21 +73,20 @@ This document serves as the comprehensive engineering and design reference for t
 *   **Implementation:**
     *   **Database:** `play_events` table (track_id, started_at, ended_at, completed).
     *   **Reporting:** `PlaybackEngine` sends heartbeat/event pings to `/api/stats/event`.
-*   **Status:** **PLANNED**
+*   **Status:** **IMPLEMENTED** (`server/src/services/StatsService.ts`, `src/pages/StatsPage.tsx`)
 
 ### 3.2 Cross-Device Sync
 *   **Feature:** Resume playback and sync playlists across devices.
 *   **Implementation:**
-    *   **Backend:** Supabase/PostgreSQL for cloud storage.
-    *   **Security:** Client-side AES-GCM encryption for metadata privacy.
-*   **Status:** **PLANNED**
+    *   **Backend:** WebSocket server and event log.
+    *   **Status:** **IMPLEMENTED (Local Network)** (`server/src/services/LocalSyncServer.ts`)
 
 ### 3.3 Resource Monitor (Low-Power Mode)
 *   **Feature:** Optimize performance on low-end devices or low battery.
 *   **Implementation:**
     *   **Logic:** Monitor FPS and `navigator.getBattery()`.
     *   **Action:** Disable visualizers, simplify waveforms, and reduce analysis frequency.
-*   **Status:** **PLANNED**
+*   **Status:** **IMPLEMENTED** (`src/lib/ResourceMonitor.ts`)
 
 ---
 
@@ -96,10 +95,12 @@ This document serves as the comprehensive engineering and design reference for t
 ### 4.1 Acoustic Fingerprinting
 *   **Feature:** Identify unknown tracks by audio content.
 *   **Implementation:** Integrate AcoustID/Chromaprint in the native module.
+*   **Status:** **IMPLEMENTED** (`server/src/services/FingerprintService.ts`)
 
 ### 4.2 Phone as Remote
 *   **Feature:** Control desktop player via mobile device.
 *   **Implementation:** WebSocket signaling server for remote commands (play/pause, volume, seek).
+*   **Status:** **IMPLEMENTED** (`server/src/services/RemoteControlServer.ts`, `src/pages/RemotePage.tsx`)
 
 ### 4.3 Music Map
 *   **Feature:** Geographically tag library by artist origin.

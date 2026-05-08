@@ -9,6 +9,9 @@ import tracksRouter from './routes/tracks';
 import playlistsRouter from './routes/playlists';
 import statsRouter from './routes/stats';
 import subtitlesRouter from './routes/subtitles';
+import radioRouter from './routes/radio';
+import { LocalSyncServer } from './services/LocalSyncServer';
+import { RemoteControlServer } from './services/RemoteControlServer';
 
 dotenv.config();
 
@@ -24,6 +27,9 @@ const io = new Server(server, {
 scannerService.setIo(io);
 scannerService.init();
 
+const syncServer = new LocalSyncServer();
+const remoteServer = new RemoteControlServer();
+
 app.use(cors());
 app.use(express.json());
 
@@ -32,6 +38,7 @@ app.use('/api/tracks', tracksRouter);
 app.use('/api/playlists/smart', playlistsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/subtitles', subtitlesRouter);
+app.use('/api/radio', radioRouter);
 
 const PORT = process.env.PORT || 3001;
 
