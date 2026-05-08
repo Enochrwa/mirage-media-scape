@@ -1,11 +1,11 @@
 import React from 'react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import AudioPlayer from './AudioPlayer';
 import VideoPlayer from './VideoPlayer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const PlayerModal = () => {
-  const { currentFile, closePlayer } = useMedia();
+  const { currentFile, closePlayer } = usePlayerStore();
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {

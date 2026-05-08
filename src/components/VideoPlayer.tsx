@@ -9,7 +9,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { SubtitleCue, parseSRT } from '@/lib/utils';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
 
 const formatTime = (seconds: number): string => {
@@ -85,7 +85,8 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
 };
 
 const VideoPlayer: React.FC = () => {
-  const { currentFile, playbackEngine, updateCurrentTime, updateDuration } = useMedia();
+  const { currentFile, setCurrentTime: updateCurrentTime, setDuration: updateDuration } = usePlayerStore();
+  const playbackEngine = (window as any).playbackEngine; // We might need to export this properly
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -413,6 +414,7 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    const engine = (window as any).playbackEngine;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;
@@ -420,9 +422,11 @@ const VideoPlayer: React.FC = () => {
       updateCurrentTime(time);
 
       // Handle A-B Loop
-      playbackEngine.abLoop.check(time, (seekTo) => {
-        video.currentTime = seekTo;
-      });
+      if (engine && engine.abLoop) {
+        engine.abLoop.check(time, (seekTo: number) => {
+          video.currentTime = seekTo;
+        });
+      }
 
       // Handle Subtitles
       if (subtitlesEnabled && cues.length > 0) {

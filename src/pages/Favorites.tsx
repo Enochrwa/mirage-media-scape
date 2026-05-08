@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { useMedia, MediaFile } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore'; import { useLibraryStore } from '@/store/useLibraryStore'; import { MediaFile } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heart, Play, Music, Film, ListMusic, Search } from 'lucide-react';
@@ -19,7 +19,7 @@ interface MediaCardProps {
 }
 
 const MediaCard: React.FC<MediaCardProps> = ({ file, onRemoveFavorite }) => {
-  const { playFile } = useMedia();
+  const { playFile } = usePlayerStore();
   
   return (
     <Card className="group relative overflow-hidden">
@@ -56,7 +56,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ file, onRemoveFavorite }) => {
 const Favorites = () => {
   // In a real app, favorites would be stored in the state or database
   // For this demo, we're using the existing files as "favorites"
-  const { files } = useMedia();
+  const { files } = useLibraryStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [favorites, setFavorites] = useState<MediaFile[]>(files.slice(0, 5));
   

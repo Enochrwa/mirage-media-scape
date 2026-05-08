@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import type { MediaFile } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,7 @@ const formatDuration = (seconds: number) => {
 };
 
 const Dashboard = () => {
-  const { files, playFile } = useMedia();
+  const { files, playFile } = useLibraryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [sortField, setSortField] = useState('title');

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import * as Grid from 'react-window';
 import { AutoSizer } from 'react-virtualized-auto-sizer';
-import { MediaFile, useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore'; import { MediaFile } from '@/types/media';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, MoreHorizontal, Film, Music } from 'lucide-react';
@@ -13,7 +13,7 @@ interface LibraryGridProps {
 }
 
 const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
-  const { playFile } = useMedia();
+  const { playFile } = usePlayerStore();
 
   const COLUMN_COUNT = 5;
   const ROW_COUNT = Math.ceil(files.length / COLUMN_COUNT);

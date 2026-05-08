@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { useMedia } from "@/contexts/MediaContext";
+import { usePlayerStore } from "@/store/usePlayerStore";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/utils";
 import WaveformSeekBar from "./WaveformSeekBar";

@@ -11,7 +11,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useMedia } from '@/contexts/MediaContext';
+import { useLibraryStore } from '@/store/useLibraryStore';
 import { 
   Search, Music, Film, ListMusic, Upload, Settings, 
   Home, ChevronLeft, ChevronRight, Menu, Heart, Globe, 
@@ -75,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isSmartPlaylistModalOpen, setIsSmartPlaylistModalOpen] = useState(false);
-  const { playlists, smartPlaylists, fetchSmartPlaylists, files } = useMedia();
+  const { playlists, smartPlaylists, fetchSmartPlaylists, files } = useLibraryStore();
   
   useEffect(() => {
     // Set active view based on current route

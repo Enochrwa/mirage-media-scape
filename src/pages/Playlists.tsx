@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { useMedia, Playlist } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore'; import { useLibraryStore } from '@/store/useLibraryStore'; import { Playlist } from '@/types/media';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Play, ListMusic, MoreHorizontal, Plus, Music, Film } from 'lucide-react';
 
 const PlaylistCard: React.FC<{ playlist: Playlist }> = ({ playlist }) => {
-  const { playFile } = useMedia();
+  const { playFile } = usePlayerStore();
   
   const handlePlayPlaylist = () => {
     if (playlist.files.length > 0) {
@@ -56,7 +56,7 @@ const PlaylistCard: React.FC<{ playlist: Playlist }> = ({ playlist }) => {
 };
 
 const Playlists = () => {
-  const { playlists, createPlaylist } = useMedia();
+  const { playlists, createPlaylist } = useLibraryStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   

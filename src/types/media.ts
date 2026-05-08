@@ -1,5 +1,4 @@
-
-import { MediaType } from "@/contexts/MediaContext";
+export type MediaType = 'audio' | 'video';
 
 export interface MediaFile {
   id: string;
@@ -7,13 +6,23 @@ export interface MediaFile {
   artist?: string;
   album?: string;
   cover?: string;
-  url: string;
+  file: string;
   type: MediaType;
   duration?: number;
-  size?: number;
-  bpm?: number;
-  key?: string;
-  camelot_key?: string;
-  bpm_confidence?: number;
   loudness?: number;
+  bpm?: number;
+  camelot_key?: string;
+  file_path?: string;
+  key?: string;
+  genre?: string;
+  year?: number;
+  bitrate?: string;
+  sampleRate?: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  files: MediaFile[];
+  rules?: any;
 }

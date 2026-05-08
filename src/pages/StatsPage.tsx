@@ -3,10 +3,10 @@ import MainLayout from '@/components/MainLayout';
 import { API_BASE, formatDuration } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Music, Clock, User, BarChart3, History } from 'lucide-react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 const StatsPage = () => {
-    const { playFile } = useMedia();
+    const { playFile } = usePlayerStore();
     const [topTracks, setTopTracks] = useState<any[]>([]);
     const [history, setHistory] = useState<any[]>([]);
     const [summary, setSummary] = useState<any>(null);

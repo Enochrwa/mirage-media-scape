@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useMedia, MediaFile } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore'; import { MediaFile } from '@/types/media';
 import { API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Play, Sparkles } from 'lucide-react';
@@ -10,7 +10,7 @@ interface RecommendationsProps {
 }
 
 const Recommendations: React.FC<RecommendationsProps> = ({ trackId }) => {
-    const { playFile } = useMedia();
+    const { playFile } = usePlayerStore();
     const [recommended, setRecommended] = useState<MediaFile[]>([]);
 
     useEffect(() => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { useMedia, MediaFile, MediaType } from '@/contexts/MediaContext';
+import { useLibraryStore } from '@/store/useLibraryStore'; import { MediaFile, MediaType } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ interface UploadMediaProps {
 }
 
 const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
-  const { addFile } = useMedia();
+  const { addFile } = useLibraryStore();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);

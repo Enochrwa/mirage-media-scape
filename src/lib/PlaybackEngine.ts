@@ -456,3 +456,4 @@ export class PlaybackEngine {
 // → Destination
 
 export const playbackEngine = new PlaybackEngine();
+(window as any).playbackEngine = playbackEngine;

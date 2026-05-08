@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import AudioPlayer from './AudioPlayer';
 import VideoPlayer from './VideoPlayer';
 import {
@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog"
 
 const PlayerWrapper = () => {
-  const { currentFile, closePlayer } = useMedia();
+  const { currentFile, closePlayer } = usePlayerStore();
 
   if (!currentFile) {
     return null;

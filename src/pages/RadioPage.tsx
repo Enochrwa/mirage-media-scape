@@ -5,10 +5,10 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Radio, Search, Play, Globe } from 'lucide-react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 const RadioPage = () => {
-    const { playFile } = useMedia();
+    const { playFile } = usePlayerStore();
     const [stations, setStations] = useState<any[]>([]);
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/MainLayout';
-import { useMedia, MediaFile } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore'; import { useLibraryStore } from '@/store/useLibraryStore'; import { MediaFile } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { 
@@ -18,7 +18,7 @@ interface MediaCardProps {
 }
 
 const MediaCard: React.FC<MediaCardProps> = ({ file }) => {
-  const { playFile } = useMedia();
+  const { playFile } = usePlayerStore(); const { files, playlists } = useLibraryStore();
   
   return (
     <Card className="group relative overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -61,7 +61,7 @@ const StatCard: React.FC<{ icon: JSX.Element; label: string; count: number; bg: 
 };
 
 const Home = () => {
-  const { files, playlists } = useMedia();
+  const { files, playlists } = useLibraryStore();
   const [activeTab, setActiveTab] = useState("discover");
   
   const audioFiles = files.filter(file => file.type === 'audio');
