@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useMedia, MediaFile, MediaType } from '@/contexts/MediaContext';
+import { useLibraryStore } from '@/store/useLibraryStore'; import { MediaFile, MediaType } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ interface MediaLibraryProps {
 }
 
 const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initialMediaType }) => {
-  const { files } = useMedia();
+  const { files } = useLibraryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [mediaType, setMediaType] = useState<MediaType | 'all'>(initialMediaType || 'all');
   const location = useLocation();

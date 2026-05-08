@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { API_BASE, SubtitleCue } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Captions } from 'lucide-react';
 
 const SubtitleManager: React.FC = () => {
-    const { currentFile, currentTime } = useMedia();
+    const { currentFile, currentTime } = usePlayerStore();
     const [tracks, setTracks] = useState<any[]>([]);
     const [cues, setCues] = useState<SubtitleCue[]>([]);
     const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);

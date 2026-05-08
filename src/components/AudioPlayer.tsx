@@ -5,20 +5,21 @@ import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpe
 import { cn } from '@/lib/utils';
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, 
-  Repeat, Shuffle, Heart, Share2, BookmarkPlus, MoreHorizontal, 
-  Globe, Mic, Radio, Headphones, Settings, Zap, Music, Waves,
-  Timer, Clock, Rewind, FastForward, Download, Upload, Star,
-  TrendingUp, Activity, Sparkles, Eye, EyeOff, RotateCcw,
-  Wind, Sun, Moon, Palette, Filter, SlidersHorizontal, Maximize, Minimize, X
+  Repeat, Shuffle, Heart, Share2, BookmarkPlus,
+  Mic, Radio, Headphones, Settings, Zap, Music,
+  Timer, Rewind, FastForward, Download, Star,
+  TrendingUp, Activity, Eye, EyeOff, Maximize, Minimize, X,
+  Palette, SlidersHorizontal
 } from 'lucide-react';
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { MediaFile, Playlist } from '@/types/media';
 
-
-
-// Simplified UI Components (since we don't have access to the full shadcn/ui library)
-const Button = ({ children, variant = "default", size = "default", className = "", onClick, ...props }) => (
+// Re-using the simplified UI components for consistency
+const Button = ({ children, variant = "default", size = "default", className = "", onClick, ...props }: any) => (
   <button 
     onClick={onClick}
     className={cn(
@@ -37,13 +38,13 @@ const Button = ({ children, variant = "default", size = "default", className = "
   </button>
 );
 
-const Card = ({ children, className = "" }) => (
+const Card = ({ children, className = "" }: any) => (
   <div className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}>
     {children}
   </div>
 );
 
-const Badge = ({ children, variant = "default", className = "" }) => (
+const Badge = ({ children, variant = "default", className = "" }: any) => (
   <div className={cn(
     "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
     variant === "secondary" ? "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80" :
@@ -55,8 +56,8 @@ const Badge = ({ children, variant = "default", className = "" }) => (
   </div>
 );
 
-const Slider = ({ value, max, min = 0, step = 1, onValueChange, className = "" }) => {
-  const handleChange = (e) => {
+const Slider = ({ value, max, min = 0, step = 1, onValueChange, className = "" }: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     onValueChange([newValue]);
   };
@@ -70,37 +71,16 @@ const Slider = ({ value, max, min = 0, step = 1, onValueChange, className = "" }
         step={step}
         value={value[0]}
         onChange={handleChange}
-        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
         style={{
           background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${(value[0] / max) * 100}%, rgb(55, 65, 81) ${(value[0] / max) * 100}%, rgb(55, 65, 81) 100%)`
         }}
       />
-      <style jsx>{`
-        .slider-thumb::-webkit-slider-thumb {
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: rgb(139, 92, 246);
-          cursor: pointer;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        .slider-thumb::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: rgb(139, 92, 246);
-          cursor: pointer;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-      `}</style>
     </div>
   );
 };
 
-const Switch = ({ checked, onCheckedChange, className = "" }) => (
+const Switch = ({ checked, onCheckedChange, className = "" }: any) => (
   <button
     role="switch"
     aria-checked={checked}
@@ -120,56 +100,46 @@ const Switch = ({ checked, onCheckedChange, className = "" }) => (
   </button>
 );
 
-// Mock data for demonstration
-const mockCurrentFile = {
-  title: "Starlight Symphony",
-  artist: "Cosmic Orchestra",
-  album: "Celestial Sounds",
-  cover: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop",
-  file: "https://wavesurfer-js.org/examples/audio/audio.wav",
-  type: 'audio',
-  duration: 245,
-  genre: "Electronic",
-  year: 2024,
-  bitrate: "320 kbps",
-  sampleRate: "44.1 kHz"
-};
-
-const mockPlaylists = [
-  { id: '1', name: 'Favorites' },
-  { id: '2', name: 'Chill Vibes' },
-  { id: '3', name: 'Workout Mix' },
-];
-
-const formatTime = (seconds) => {
+const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
-
-import { useMedia, MediaFile } from '@/contexts/MediaContext';
 
 interface AudioPlayerProps {
   file?: MediaFile;
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
-  const { closePlayer, ...media } = useMedia();
-  // Core player state
-  const [currentFile] = useState(file || mockCurrentFile);
-  const [playlists] = useState(media.playlists || mockPlaylists);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.7);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const {
+    currentFile: storeFile,
+    isPlaying,
+    togglePlayback,
+    volume,
+    setVolume,
+    currentTime,
+    duration,
+    setCurrentTime,
+    setDuration,
+    shuffle,
+    setShuffle,
+    repeat,
+    setRepeat,
+    nextTrack,
+    previousTrack,
+    closePlayer,
+    isPlayerFullscreen,
+    setPlayerFullscreen
+  } = usePlayerStore();
+
+  const { files, playlists, addToPlaylist } = useLibraryStore();
+
+  const currentFile = file || storeFile;
+
+  // Local UI states
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
-  const [isPlayerFullscreen, setPlayerFullscreen] = useState(false);
-  
-  // Enhanced features state
   const [isFavorite, setIsFavorite] = useState(false);
-  const [repeat, setRepeat] = useState(false);
-  const [shuffle, setShuffle] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [sleepTimer, setSleepTimer] = useState(0);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
@@ -201,11 +171,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   // Refs
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
-  const regionsRef = useRef(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const regionsRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!waveformRef.current) return;
+    if (!waveformRef.current || !currentFile) return;
     
     if (wavesurferRef.current) {
         wavesurferRef.current.destroy();
@@ -222,9 +191,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       height: 120,
       cursorWidth: 2,
       cursorColor: '#fff',
+      interact: true,
     });
 
     wavesurferRef.current = ws;
+    ws.setMuted(true); // Single source of truth is PlaybackEngine
     
     const wsRegions = ws.registerPlugin(RegionsPlugin.create());
     regionsRef.current = wsRegions;
@@ -242,57 +213,44 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
     ws.on('ready', () => {
       setDuration(ws.getDuration());
-      media.updateDuration(ws.getDuration());
     });
 
-    ws.on('audioprocess', (time) => {
-      setCurrentTime(time);
-      media.updateCurrentTime(time);
+    ws.on('interaction', (newProgress) => {
+        const engine = (window as any).playbackEngine;
+        if (engine) {
+            // Seek on interaction
+            const seekTime = newProgress * ws.getDuration();
+            setCurrentTime(seekTime);
+        }
     });
-
-    ws.on('play', () => setIsPlaying(true));
-    ws.on('pause', () => setIsPlaying(false));
 
     return () => {
       ws.destroy();
     };
-  }, [currentFile.file]);
-
-
-  const togglePlayback = useCallback(() => {
-    media.togglePlayback();
-  }, [media.togglePlayback]);
+  }, [currentFile?.file]);
 
   useEffect(() => {
-    setIsPlaying(media.isPlaying);
-  }, [media.isPlaying]);
+    if (wavesurferRef.current && duration > 0) {
+        wavesurferRef.current.setTime(currentTime);
+    }
+  }, [currentTime, duration]);
 
   const handleVolumeClick = () => {
-    if (wavesurferRef.current) {
-        if (muted) {
-            setMuted(false);
-            setVolume(prevVolume);
-            wavesurferRef.current.setVolume(prevVolume);
-        } else {
-            setPrevVolume(volume);
-            setMuted(true);
-            setVolume(0);
-            wavesurferRef.current.setVolume(0);
-        }
+    if (muted) {
+        setMuted(false);
+        setVolume(prevVolume);
+    } else {
+        setPrevVolume(volume);
+        setMuted(true);
+        setVolume(0);
     }
   };
 
   const handleVolumeChange = (newVolume: number[]) => {
     const vol = newVolume[0];
     setVolume(vol);
-    if (wavesurferRef.current) {
-      wavesurferRef.current.setVolume(vol);
-    }
-    if (vol > 0 && muted) {
-      setMuted(false);
-    } else if (vol === 0) {
-      setMuted(true);
-    }
+    if (vol > 0 && muted) setMuted(false);
+    else if (vol === 0) setMuted(true);
   };
 
   const VolumeIcon = () => {
@@ -301,256 +259,112 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return <Volume2 size={20} />;
   };
 
-  const handleProgressChange = (newValue: number[]) => {
-    const time = newValue[0];
-    setCurrentTime(time);
-    if (wavesurferRef.current) {
-      wavesurferRef.current.seekTo(time / wavesurferRef.current.getDuration());
-    }
-  };
-
-  const handleSpeedChange = (speed: number) => {
-    setPlaybackSpeed(speed);
-    if (wavesurferRef.current) {
-      wavesurferRef.current.setPlaybackRate(speed);
-    }
-    setShowSpeedMenu(false);
-  };
-
-  const handleSleepTimer = (minutes) => {
+  const handleSleepTimer = (minutes: number) => {
     setSleepTimer(minutes);
     setShowTimerMenu(false);
-    if (minutes > 0) {
-      setTimeout(() => {
-        setIsPlaying(false);
-        setSleepTimer(0);
-      }, minutes * 60 * 1000);
-    }
+    const engine = (window as any).playbackEngine;
+    if (engine) engine.startSleepTimer(minutes * 60);
   };
 
-  const showToast = (message) => {
-    // Mock toast notification
+  const showToast = (message: string) => {
     console.log('Toast:', message);
-  };
-
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    showToast(isFavorite ? "Removed from favorites" : "Added to favorites");
-  };
-
-  const toggleTrimming = () => {
-    if (regionsRef.current) {
-        // Clear any existing regions when toggling mode
-        regionsRef.current.clearRegions();
-        setTrimRegion(null);
-
-        if (!isTrimming) {
-            // Enable region creation by dragging
-            regionsRef.current.enableDragSelection({
-                color: 'rgba(255, 100, 0, 0.15)',
-            });
-        } else {
-            // Disable region creation
-            regionsRef.current.disableDragSelection();
-        }
-        setIsTrimming(!isTrimming);
-    }
   };
 
   const handleConfirmTrim = async () => {
     if (!trimRegion || !currentFile) return;
-
     setIsProcessing(true);
-    showToast('Starting trim process... This may take a moment.');
-
     try {
-        const trimmedAudioBlob = await trimAudio(
-            currentFile.file,
-            trimRegion.start,
-            trimRegion.end
-        );
-
-        // Create a downloadable link
-        const url = URL.createObjectURL(trimmedAudioBlob);
+        const blob = await trimAudio(currentFile.file, trimRegion.start, trimRegion.end);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `trimmed_${currentFile.title}.wav`; // Assuming wav
-        document.body.appendChild(a);
+        a.download = `trimmed_${currentFile.title}.wav`;
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        showToast('Trim successful! Check your downloads.');
-    } catch (error) {
-        console.error('Error trimming audio:', error);
-        showToast('An error occurred during the trim process.');
-    } finally {
-        setIsProcessing(false);
-    }
+        showToast('Trim successful!');
+    } catch (e) { showToast('Trim failed'); }
+    finally { setIsProcessing(false); }
   };
 
   const handleNormalize = async () => {
     if (!currentFile) return;
     setIsProcessing(true);
-    showToast('Normalizing volume... This may take a moment.');
     try {
-        const normalizedBlob = await normalizeVolume(currentFile.file);
-        const url = URL.createObjectURL(normalizedBlob);
+        const blob = await normalizeVolume(currentFile.file);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `normalized_${currentFile.title}.wav`;
-        document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('Normalization successful! Check your downloads.');
-    } catch (error) {
-        console.error('Error normalizing volume:', error);
-        showToast('An error occurred during normalization.');
-    } finally {
-        setIsProcessing(false);
-    }
+        showToast('Normalization complete!');
+    } catch (e) { showToast('Normalization failed'); }
+    finally { setIsProcessing(false); }
   };
 
   const handleVolumeBoost = async () => {
       if (!currentFile || volumeBoost === 0) return;
       setIsProcessing(true);
-      showToast(`Changing volume by ${volumeBoost}dB...`);
       try {
-          const boostedBlob = await changeVolume(currentFile.file, volumeBoost);
-          const url = URL.createObjectURL(boostedBlob);
+          const blob = await changeVolume(currentFile.file, volumeBoost);
+          const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `volume_boost_${volumeBoost}dB_${currentFile.title}.wav`;
-          document.body.appendChild(a);
+          a.download = `boosted_${currentFile.title}.wav`;
           a.click();
-          document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          showToast('Volume change successful! Check your downloads.');
-      } catch (error) {
-          console.error('Error changing volume:', error);
-          showToast('An error occurred while changing volume.');
-      } finally {
-          setIsProcessing(false);
-      }
+          showToast('Volume boost applied!');
+      } catch (e) { showToast('Boost failed'); }
+      finally { setIsProcessing(false); }
   };
 
   const handleApplyFades = async () => {
-    if (!currentFile || (fadeInDuration === 0 && fadeOutDuration === 0)) {
-        showToast("Please specify a fade-in or fade-out duration.");
-        return;
-    }
-    if (fadeInDuration + fadeOutDuration > duration) {
-        showToast("Total fade duration cannot exceed the audio length.");
-        return;
-    }
-
+    if (!currentFile) return;
     setIsProcessing(true);
-    showToast('Applying fade effects...');
-
     try {
-        const fadedBlob = await applyFade(currentFile.file, duration, fadeInDuration, fadeOutDuration);
-        const url = URL.createObjectURL(fadedBlob);
+        const blob = await applyFade(currentFile.file, duration, fadeInDuration, fadeOutDuration);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `faded_${currentFile.title}.wav`;
-        document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('Fade effects applied successfully!');
-    } catch (error) {
-        console.error('Error applying fades:', error);
-        showToast('An error occurred while applying fades.');
-    } finally {
-        setIsProcessing(false);
-    }
+        showToast('Fades applied!');
+    } catch (e) { showToast('Fades failed'); }
+    finally { setIsProcessing(false); }
   };
+
+  if (!currentFile) return null;
 
   if (isPlayerFullscreen) {
     return (
       <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-between p-8 text-white">
         <div className="absolute top-4 right-4 flex gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-gray-400 hover:text-white hover:bg-white/10"
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = currentFile.file;
-              link.download = `${currentFile.title}.mp3`;
-              link.click();
-            }}
-          >
-            <Download size={22} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-gray-400 hover:text-white hover:bg-white/10"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              showToast("Link copied to clipboard!");
-            }}
-          >
-            <Share2 size={22} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-gray-400 hover:text-white hover:bg-white/10"
-            onClick={() => setPlayerFullscreen(false)}
-          >
-            <Minimize size={22} />
-          </Button>
+            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={() => {
+                const link = document.createElement('a');
+                link.href = currentFile.file;
+                link.download = `${currentFile.title}.mp3`;
+                link.click();
+            }}><Download size={22} /></Button>
+            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={() => setPlayerFullscreen(false)}><Minimize size={22} /></Button>
         </div>
-
         <div className="flex flex-col items-center gap-6 text-center">
-          <img 
-            src={currentFile.cover} 
-            alt={currentFile.title} 
-            className="w-64 h-64 rounded-full shadow-2xl animate-pulse-slow" 
-          />
+          <img src={currentFile.cover || '/placeholder.svg'} alt={currentFile.title} className="w-64 h-64 rounded-full shadow-2xl animate-pulse-slow" />
           <h1 className="text-5xl font-bold">{currentFile.title}</h1>
           <p className="text-2xl text-gray-400">{currentFile.artist}</p>
         </div>
-
-        <div className="w-full max-w-5xl h-48 my-8">
-          {/* Intentionally left blank for now, waveform is in the main view */}
-        </div>
-
         <div className="w-full max-w-3xl space-y-6">
           <div className="flex items-center gap-4">
-            <span className="text-base text-gray-400 w-16 text-center font-mono">
-              {formatTime(currentTime)}
-            </span>
-            <div className="flex-1 relative">
-              <Slider
-                value={[currentTime]}
-                max={duration}
-                step={1}
-                onValueChange={handleProgressChange}
-                className="w-full"
-              />
-            </div>
-            <span className="text-base text-gray-400 w-16 text-center font-mono">
-              {formatTime(duration)}
-            </span>
+            <span className="font-mono text-gray-400 w-16">{formatTime(currentTime)}</span>
+            <Slider value={[currentTime]} max={duration} onValueChange={(v: number[]) => setCurrentTime(v[0])} className="flex-1" />
+            <span className="font-mono text-gray-400 w-16">{formatTime(duration)}</span>
           </div>
           <div className="flex items-center justify-center gap-6">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 w-12 h-12">
-              <SkipBack size={28} />
+            <Button variant="ghost" size="icon" onClick={() => previousTrack(files)}><SkipBack size={28} /></Button>
+            <Button size="icon" className="w-24 h-24 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-full" onClick={togglePlayback}>
+                {isPlaying ? <Pause size={36} /> : <Play size={36} className="ml-1" />}
             </Button>
-            <Button
-              size="icon"
-              className="w-24 h-24 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 rounded-full shadow-2xl transition-all duration-300 hover:scale-105"
-              onClick={togglePlayback}
-            >
-              {isPlaying ? <Pause size={36} /> : <Play size={36} className="ml-1" />}
-            </Button>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 w-12 h-12">
-              <SkipForward size={28} />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={() => nextTrack(files)}><SkipForward size={28} /></Button>
           </div>
         </div>
       </div>
@@ -559,752 +373,114 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   return (
     <div className="w-full mx-auto h-[95vh] bg-gradient-to-br from-slate-900 via-purple-900/20 to-cyan-900/20 p-4 flex items-center justify-center">
-      <Card className={cn(
-        "relative overflow-hidden w-full h-full",
-        "bg-gradient-to-br from-slate-900/95 via-purple-900/30 to-cyan-900/30",
-        "backdrop-blur-xl border border-white/20 shadow-2xl",
-        ambientMode && "ring-2 ring-purple-500/50 shadow-purple-500/25"
-      )}>
-        {/* Ambient lighting effect */}
-        {ambientMode && (
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-transparent to-cyan-600/10 animate-pulse" />
-        )}
-        
-        {/* Particle background effect */}
-        {particleEffect && (
-          <div className="absolute inset-0 opacity-30">
-            <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-            <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '1s' }} />
-            <div className="absolute top-1/2 left-3/4 w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '2s' }} />
-          </div>
-        )}
-
-        <div className="relative z-10 p-8 space-y-8">
-          {/* Header Section */}
+      <Card className="relative overflow-hidden w-full h-full bg-slate-900/95 backdrop-blur-xl border border-white/20 shadow-2xl">
+        <div className="relative z-10 p-8 space-y-8 overflow-y-auto h-full">
+          {/* Header */}
           <div className="flex items-start gap-8">
-            <div className="relative group">
-              <img 
-                src={currentFile.cover} 
-                alt={currentFile.title} 
-                className="w-32 h-32 rounded-2xl object-cover shadow-2xl ring-2 ring-white/20 transition-all duration-300 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-cyan-500/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              {isPlaying && (
-                <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/30 to-cyan-500/30 rounded-2xl animate-pulse" />
-              )}
-            </div>
-            
+            <img src={currentFile.cover || '/placeholder.svg'} alt={currentFile.title} className="w-32 h-32 rounded-2xl object-cover shadow-2xl" />
             <div className="flex-1 min-w-0 space-y-4">
               <h2 className="text-4xl font-bold text-white truncate">{currentFile.title}</h2>
               <p className="text-2xl text-gray-300 truncate">{currentFile.artist}</p>
-              <div className="flex items-center gap-6 text-base text-gray-400">
-                <Badge variant="secondary" className="bg-purple-500/20 text-purple-200 text-base px-4 py-1">
-                  {currentFile.genre}
-                </Badge>
-                <span>{currentFile.year}</span>
-                <span>{currentFile.bitrate}</span>
-                <span>{currentFile.sampleRate}</span>
-                {currentFile.bpm && (
-                  <span className="flex items-center gap-1.5 font-mono text-purple-400">
-                    <Activity size={16} />
-                    {Math.round(currentFile.bpm)} BPM
-                  </span>
-                )}
-                {currentFile.camelot_key && (
-                  <span className="flex items-center gap-1.5 font-bold text-cyan-400">
-                    <Zap size={16} />
-                    {currentFile.camelot_key} ({currentFile.key})
-                  </span>
-                )}
-              </div>
-              
-              {/* Star Rating */}
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Button
-                    key={star}
-                    variant="ghost"
-                    size="icon"
-                    className="w-8 h-8 p-0 hover:bg-transparent"
-                    onClick={() => setRating(star)}
-                  >
-                    <Star 
-                      size={18} 
-                      className={star <= rating ? "text-yellow-400 fill-current" : "text-gray-500"} 
-                    />
-                  </Button>
-                ))}
+              <div className="flex items-center gap-4">
+                <Badge variant="secondary">{currentFile.genre || 'Music'}</Badge>
+                {currentFile.bpm && <span className="text-gray-400 flex items-center gap-1"><Activity size={16}/>{Math.round(currentFile.bpm)} BPM</span>}
+                {currentFile.camelot_key && <span className="text-cyan-400 flex items-center gap-1"><Zap size={16}/>{currentFile.camelot_key}</span>}
               </div>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "hover:bg-white/10 transition-all duration-300 w-12 h-12",
-                  isFavorite ? "text-red-400 hover:text-red-300" : "text-gray-400 hover:text-white"
-                )}
-                onClick={toggleFavorite}
-              >
-                <Heart size={24} fill={isFavorite ? "currentColor" : "none"} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${currentFile.title} by ${currentFile.artist}`);
-                  showToast("Copied to clipboard!");
-                }}
-              >
-                <Share2 size={24} />
-              </Button>
-
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                  onClick={() => setShowPlaylistMenu(!showPlaylistMenu)}
-                >
-                  <BookmarkPlus size={24} />
-                </Button>
-                {showPlaylistMenu && (
-                  <div className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg p-2 min-w-48 z-20">
-                    <div className="text-white text-sm font-semibold p-2">Add to playlist</div>
-                    <div className="border-t border-slate-700 my-1"></div>
-                    {playlists.map(playlist => (
-                      <button 
-                        key={playlist.id}
-                        className="block w-full text-left text-gray-300 hover:bg-slate-700 hover:text-white p-2 rounded text-sm"
-                        onClick={() => {
-                          setShowPlaylistMenu(false);
-                          showToast(`Added to ${playlist.name}`);
-                        }}
-                      >
-                        {playlist.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12",
-                  recordingMode && "text-red-400"
-                )}
-                onClick={() => setRecordingMode(!recordingMode)}
-              >
-                <Mic size={24} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = currentFile.file;
-                  link.download = `${currentFile.title}.mp3`;
-                  link.click();
-                }}
-              >
-                <Download size={24} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                onClick={closePlayer}
-              >
-                <X size={24} />
-              </Button>
-            </div>
-          </div>
-
-          {/* Waveform Display / Lyrics */}
-          <div className="relative h-64 rounded-2xl overflow-hidden bg-black/20 border border-white/10">
-            {showLyrics ? (
-              <LyricsDisplay
-                artist={currentFile.artist || ''}
-                title={currentFile.title}
-                currentTime={currentTime}
-                className="h-full"
-              />
-            ) : (
-              <div ref={waveformRef} className="h-full w-full" />
-            )}
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <span className="text-base text-gray-400 w-16 text-center font-mono">
-                {formatTime(currentTime)}
-              </span>
-              <div className="flex-1 relative">
-                <Slider
-                  value={[currentTime]}
-                  max={duration}
-                  step={1}
-                  onValueChange={handleProgressChange}
-                  className="w-full"
-                />
-                <div className="absolute -top-8 left-0 right-0 flex justify-between text-xs text-gray-500 pointer-events-none">
-                  {[0, 0.25, 0.5, 0.75, 1].map((pos, i) => (
-                    <span key={i}>{formatTime(duration * pos)}</span>
-                  ))}
-                </div>
-              </div>
-              <span className="text-base text-gray-400 w-16 text-center font-mono">
-                {formatTime(duration)}
-              </span>
-            </div>
-
-            {/* Sleep Timer */}
-            {sleepTimer > 0 && (
-              <div className="flex items-center justify-center gap-3 text-base text-purple-300">
-                <Timer size={20} />
-                <span>Sleep timer: {sleepTimer} minutes</span>
-              </div>
-            )}
-          </div>
-
-          {/* Main Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12",
-                  shuffle && "text-purple-400"
-                )}
-                onClick={() => setShuffle(!shuffle)}
-              >
-                <Shuffle size={22} />
-              </Button>
-
-              <div className="relative">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                  onClick={() => setShowTimerMenu(!showTimerMenu)}
-                >
-                  <Timer size={22} />
-                </Button>
-                {showTimerMenu && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg p-2 min-w-32 z-20">
-                    <div className="text-white text-sm font-semibold p-2">Sleep Timer</div>
-                    <div className="border-t border-slate-700 my-1"></div>
-                    {[0, 15, 30, 45, 60, 90, 120].map(minutes => (
-                      <button 
-                        key={minutes}
-                        onClick={() => handleSleepTimer(minutes)}
-                        className="block w-full text-left text-gray-300 hover:bg-slate-700 hover:text-white p-2 rounded text-sm"
-                      >
-                        {minutes === 0 ? 'Off' : `${minutes} min`}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white hover:bg-white/10 w-12 h-12"
-                onClick={() => setCurrentTime(Math.max(0, currentTime - 10))}
-              >
-                <Rewind size={24} />
-              </Button>
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white hover:bg-white/10 w-12 h-12"
-              >
-                <SkipBack size={24} />
-              </Button>
-              
-              <Button 
-                size="icon" 
-                className="w-16 h-16 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 rounded-full shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={togglePlayback}
-              >
-                {isPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
-              </Button>
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white hover:bg-white/10 w-12 h-12"
-              >
-                <SkipForward size={24} />
-              </Button>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white hover:bg-white/10 w-12 h-12"
-                onClick={() => setCurrentTime(Math.min(duration, currentTime + 10))}
-              >
-                <FastForward size={24} />
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12",
-                  repeat && "text-purple-400"
-                )}
-                onClick={() => setRepeat(!repeat)}
-              >
-                <Repeat size={22} />
-              </Button>
-
-              <div className="relative">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                  onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                >
-                  <Settings size={22} />
-                </Button>
-                {showSettingsMenu && (
-                  <div className="absolute bottom-full right-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg p-3 min-w-48 z-20">
-                    <div className="text-white text-sm font-semibold mb-3">Audio Settings</div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-300 text-sm">Crossfade</span>
-                        <Switch
-                          checked={crossfadeEnabled}
-                          onCheckedChange={setCrossfadeEnabled}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-300 text-sm">Surround Sound</span>
-                        <Switch
-                          checked={surroundSound}
-                          onCheckedChange={setSurroundSound}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-300 text-sm">Noise Reduction</span>
-                        <Switch
-                          checked={noiseReduction}
-                          onCheckedChange={setNoiseReduction}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-300 text-sm">Auto Gain</span>
-                        <Switch
-                          checked={autoGain}
-                          onCheckedChange={setAutoGain}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Advanced Controls Panel */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                onClick={handleVolumeClick}
-              >
-                <VolumeIcon />
-              </Button>
-              <div className="flex items-center gap-3">
-                <Slider
-                  value={[volume]}
-                  max={1}
-                  step={0.01}
-                  onValueChange={handleVolumeChange}
-                  className="w-32"
-                />
-                <span className="text-sm text-gray-400 w-10 text-center">{Math.round(volume * 100)}%</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-400">Speed:</span>
+            <div className="flex gap-2">
+                <Button variant="ghost" size="icon" onClick={() => setIsFavorite(!isFavorite)} className={isFavorite ? "text-red-400" : "text-gray-400"}><Heart size={24} fill={isFavorite ? "currentColor" : "none"} /></Button>
                 <div className="relative">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-gray-400 hover:text-white"
-                    onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                  >
-                    {playbackSpeed}x
-                  </Button>
-                  {showSpeedMenu && (
-                    <div className="absolute bottom-full left-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg p-2 min-w-20 z-20">
-                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map(speed => (
-                        <button 
-                          key={speed}
-                          onClick={() => handleSpeedChange(speed)}
-                          className="block w-full text-left text-gray-300 hover:bg-slate-700 hover:text-white p-2 rounded text-sm"
-                        >
-                          {speed}x
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    <Button variant="ghost" size="icon" className="text-gray-400" onClick={() => setShowPlaylistMenu(!showPlaylistMenu)}><BookmarkPlus size={24} /></Button>
+                    {showPlaylistMenu && (
+                        <div className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg p-2 min-w-48 z-50">
+                            {playlists.map(p => (
+                                <button key={p.id} className="block w-full text-left text-gray-300 hover:bg-slate-700 p-2 rounded text-sm" onClick={() => { addToPlaylist(p.id, currentFile.id); setShowPlaylistMenu(false); }}>{p.name}</button>
+                            ))}
+                        </div>
+                    )}
                 </div>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn("text-gray-400 hover:text-white hover:bg-white/10", showEqualizer && "text-purple-400")}
-                onClick={() => setShowEqualizer(!showEqualizer)}
-              >
-                <Activity size={20} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-white hover:bg-white/10"
-                onClick={() => setShowAdvancedControls(!showAdvancedControls)}
-              >
-                <SlidersHorizontal size={20} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12",
-                  ambientMode && "text-purple-400"
-                )}
-                onClick={() => setAmbientMode(!ambientMode)}
-              >
-                <Eye size={22} />
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white hover:bg-white/10 w-12 h-12"
-                onClick={() => setPlayerFullscreen(true)}
-              >
-                <Maximize size={22} />
-              </Button>
+                <Button variant="ghost" size="icon" onClick={closePlayer} className="text-gray-400"><X size={24} /></Button>
             </div>
           </div>
 
-          {/* Equalizer Panel */}
-          {showEqualizer && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center p-8 bg-black/60 backdrop-blur-md">
-              <EqualizerControls onClose={() => setShowEqualizer(false)} />
+          {/* Waveform / Lyrics */}
+          <div className="relative h-48 bg-black/20 rounded-2xl overflow-hidden border border-white/10">
+            {showLyrics ? <LyricsDisplay artist={currentFile.artist || ''} title={currentFile.title} currentTime={currentTime} className="h-full" /> : <div ref={waveformRef} className="h-full w-full" />}
+          </div>
+
+          {/* Controls */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 text-white">
+              <span className="font-mono text-gray-400 w-16">{formatTime(currentTime)}</span>
+              <Slider value={[currentTime]} max={duration} onValueChange={(v: number[]) => setCurrentTime(v[0])} className="flex-1" />
+              <span className="font-mono text-gray-400 w-16">{formatTime(duration)}</span>
             </div>
-          )}
 
-          {/* Advanced Audio Controls (Expandable) */}
-          {showAdvancedControls && (
-            <div className="space-y-6 p-6 bg-black/20 rounded-2xl border border-white/10">
-              <h3 className="text-lg font-semibold text-white mb-4">Advanced Audio Controls</h3>
-              
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base text-gray-300">Bass Boost</span>
-                    <span className="text-sm text-gray-400">{bassBoost > 0 ? '+' : ''}{bassBoost}dB</span>
-                  </div>
-                  <Slider
-                    value={[bassBoost]}
-                    min={-12}
-                    max={12}
-                    step={1}
-                    onValueChange={(value) => setBassBoost(value[0])}
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base text-gray-300">Treble Boost</span>
-                    <span className="text-sm text-gray-400">{trebleBoost > 0 ? '+' : ''}{trebleBoost}dB</span>
-                  </div>
-                  <Slider
-                    value={[trebleBoost]}
-                    min={-12}
-                    max={12}
-                    step={1}
-                    onValueChange={(value) => setTrebleBoost(value[0])}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-white/10">
-                <h4 className="text-base font-semibold text-white mb-3">Audio Editing</h4>
-                <div className="flex items-center gap-4">
-                    <Button onClick={toggleTrimming} variant="outline">
-                        {isTrimming ? 'Cancel Trimming' : 'Trim Audio'}
-                    </Button>
-                    {isTrimming && trimRegion && (
-                        <div className="flex items-center gap-4 text-white">
-                            <span>
-                                Start: {formatTime(trimRegion.start)}
-                            </span>
-                            <span>
-                                End: {formatTime(trimRegion.end)}
-                            </span>
-                            <Button
-                                variant="default"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={handleConfirmTrim}
-                                disabled={isProcessing}
-                            >
-                                {isProcessing ? 'Processing...' : 'Confirm Trim'}
-                            </Button>
-                        </div>
-                    )}
-                </div>
-                {isTrimming && !trimRegion && (
-                    <p className="text-sm text-gray-400 mt-2">Click and drag on the waveform to select a region to trim.</p>
-                )}
-                <div className="flex items-center gap-4 mt-4">
-                    <Button onClick={handleNormalize} disabled={isProcessing} variant="outline">
-                        {isProcessing ? 'Processing...' : 'Normalize Volume'}
-                    </Button>
-                </div>
-                <div className="mt-4">
-                    <div className="flex items-center justify-between">
-                        <span className="text-base text-gray-300">Volume Boost</span>
-                        <span className="text-sm text-gray-400">{volumeBoost > 0 ? '+' : ''}{volumeBoost}dB</span>
-                    </div>
-                    <Slider
-                        value={[volumeBoost]}
-                        min={-12}
-                        max={12}
-                        step={1}
-                        onValueChange={(value) => setVolumeBoost(value[0])}
-                        className="w-full"
-                    />
-                    <Button onClick={handleVolumeBoost} disabled={isProcessing || volumeBoost === 0} className="mt-2">
-                        {isProcessing ? 'Processing...' : 'Apply Volume Boost'}
-                    </Button>
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/10">
-                    <h4 className="text-base font-semibold text-white mb-3">Fade Effects</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm text-gray-300">Fade In (seconds)</label>
-                            <input
-                                type="number"
-                                value={fadeInDuration}
-                                onChange={(e) => setFadeInDuration(Math.max(0, parseFloat(e.target.value) || 0))}
-                                className="w-full bg-gray-700 text-white rounded p-2 mt-1"
-                                min="0"
-                                step="0.1"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm text-gray-300">Fade Out (seconds)</label>
-                            <input
-                                type="number"
-                                value={fadeOutDuration}
-                                onChange={(e) => setFadeOutDuration(Math.max(0, parseFloat(e.target.value) || 0))}
-                                className="w-full bg-gray-700 text-white rounded p-2 mt-1"
-                                min="0"
-                                step="0.1"
-                            />
-                        </div>
-                    </div>
-                    <Button
-                        onClick={handleApplyFades}
-                        disabled={isProcessing || (fadeInDuration === 0 && fadeOutDuration === 0)}
-                        className="mt-3"
-                    >
-                        {isProcessing ? 'Processing...' : 'Apply Fades'}
-                    </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={surroundSound}
-                      onCheckedChange={setSurroundSound}
-                      className="data-[state=checked]:bg-purple-600"
-                    />
-                    <span className="text-base text-gray-300">3D Surround</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={noiseReduction}
-                      onCheckedChange={setNoiseReduction}
-                      className="data-[state=checked]:bg-purple-600"
-                    />
-                    <span className="text-base text-gray-300">Noise Reduction</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <span className="text-base text-gray-300">Mood:</span>
-                  <div className="relative">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-gray-400 hover:text-white capitalize"
-                      onClick={() => setShowMoodMenu(!showMoodMenu)}
-                    >
-                      {moodLighting} <Palette size={18} className="ml-2" />
-                    </Button>
-                    {showMoodMenu && (
-                      <div className="absolute bottom-full right-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg p-2 min-w-24 z-20">
-                        {['auto', 'energetic', 'calm', 'focus', 'party'].map(mood => (
-                          <button 
-                            key={mood}
-                            onClick={() => {
-                              setMoodLighting(mood);
-                              setShowMoodMenu(false);
-                            }}
-                            className="block w-full text-left text-gray-300 hover:bg-slate-700 hover:text-white p-2 rounded text-sm capitalize"
-                          >
-                            {mood}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-              {/* More Like This (Recommendations) */}
-              <div className="mt-8">
-                <Recommendations trackId={currentFile.id} />
-              </div>
-
-          {/* Lyrics Panel (Optional) */}
-          {showLyrics && (
-                <div className="bg-black/20 rounded-2xl border border-white/10 p-6 max-h-64 overflow-y-auto mt-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Lyrics</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowLyrics(false)}
-                  className="w-8 h-8 text-gray-400 hover:text-white"
-                >
-                  <EyeOff size={18} />
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" onClick={() => setShuffle(!shuffle)} className={shuffle ? "text-purple-400" : "text-gray-400"}><Shuffle size={22}/></Button>
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" className="text-white" onClick={() => previousTrack(files)}><SkipBack size={24}/></Button>
+                <Button size="icon" className="w-16 h-16 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-full" onClick={togglePlayback}>
+                    {isPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
                 </Button>
+                <Button variant="ghost" size="icon" className="text-white" onClick={() => nextTrack(files)}><SkipForward size={24}/></Button>
               </div>
-              <div className="space-y-3 text-base text-gray-300 leading-relaxed">
-                <p className="opacity-60">Under the starlight, we dance tonight</p>
-                <p className="text-purple-300 font-medium">In the cosmic symphony of our hearts</p>
-                <p className="opacity-60">Every beat, every note, feels so right</p>
-                <p className="opacity-40">As the melody carries us to distant stars...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Quick Actions Bar */}
-          <div className="flex items-center justify-between pt-4 border-t border-white/10">
-            <div className="flex items-center gap-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowLyrics(!showLyrics)}
-                className="text-gray-400 hover:text-white hover:bg-white/10 text-sm"
-              >
-                <Music size={18} className="mr-2" />
-                Lyrics
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-white hover:bg-white/10 text-sm"
-                onClick={() => showToast("Radio mode activated!")}
-              >
-                <Radio size={18} className="mr-2" />
-                Radio
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-white hover:bg-white/10 text-sm"
-                onClick={() => showToast("Concert mode enabled!")}
-              >
-                <Headphones size={18} className="mr-2" />
-                Concert
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-4 text-sm text-gray-400">
-              {currentFile.loudness !== undefined && <Badge variant="outline" className="text-sm border-blue-400 text-blue-400">ReplayGain</Badge>}
-              {crossfadeEnabled && <Badge variant="outline" className="text-sm">Crossfade</Badge>}
-              {surroundSound && <Badge variant="outline" className="text-sm">3D Audio</Badge>}
-              {noiseReduction && <Badge variant="outline" className="text-sm">Clean</Badge>}
-              {recordingMode && <Badge variant="outline" className="text-sm text-red-400 border-red-400">REC</Badge>}
-              {sleepTimer > 0 && <Badge variant="outline" className="text-sm text-purple-400 border-purple-400">Sleep</Badge>}
-            </div>
-
-            <div className="flex items-center gap-3 text-sm text-gray-400">
-              <TrendingUp size={16} />
-              <span>Quality: {currentFile.bitrate}</span>
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" title="Connected" />
+              <Button variant="ghost" size="icon" onClick={() => setRepeat(!repeat)} className={repeat ? "text-purple-400" : "text-gray-400"}><Repeat size={22}/></Button>
             </div>
           </div>
 
-          {/* Hidden Audio Element */}
-          <audio
-            ref={audioRef}
-            preload="metadata"
-            className="hidden"
-          />
-
-          {/* Performance Stats (Debug Mode) */}
-          <div className="absolute top-4 left-4 opacity-20 hover:opacity-100 transition-opacity">
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>CPU: {Math.round(Math.random() * 15 + 5)}%</div>
-              <div>Buffer: {Math.round(Math.random() * 30 + 70)}%</div>
-              <div>Latency: {Math.round(Math.random() * 10 + 5)}ms</div>
+          {/* Advanced Panels */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleVolumeClick} className="text-gray-400"><VolumeIcon /></Button>
+                <Slider value={[volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="w-24" />
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => setShowEqualizer(!showEqualizer)} className={showEqualizer ? "text-purple-400" : "text-gray-400"}><Activity size={20}/></Button>
+                <Button variant="ghost" onClick={() => setShowAdvancedControls(!showAdvancedControls)} className={showAdvancedControls ? "text-purple-400" : "text-gray-400"}><SlidersHorizontal size={20}/></Button>
+                <Button variant="ghost" onClick={() => setPlayerFullscreen(true)} className="text-gray-400"><Maximize size={20}/></Button>
             </div>
           </div>
 
-          {/* Ambient Glow Effect */}
-          {ambientMode && isPlaying && (
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-cyan-500/5 animate-pulse" />
-              <div 
-                className="absolute inset-0 opacity-30"
-                style={{
-                  background: `radial-gradient(circle at ${Math.sin(Date.now() * 0.001) * 50 + 50}% ${Math.cos(Date.now() * 0.001) * 50 + 50}%, rgba(139, 92, 246, 0.1) 0%, transparent 50%)`,
-                  animation: 'pulse 4s ease-in-out infinite'
-                }}
-              />
+          {showEqualizer && <div className="mt-4 p-4 bg-black/40 rounded-xl"><EqualizerControls onClose={() => setShowEqualizer(false)} /></div>}
+
+          {showAdvancedControls && (
+            <div className="mt-4 p-6 bg-black/40 rounded-xl space-y-6">
+                <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                        <label className="text-gray-300 text-sm">Bass Boost</label>
+                        <Slider value={[bassBoost]} min={-12} max={12} onValueChange={(v: number[]) => setBassBoost(v[0])} />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-gray-300 text-sm">Treble Boost</label>
+                        <Slider value={[trebleBoost]} min={-12} max={12} onValueChange={(v: number[]) => setTrebleBoost(v[0])} />
+                    </div>
+                </div>
+                <div className="pt-4 border-t border-white/10 flex flex-wrap gap-4">
+                    <Button variant="outline" onClick={toggleTrimming}>{isTrimming ? 'Cancel' : 'Trim'}</Button>
+                    {isTrimming && trimRegion && <Button onClick={handleConfirmTrim}>Confirm Trim</Button>}
+                    <Button variant="outline" onClick={handleNormalize}>Normalize</Button>
+                    <div className="flex items-center gap-2">
+                        <label className="text-gray-300 text-sm">Boost dB</label>
+                        <input type="number" value={volumeBoost} onChange={(e) => setVolumeBoost(parseInt(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
+                        <Button variant="outline" onClick={handleVolumeBoost}>Apply</Button>
+                    </div>
+                </div>
+                <div className="pt-4 border-t border-white/10 flex gap-4">
+                    <div className="space-y-1">
+                        <label className="text-xs text-gray-400">Fade In (s)</label>
+                        <input type="number" value={fadeInDuration} onChange={(e) => setFadeInDuration(parseFloat(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs text-gray-400">Fade Out (s)</label>
+                        <input type="number" value={fadeOutDuration} onChange={(e) => setFadeOutDuration(parseFloat(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
+                    </div>
+                    <Button variant="outline" onClick={handleApplyFades} className="self-end">Apply Fades</Button>
+                </div>
             </div>
           )}
+
+          <Recommendations trackId={currentFile.id} />
         </div>
       </Card>
     </div>

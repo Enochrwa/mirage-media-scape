@@ -25,11 +25,11 @@
     "@types/chokidar": "^1.7.5",
     "@types/express": "^4.17.21",
     "@types/jest": "^30.0.0",
-    "@types/node": "^20.19.39",
+    "@types/node": "^20.19.40",
     "jest": "^30.4.0",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.3.2"
+    "typescript": "^5.9.3"
   }
 }

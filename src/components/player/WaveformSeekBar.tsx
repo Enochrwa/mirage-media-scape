@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { API_BASE } from '@/lib/utils';
 
 interface WaveformSeekBarProps {
@@ -8,7 +8,7 @@ interface WaveformSeekBarProps {
 }
 
 const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ trackId, className }) => {
-  const { currentTime, duration, seekTo, playbackEngine } = useMedia() as any;
+  const { currentTime, duration, seekTo, playbackEngine } = usePlayerStore() as any;
   const [peaks, setPeaks] = useState<number[]>([]);
   const [abLoop, setABLoop] = useState({ pointA: null as number | null, pointB: null as number | null, isActive: false });
   const canvasRef = useRef<HTMLCanvasElement>(null);

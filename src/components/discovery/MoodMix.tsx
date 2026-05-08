@@ -3,11 +3,11 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sparkles, Play } from 'lucide-react';
-import { useMedia } from '@/contexts/MediaContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { API_BASE } from '@/lib/utils';
 
 const MoodMix: React.FC = () => {
-    const { playFile } = useMedia();
+    const { playFile } = usePlayerStore();
     const [energy, setEnergy] = useState([0.5]);
     const [tempo, setTempo] = useState([120]);
 
