@@ -8,6 +8,7 @@ import scannerRouter from './routes/scanner';
 import tracksRouter from './routes/tracks';
 import playlistsRouter from './routes/playlists';
 import statsRouter from './routes/stats';
+import subtitlesRouter from './routes/subtitles';
 
 dotenv.config();
 
@@ -20,6 +21,9 @@ const io = new Server(server, {
     }
 });
 
+scannerService.setIo(io);
+scannerService.init();
+
 app.use(cors());
 app.use(express.json());
 
@@ -27,6 +31,7 @@ app.use('/api/scanner', scannerRouter);
 app.use('/api/tracks', tracksRouter);
 app.use('/api/playlists/smart', playlistsRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/subtitles', subtitlesRouter);
 
 const PORT = process.env.PORT || 3001;
 

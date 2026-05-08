@@ -104,6 +104,8 @@ export class PlaybackEngine {
     private fadeDuration: number = 2; // Default 2s crossfade
     private sleepTimerTimeout: NodeJS.Timeout | null = null;
 
+    private compressor: DynamicsCompressorNode;
+
     constructor() {
         this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.currentGainNode = this.ctx.createGain();
@@ -124,20 +126,34 @@ export class PlaybackEngine {
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 2048;
 
+        this.compressor = this.ctx.createDynamicsCompressor();
+        this.compressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
+        this.compressor.knee.setValueAtTime(40, this.ctx.currentTime);
+        this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);
+        this.compressor.attack.setValueAtTime(0, this.ctx.currentTime);
+        this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+
         this.eq = new ParametricEQ(this.ctx);
         this.abLoop = new ABLoop();
 
+        // Chain construction based on canonical order:
+        // Source → EQ Chain (5 BiquadFilterNodes) → ReplayGain (normalizationGain)
+        // → Master Volume (masterGain) → Crossfade (current/nextGainNode handled in play)
+        // → Analyser (tap-only) → Spatial Panner → Night Compressor → Destination
+
         this.currentGainNode.connect(this.normalizationGain);
         this.nextGainNode.connect(this.normalizationGain);
-        this.normalizationGain.connect(this.masterGain);
-        this.masterGain.connect(this.eq.bands[0]);
-        // Connect the EQ bands in series
+        this.normalizationGain.connect(this.eq.bands[0]);
+
         for (let i = 0; i < this.eq.bands.length - 1; i++) {
             this.eq.bands[i].connect(this.eq.bands[i+1]);
         }
-        this.eq.bands[this.eq.bands.length - 1].connect(this.panner);
-        this.panner.connect(this.analyser);
-        this.analyser.connect(this.ctx.destination);
+
+        this.eq.bands[this.eq.bands.length - 1].connect(this.masterGain);
+        this.masterGain.connect(this.analyser);
+        this.analyser.connect(this.panner);
+        this.panner.connect(this.compressor);
+        this.compressor.connect(this.ctx.destination);
     }
 
     setSpatialAudioEnabled(enabled: boolean) {
@@ -391,5 +407,11 @@ export class PlaybackEngine {
         return this.ctx.currentTime;
     }
 }
+
+// AUDIO GRAPH CHAIN (canonical order — insert all new nodes here):
+// Source → EQ Chain (5 BiquadFilterNodes) → ReplayGain (GainNode)
+// → Crossfade (GainNode) → Analyser (AnalyserNode, tap-only)
+// → Spatial Panner (PannerNode, bypassable) → Night Compressor (DynamicsCompressorNode, bypassable)
+// → Destination
 
 export const playbackEngine = new PlaybackEngine();
