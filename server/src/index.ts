@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import db from './db';
+import { scannerService } from './services/scanner';
 import scannerRouter from './routes/scanner';
 import tracksRouter from './routes/tracks';
 import playlistsRouter from './routes/playlists';

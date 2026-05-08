@@ -9,16 +9,8 @@ import {
   Repeat
 } from 'lucide-react';
 import { SubtitleCue, parseSRT } from '@/lib/utils';
-
-// Mock data for demo
-const mockFile = {
-  id: '1',
-  title: 'Epic Cinematic Journey',
-  artist: 'Visionary Studios',
-  file: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-  type: 'video' as const,
-  duration: 596.5
-};
+import { useMedia } from '@/contexts/MediaContext';
+import SubtitleManager from './SubtitleManager';
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -93,6 +85,7 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
 };
 
 const VideoPlayer: React.FC = () => {
+  const { currentFile, playbackEngine, updateCurrentTime, updateDuration } = useMedia();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,7 +93,7 @@ const VideoPlayer: React.FC = () => {
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(596.5);
+  const [duration, setDuration] = useState(currentFile?.duration || 0);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
@@ -424,6 +417,7 @@ const VideoPlayer: React.FC = () => {
     const handleTimeUpdate = () => {
       const time = video.currentTime;
       setCurrentTime(time);
+      updateCurrentTime(time);
 
       // Handle A-B Loop
       playbackEngine.abLoop.check(time, (seekTo) => {
@@ -436,7 +430,10 @@ const VideoPlayer: React.FC = () => {
         setActiveCue(cue || null);
       }
     };
-    const handleLoadedMetadata = () => setDuration(video.duration);
+    const handleLoadedMetadata = () => {
+        setDuration(video.duration);
+        updateDuration(video.duration);
+    };
     const handleEnded = () => setIsPlaying(false);
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -492,7 +489,7 @@ const VideoPlayer: React.FC = () => {
               "w-full h-full object-cover cursor-pointer transition-all duration-300",
               immersiveMode && "object-fill"
             )}
-            src={mockFile.file}
+            src={currentFile?.file}
             onClick={togglePlayback}
             playsInline
             style={{
@@ -507,8 +504,8 @@ const VideoPlayer: React.FC = () => {
           )}>
             <div className="flex items-start justify-between">
               <div className="text-white space-y-1 flex-1 min-w-0">
-                <h3 className="font-bold text-sm sm:text-xl truncate">{mockFile.title}</h3>
-                <p className="text-xs sm:text-sm opacity-80 truncate">{mockFile.artist}</p>
+                <h3 className="font-bold text-sm sm:text-xl truncate">{currentFile?.title}</h3>
+                <p className="text-xs sm:text-sm opacity-80 truncate">{currentFile?.artist}</p>
                 <div className="flex items-center gap-2 sm:gap-4 text-xs opacity-70">
                   <span>Quality: {qualityMode.toUpperCase()}</span>
                   <span>Rate: {playbackRate}x</span>
@@ -528,7 +525,7 @@ const VideoPlayer: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={() => navigator.clipboard.writeText(mockFile.title)}
+                  onClick={() => navigator.clipboard.writeText(currentFile?.title || '')}
                   className="p-1.5 sm:p-2 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm transition-all hover:scale-110"
                 >
                   <Share2 size={isMobile ? 16 : 20} />
@@ -632,6 +629,8 @@ const VideoPlayer: React.FC = () => {
               </div>
             </div>
           )}
+
+          <SubtitleManager />
 
           {/* Bottom Controls */}
           <div className={cn(
@@ -875,9 +874,10 @@ const VideoPlayer: React.FC = () => {
                       {/* Download */}
                       <button
                         onClick={() => {
+                          if (!currentFile) return;
                           const link = document.createElement('a');
-                          link.href = mockFile.file;
-                          link.download = `${mockFile.title}.mp4`;
+                          link.href = currentFile.file;
+                          link.download = `${currentFile.title}.mp4`;
                           link.click();
                         }}
                         className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"

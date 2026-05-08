@@ -84,8 +84,11 @@ export class ABLoop {
     }
 }
 
+export type PlaybackState = 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'ENDED' | 'ERROR';
+
 export class PlaybackEngine {
     public ctx: AudioContext;
+    private state: PlaybackState = 'IDLE';
     private currentSource: AudioBufferSourceNode | null = null;
     private nextSource: AudioBufferSourceNode | null = null;
     private currentGainNode: GainNode;
@@ -98,11 +101,11 @@ export class PlaybackEngine {
     public abLoop: ABLoop;
     private spatialAudioEnabled: boolean = false;
     private nextStartTime: number = 0;
-    private isPlaying: boolean = false;
     private currentTrackId: string | null = null;
     private currentEventId: number | null = null;
     private fadeDuration: number = 2; // Default 2s crossfade
     private sleepTimerTimeout: NodeJS.Timeout | null = null;
+    private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
 
     private compressor: DynamicsCompressorNode;
 
@@ -154,6 +157,24 @@ export class PlaybackEngine {
         this.analyser.connect(this.panner);
         this.panner.connect(this.compressor);
         this.compressor.connect(this.ctx.destination);
+    }
+
+    setState(newState: PlaybackState) {
+        if (this.state !== newState) {
+            this.state = newState;
+            this.stateChangeListeners.forEach(l => l(newState));
+        }
+    }
+
+    getState() {
+        return this.state;
+    }
+
+    subscribe(listener: (state: PlaybackState) => void) {
+        this.stateChangeListeners.push(listener);
+        return () => {
+            this.stateChangeListeners = this.stateChangeListeners.filter(l => l !== listener);
+        };
     }
 
     setSpatialAudioEnabled(enabled: boolean) {
@@ -215,7 +236,7 @@ export class PlaybackEngine {
     }
 
     play(buffer: AudioBuffer, startTime: number = 0, loudness?: number, trackId?: string) {
-        if (this.isPlaying && this.currentTrackId) {
+        if ((this.state === 'PLAYING' || this.state === 'PAUSED') && this.currentTrackId) {
             this.reportEvent('end', {
                 track_id: this.currentTrackId,
                 event_id: this.currentEventId,
@@ -232,26 +253,38 @@ export class PlaybackEngine {
 
         this.stop();
 
-        const source = this.ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(this.currentGainNode);
+        try {
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(this.currentGainNode);
 
-        const now = this.ctx.currentTime;
-        const playTime = now + 0.1;
+            const now = this.ctx.currentTime;
+            const playTime = now + 0.1;
 
-        this.currentGainNode.gain.setValueAtTime(1, playTime);
-        source.start(playTime, startTime);
+            this.currentGainNode.gain.setValueAtTime(1, playTime);
+            source.start(playTime, startTime);
 
-        this.currentSource = source;
-        this.nextStartTime = playTime + buffer.duration - startTime;
-        this.isPlaying = true;
-        this.currentTrackId = trackId || null;
+            source.onended = () => {
+                if (this.currentSource === source) {
+                    this.setState('ENDED');
+                    this.stop(true);
+                }
+            };
 
-        if (trackId) {
-            this.reportEvent('start', {
-                track_id: trackId,
-                position: startTime
-            });
+            this.currentSource = source;
+            this.nextStartTime = playTime + buffer.duration - startTime;
+            this.setState('PLAYING');
+            this.currentTrackId = trackId || null;
+
+            if (trackId) {
+                this.reportEvent('start', {
+                    track_id: trackId,
+                    position: startTime
+                });
+            }
+        } catch (e) {
+            console.error('Failed to start playback:', e);
+            this.setState('ERROR');
         }
     }
 
@@ -325,7 +358,7 @@ export class PlaybackEngine {
     }
 
     stop(completed: boolean = false) {
-        if (this.isPlaying && this.currentTrackId) {
+        if (this.state === 'PLAYING' && this.currentTrackId) {
             this.reportEvent('end', {
                 track_id: this.currentTrackId,
                 event_id: this.currentEventId,
@@ -342,7 +375,11 @@ export class PlaybackEngine {
             try { this.nextSource.stop(); } catch(e) {}
             this.nextSource = null;
         }
-        this.isPlaying = false;
+
+        if (this.state !== 'ENDED') {
+            this.setState('IDLE');
+        }
+
         this.currentGainNode.gain.cancelScheduledValues(this.ctx.currentTime);
         this.nextGainNode.gain.cancelScheduledValues(this.ctx.currentTime);
         this.currentGainNode.gain.setValueAtTime(1, this.ctx.currentTime);
@@ -351,13 +388,17 @@ export class PlaybackEngine {
 
     pause() {
         if (this.ctx.state === 'running') {
-            this.ctx.suspend();
+            this.ctx.suspend().then(() => {
+                this.setState('PAUSED');
+            });
         }
     }
 
     resume() {
         if (this.ctx.state === 'suspended') {
-            this.ctx.resume();
+            this.ctx.resume().then(() => {
+                this.setState('PLAYING');
+            });
         }
     }
 
