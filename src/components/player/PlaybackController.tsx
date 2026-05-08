@@ -1,7 +1,7 @@
 import {
   Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
   Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart, Activity,
-  Globe2
+  Globe2, RotateCcw
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,31 @@ export function PlaybackController() {
     setSpatialAudio(newState);
     playbackEngine.setSpatialAudioEnabled(newState);
   };
+
+  const toggleABLoop = () => {
+    playbackEngine.abLoop.toggle();
+  };
+
+  const setLoopA = () => {
+    playbackEngine.abLoop.setA(playbackEngine.currentTime);
+  };
+
+  const setLoopB = () => {
+    playbackEngine.abLoop.setB(playbackEngine.currentTime);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === '[') setLoopA();
+      else if (e.key === ']') setLoopB();
+      else if (e.key === '\\') toggleABLoop();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const {
     currentFile,
@@ -132,6 +157,31 @@ export function PlaybackController() {
           <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={(e) => e.stopPropagation()}>
             <Repeat className="w-4 h-4" />
           </Button>
+          <div className="flex items-center bg-zinc-900 rounded-md p-0.5 border border-white/5">
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-[10px] font-bold text-cyan-400 hover:text-cyan-300"
+                onClick={setLoopA}
+                title="Set Loop Point A ([)"
+            >A</Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-[10px] font-bold text-orange-400 hover:text-orange-300"
+                onClick={setLoopB}
+                title="Set Loop Point B (])"
+            >B</Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", playbackEngine.abLoop.isActive ? "text-purple-400" : "text-zinc-500")}
+                onClick={toggleABLoop}
+                title="Toggle A-B Loop (\)"
+            >
+                <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2 w-full">
           <span className="text-[10px] text-gray-400 min-w-[35px] text-right">

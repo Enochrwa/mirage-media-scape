@@ -9,6 +9,10 @@ import { MediaProvider } from '@/contexts/MediaContext';
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Library from "./pages/Library";
+import StatsPage from "./pages/StatsPage";
+import RemotePage from "./pages/RemotePage";
+import DuplicateManagerPage from "./pages/DuplicateManagerPage";
+import RadioPage from "./pages/RadioPage";
 import Music from "./pages/Music";
 import Videos from "./pages/Videos";
 import Upload from "./pages/Upload";
@@ -42,6 +46,10 @@ const App = () => (
               <Route path="/favorites" element={<Favorites />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/stats" element={<StatsPage />} />
+        <Route path="/remote" element={<RemotePage />} />
+        <Route path="/duplicates" element={<DuplicateManagerPage />} />
+        <Route path="/radio" element={<RadioPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

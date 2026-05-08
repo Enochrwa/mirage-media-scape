@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../db';
+import { StatsService } from '../services/StatsService';
 
 const router = Router();
 
@@ -26,16 +27,18 @@ router.post('/event', (req, res) => {
 });
 
 router.get('/top-tracks', (req, res) => {
-    const tracks = db.prepare(`
-        SELECT t.*, COUNT(pe.id) as play_count
-        FROM tracks t
-        JOIN play_events pe ON t.id = pe.track_id
-        WHERE pe.completed = 1
-        GROUP BY t.id
-        ORDER BY play_count DESC
-        LIMIT 10
-    `).all();
+    const tracks = StatsService.getTopTracks(parseInt(req.query.limit as string) || 10);
     res.json(tracks);
+});
+
+router.get('/history', (req, res) => {
+    const history = StatsService.getHistory(parseInt(req.query.limit as string) || 50);
+    res.json(history);
+});
+
+router.get('/summary', (req, res) => {
+    const summary = StatsService.getStats();
+    res.json(summary);
 });
 
 export default router;

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
+import Recommendations from './discovery/Recommendations';
 
 
 
@@ -1205,9 +1206,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
           )}
 
+              {/* More Like This (Recommendations) */}
+              <div className="mt-8">
+                <Recommendations trackId={currentFile.id} />
+              </div>
+
           {/* Lyrics Panel (Optional) */}
           {showLyrics && (
-            <div className="bg-black/20 rounded-2xl border border-white/10 p-6 max-h-64 overflow-y-auto">
+                <div className="bg-black/20 rounded-2xl border border-white/10 p-6 max-h-64 overflow-y-auto mt-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">Lyrics</h3>
                 <Button

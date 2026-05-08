@@ -8,10 +8,25 @@ interface WaveformSeekBarProps {
 }
 
 const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ trackId, className }) => {
-  const { currentTime, duration, seekTo } = useMedia();
+  const { currentTime, duration, seekTo, playbackEngine } = useMedia() as any;
   const [peaks, setPeaks] = useState<number[]>([]);
+  const [abLoop, setABLoop] = useState({ pointA: null as number | null, pointB: null as number | null, isActive: false });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkLoop = setInterval(() => {
+        if (playbackEngine?.abLoop) {
+            const state = {
+                pointA: playbackEngine.abLoop.pointA,
+                pointB: playbackEngine.abLoop.pointB,
+                isActive: playbackEngine.abLoop.isActive
+            };
+            setABLoop(state);
+        }
+    }, 100);
+    return () => clearInterval(checkLoop);
+  }, [playbackEngine]);
 
   useEffect(() => {
     const fetchWaveform = async () => {
@@ -48,11 +63,19 @@ const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ trackId, className })
       const barHeight = peak * height * 0.8;
 
       const isPlayed = (i / peaks.length) < progress;
-      ctx.fillStyle = isPlayed ? '#8B5CF6' : '#4B5563'; // purple-500 : gray-600
+      ctx.fillStyle = isPlayed ? '#8B5CF6' : '#4B5563';
 
       ctx.fillRect(x, midY - barHeight / 2, barWidth - 1, barHeight);
     });
-  }, [peaks, currentTime, duration]);
+
+    // Draw A-B loop area
+    if (abLoop.pointA !== null && abLoop.pointB !== null) {
+        const xA = (abLoop.pointA / duration) * width;
+        const xB = (abLoop.pointB / duration) * width;
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+        ctx.fillRect(xA, 0, xB - xA, height);
+    }
+  }, [peaks, currentTime, duration, abLoop]);
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current) return;
@@ -79,6 +102,19 @@ const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ trackId, className })
         className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-100"
         style={{ left: `${(currentTime / duration) * 100}%` }}
       />
+
+      {abLoop.pointA !== null && (
+        <div
+            className="absolute top-0 bottom-0 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-cyan-400"
+            style={{ left: `${(abLoop.pointA / duration) * 100}%`, transform: 'translateX(-50%)' }}
+        />
+      )}
+      {abLoop.pointB !== null && (
+        <div
+            className="absolute top-0 bottom-0 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-orange-400"
+            style={{ left: `${(abLoop.pointB / duration) * 100}%`, transform: 'translateX(-50%)' }}
+        />
+      )}
     </div>
   );
 };

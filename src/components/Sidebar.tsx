@@ -15,7 +15,7 @@ import { useMedia } from '@/contexts/MediaContext';
 import { 
   Search, Music, Film, ListMusic, Upload, Settings, 
   Home, ChevronLeft, ChevronRight, Menu, Heart, Globe, 
-  LayoutDashboard, Share2, Sparkles
+  LayoutDashboard, Share2, Sparkles, User, Disc, BarChart3, Radio
 } from 'lucide-react';
 import { SmartPlaylistModal } from './discovery/SmartPlaylistModal';
 import { Badge } from '@/components/ui/badge';
@@ -131,6 +131,18 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 label={t('Dashboard')}
                 active={view === 'dashboard'}
                 to="/dashboard"
+              />
+              <SidebarItem
+                icon={<BarChart3 size={20} />}
+                label={t('Statistics')}
+                active={location.pathname === '/stats'}
+                to="/stats"
+              />
+              <SidebarItem
+                icon={<Radio size={20} />}
+                label={t('Internet Radio')}
+                active={location.pathname === '/radio'}
+                to="/radio"
               />
             </div>
 
@@ -325,28 +337,76 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           
           <TooltipProvider>
             {collapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <SidebarItem
-                      icon={<LayoutDashboard size={20} />}
-                      label=""
-                      active={view === 'dashboard'}
-                      to="/dashboard"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  {t('Dashboard')}
-                </TooltipContent>
-              </Tooltip>
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<LayoutDashboard size={20} />}
+                        label=""
+                        active={view === 'dashboard'}
+                        to="/dashboard"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {t('Dashboard')}
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<BarChart3 size={20} />}
+                        label=""
+                        active={location.pathname === '/stats'}
+                        to="/stats"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {t('Statistics')}
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<Radio size={20} />}
+                        label=""
+                        active={location.pathname === '/radio'}
+                        to="/radio"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Internet Radio
+                  </TooltipContent>
+                </Tooltip>
+              </>
             ) : (
-              <SidebarItem
-                icon={<LayoutDashboard size={20} />}
-                label={t('Dashboard')}
-                active={view === 'dashboard'}
-                to="/dashboard"
-              />
+              <div className="space-y-1">
+                <SidebarItem
+                  icon={<LayoutDashboard size={20} />}
+                  label={t('Dashboard')}
+                  active={view === 'dashboard'}
+                  to="/dashboard"
+                />
+                <SidebarItem
+                  icon={<BarChart3 size={20} />}
+                  label={t('Statistics')}
+                  active={location.pathname === '/stats'}
+                  to="/stats"
+                />
+                <SidebarItem
+                  icon={<Radio size={20} />}
+                  label={t('Internet Radio')}
+                  active={location.pathname === '/radio'}
+                  to="/radio"
+                />
+              </div>
             )}
           </TooltipProvider>
         </div>

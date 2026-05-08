@@ -354,6 +354,15 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   const updateCurrentTime = (time: number) => {
     setCurrentTime(time);
+    if ('mediaSession' in navigator && (navigator as any).mediaSession.setPositionState) {
+        try {
+            (navigator as any).mediaSession.setPositionState({
+                duration: duration || 0,
+                playbackRate: 1,
+                position: time
+            });
+        } catch (e) {}
+    }
   };
   
   const updateDuration = (newDuration: number) => {
@@ -377,12 +386,20 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     navigator.mediaSession.setActionHandler('pause', pausePlayback);
     navigator.mediaSession.setActionHandler('previoustrack', previousTrack);
     navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) seekTo(details.seekTime);
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', () => seekTo(Math.max(0, currentTime - 10)));
+    navigator.mediaSession.setActionHandler('seekforward', () => seekTo(Math.min(duration, currentTime + 10)));
 
     return () => {
       navigator.mediaSession.setActionHandler('play', null);
       navigator.mediaSession.setActionHandler('pause', null);
       navigator.mediaSession.setActionHandler('previoustrack', null);
       navigator.mediaSession.setActionHandler('nexttrack', null);
+      navigator.mediaSession.setActionHandler('seekto', null);
+      navigator.mediaSession.setActionHandler('seekbackward', null);
+      navigator.mediaSession.setActionHandler('seekforward', null);
     };
   }, [currentFile, nextTrack, previousTrack]);
 
@@ -436,7 +453,8 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     updateDuration,
     isPlayerFullscreen,
     setPlayerFullscreen,
-    closePlayer
+    closePlayer,
+    playbackEngine
   };
   
   return (

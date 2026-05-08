@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { FixedSizeGrid as Grid } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import * as Grid from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { MediaFile, useMedia } from '@/contexts/MediaContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,8 +81,9 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
         {({ height, width }) => {
             const columnWidth = width / COLUMN_COUNT;
             const rowHeight = columnWidth + 80; // Aspect ratio + padding/text
+            const { FixedSizeGrid } = Grid as any;
             return (
-                <Grid
+                <FixedSizeGrid
                     columnCount={COLUMN_COUNT}
                     columnWidth={columnWidth}
                     height={height}
@@ -91,7 +92,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
                     width={width}
                 >
                     {Cell}
-                </Grid>
+                </FixedSizeGrid>
             );
         }}
       </AutoSizer>

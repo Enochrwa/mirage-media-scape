@@ -8,14 +8,17 @@ const router = Router();
 // Get all smart playlists
 router.get('/', (req, res) => {
     const playlists = db.prepare('SELECT * FROM smart_playlists ORDER BY name ASC').all();
-    res.json(playlists);
+    res.json(playlists.map((p: any) => ({
+        ...p,
+        definition: JSON.parse(p.definition)
+    })));
 });
 
 // Create a new smart playlist
 router.post('/', (req, res) => {
-    const { name, rules } = req.body;
-    if (!name || !rules) {
-        return res.status(400).json({ error: 'Name and rules are required' });
+    const { name, definition } = req.body;
+    if (!name || !definition) {
+        return res.status(400).json({ error: 'Name and definition are required' });
     }
 
     const id = crypto.randomUUID();
@@ -23,11 +26,11 @@ router.post('/', (req, res) => {
 
     try {
         db.prepare(`
-            INSERT INTO smart_playlists (id, name, rules_json, created_at, updated_at)
+            INSERT INTO smart_playlists (id, name, definition, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?)
-        `).run(id, name, JSON.stringify(rules), now, now);
+        `).run(id, name, JSON.stringify(definition), now, now);
 
-        res.status(201).json({ id, name, rules, created_at: now, updated_at: now });
+        res.status(201).json({ id, name, definition, created_at: now, updated_at: now });
     } catch (error) {
         console.error('Failed to create smart playlist:', error);
         res.status(500).json({ error: 'Failed to create smart playlist' });
@@ -36,15 +39,15 @@ router.post('/', (req, res) => {
 
 // Evaluate a smart playlist
 router.get('/:id/tracks', (req, res) => {
-    const playlist = db.prepare('SELECT rules_json FROM smart_playlists WHERE id = ?').get(req.params.id) as { rules_json: string } | undefined;
+    const playlist = db.prepare('SELECT definition FROM smart_playlists WHERE id = ?').get(req.params.id) as { definition: string } | undefined;
 
     if (!playlist) {
         return res.status(404).json({ error: 'Playlist not found' });
     }
 
     try {
-        const rules = JSON.parse(playlist.rules_json);
-        const tracks = SmartPlaylistService.evaluate(rules);
+        const definition = JSON.parse(playlist.definition);
+        const tracks = SmartPlaylistService.evaluate(definition);
         res.json(tracks);
     } catch (error) {
         console.error('Failed to evaluate smart playlist:', error);
@@ -53,6 +56,16 @@ router.get('/:id/tracks', (req, res) => {
 });
 
 // Delete a smart playlist
+router.post('/preview', (req, res) => {
+    const { conditions, matchMode } = req.body;
+    try {
+        const tracks = SmartPlaylistService.evaluate({ conditions, matchMode });
+        res.json({ count: tracks.length });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
 router.delete('/:id', (req, res) => {
     try {
         const result = db.prepare('DELETE FROM smart_playlists WHERE id = ?').run(req.params.id);

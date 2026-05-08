@@ -49,3 +49,4 @@ export declare function getSubtitleTracks(path: string): Array<SubtitleTrackInfo
 export declare function extractSubtitleStream(path: string, streamIndex: number): string
 export declare function analyzeAudio(path: string): AudioMetadata
 export declare function generateWaveform(path: string): Array<number>
+export declare function generateWaveformFingerprint(path: string): string

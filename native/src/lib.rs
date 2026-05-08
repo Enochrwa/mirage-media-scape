@@ -501,3 +501,80 @@ pub fn generate_waveform(path: String) -> Result<Vec<f32>, napi::Error> {
 
     Ok(buckets)
 }
+
+#[napi]
+pub fn generate_waveform_fingerprint(path: String) -> Result<String, napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let mut ictx = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let stream = ictx
+        .streams()
+        .best(ffmpeg::media::Type::Audio)
+        .ok_or_else(|| napi::Error::from_reason("Could not find best audio stream"))?;
+
+    let stream_index = stream.index();
+    let mut decoder = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get codec context: {}", e)))?
+        .decoder()
+        .audio()
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get audio decoder: {}", e)))?;
+
+    // Target: 8000 Hz, Mono
+    let mut resampler = ffmpeg::software::resampling::context::Context::get(
+        decoder.format(),
+        decoder.channel_layout(),
+        decoder.rate(),
+        ffmpeg::util::format::sample::Sample::F32(ffmpeg::util::format::sample::Type::Packed),
+        ffmpeg::util::channel_layout::ChannelLayout::MONO,
+        8000,
+    ).map_err(|e| napi::Error::from_reason(format!("Resampler error: {}", e)))?;
+
+    let mut samples: Vec<f32> = Vec::with_capacity(480_000); // 60s * 8000Hz
+    let max_samples = 480_000;
+
+    for (stream, packet) in ictx.packets() {
+        if stream.index() == stream_index {
+            if decoder.send_packet(&packet).is_ok() {
+                let mut decoded = Audio::empty();
+                while decoder.receive_frame(&mut decoded).is_ok() {
+                    let mut resampled = Audio::empty();
+                    if resampler.run(&decoded, &mut resampled).is_ok() {
+                        let data = resampled.data(0);
+                        let frame_samples: &[f32] = unsafe {
+                            std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
+                        };
+                        samples.extend_from_slice(frame_samples);
+                    }
+                    if samples.len() >= max_samples { break; }
+                }
+            }
+        }
+        if samples.len() >= max_samples { break; }
+    }
+
+    if samples.is_empty() {
+        return Err(napi::Error::from_reason("No audio samples decoded"));
+    }
+
+    // Compute 32 RMS energy values across equal-time windows
+    let window_size = samples.len() / 32;
+    let mut fingerprint = String::with_capacity(32);
+
+    for i in 0..32 {
+        let start = i * window_size;
+        let end = if i == 31 { samples.len() } else { (i + 1) * window_size };
+        let window = &samples[start..end];
+
+        let sum_sq: f32 = window.iter().map(|&s| s * s).sum();
+        let rms = (sum_sq / window.len() as f32).sqrt();
+
+        // Normalize to 0-255 (scaled by a factor, RMS of 1.0 is full scale)
+        let normalized = (rms * 255.0).min(255.0) as u8;
+        fingerprint.push_str(&format!("{:02x}", normalized));
+    }
+
+    Ok(fingerprint)
+}

@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { Worker } from 'worker_threads';
 import { RecommendationService } from '../services/RecommendationService';
+import { FingerprintService } from '../services/FingerprintService';
+import { DuplicateFinderService } from '../services/DuplicateFinderService';
 
 const router = Router();
 
@@ -79,6 +81,32 @@ router.get('/:id/recommendations', (req, res) => {
     } catch (error) {
         console.error('Recommendations error:', error);
         res.status(500).json({ error: 'Failed to fetch recommendations' });
+    }
+});
+
+router.post('/:id/identify', async (req, res) => {
+    const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as { file_path: string } | undefined;
+    if (!track) return res.status(404).json({ error: 'Track not found' });
+
+    try {
+        const metadata = await FingerprintService.identifyTrack(track.file_path);
+        if (!metadata) return res.status(404).json({ error: 'Could not identify track' });
+
+        // In a real app, we would write tags back to file here
+        // and update the DB row.
+        res.json(metadata);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+router.get('/duplicates/candidates', (req, res) => {
+    try {
+        const candidates = DuplicateFinderService.findCandidates();
+        const groups = DuplicateFinderService.getDuplicateGroups(candidates);
+        res.json(groups);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
     }
 });
 
