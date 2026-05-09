@@ -1,0 +1,22 @@
+#!/bin/sh
+# Husky pre-push hook
+# Run tests before pushing
+
+set -e
+
+echo "🧪 Running pre-push checks..."
+
+# Run frontend tests and checks
+echo "✓ Running frontend checks..."
+cd frontend
+npm run type-check
+npm run lint
+cd ..
+
+# Run server tests
+echo "✓ Running server tests..."
+cd server
+npm test -- --coverage --bail
+cd ..
+
+echo "✅ All checks passed! Ready to push."

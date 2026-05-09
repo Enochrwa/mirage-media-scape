@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "rule": "from-as-final",
+      "severity": "warning"
+    },
+    {
+      "rule": "from-latest",
+      "severity": "warning"
+    },
+    {
+      "rule": "no-latest-tag",
+      "severity": "warning"
+    },
+    {
+      "rule": "no-root-user",
+      "severity": "warning"
+    },
+    {
+      "rule": "workdir",
+      "severity": "warning"
+    }
+  ]
+}

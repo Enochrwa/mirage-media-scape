@@ -1,0 +1,28 @@
+module.exports = {
+  extends: [
+    'stylelint-config-standard',
+    'stylelint-config-tailwindcss',
+    'stylelint-config-prettier',
+  ],
+  rules: {
+    'selector-pseudo-class-no-unknown': [
+      true,
+      {
+        ignorePseudoClasses: ['global', 'local'],
+      },
+    ],
+    'at-rule-no-unknown': [
+      true,
+      {
+        ignoreAtRules: ['tailwind', 'layer', 'apply', 'variants', 'responsive', 'screen'],
+      },
+    ],
+    'no-descending-specificity': null,
+    'function-no-unknown': [
+      true,
+      {
+        ignoreFunctions: ['theme'],
+      },
+    ],
+  },
+};

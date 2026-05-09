@@ -1,0 +1,79 @@
+# Renovate Configuration for Automated Dependency Updates
+# https://docs.renovatebot.com/
+
+extends:
+  - config:base
+  - group:monorepos
+  - group:recommended
+
+// Updates
+rangeStrategy: auto
+semanticCommits: true
+semanticCommitType: chore
+semanticCommitScope: deps
+
+// Schedule
+schedule:
+  - matchUpdateTypes:
+      - minor
+      - patch
+      - pin
+      - digest
+    before: 3am on Monday
+  - matchUpdateTypes:
+      - major
+    before: 3am on the first Monday of the month
+
+// Automate
+automerge: false
+automergeType: pr
+automergeStrategy: squash
+ignoreScripts: true
+
+// Monorepo
+ignorePaths:
+  - test/**
+  - dist/**
+  - docs/**
+  - coverage/**
+
+// Version Strategy
+postUpdateOptions:
+  - gomodTidy
+  - npmDedupe
+  - yarnDedupeHighest
+
+// Configuration
+configWarningReuseIssue: false
+configValidationWarningReuseIssue: false
+
+// Dependency Updates
+lockFileMaintenance:
+  enabled: true
+  schedule:
+    - before: 3am on the first Monday of the month
+
+// Commit settings
+commitMessage: 'chore(deps): update dependencies'
+prTitle: 'chore(deps): update {{depName}} to {{newVersion}}'
+prBodyColumns:
+  - Package
+  - Type
+  - Update
+  - Change
+
+// Ignore specific packages
+ignoreDeprecated: false
+ignoredUpdates: []
+
+// Stability policy
+minimumReleaseAge: 0
+internalChecksFilter: strict
+
+// Grouping
+groupName: dependencies
+groupSlug: dependencies
+prConcurrentLimit: 3
+
+// Testing
+testPypi: false

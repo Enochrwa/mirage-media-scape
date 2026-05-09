@@ -99,6 +99,69 @@ dist
 # FuseBox cache
 .fusebox/
 
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.history/
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+
+# Environment and configuration
+.env
+.env*.local
+!.env.example
+
+# OS specific
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and reports
+logs/
+lerna-debug.log*
+
+# Test outputs
+.nyc_output
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Turbo cache
+.turbo/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled binaries
+*.node
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Build artifacts
+*.o
+*.a
+*.lib
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker volumes
+.docker/
+
 # DynamoDB Local files
 .dynamodb/
 

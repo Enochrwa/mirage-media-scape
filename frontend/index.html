@@ -1,27 +1,86 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Basic -->
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mirage Player</title>
-    <meta name="description" content="Beautiful media player for music and video" />
-    <meta name="author" content="Lovable" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-    <meta property="og:title" content="Mirage Player" />
-    <meta property="og:description" content="Beautiful media player for music and video" />
+    <!-- Primary SEO -->
+    <title>Zovyra — Stream Music, Videos & Radio</title>
+    <meta
+      name="description"
+      content="Zovyra is a next-generation media player for streaming music, videos, live radio, playlists, podcasts, and immersive entertainment experiences."
+    />
+    <meta
+      name="keywords"
+      content="zovyra, media player, music player, video streaming, podcasts, radio streaming, playlist app"
+    />
+    <meta name="author" content="Zovyra" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- App-like mobile experience -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Zovyra" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.zovyra.com" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.zovyra.com" />
+
+    <!-- Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Zovyra — Stream Music, Videos & Radio" />
+    <meta
+      property="og:description"
+      content="Your immersive streaming universe for music, video, radio, and podcasts."
+    />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://zovyra.com" />
+    <meta property="og:image" content="https://zovyra.com/og-cover.png" />
+    <meta property="og:site_name" content="Zovyra" />
 
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:title" content="Zovyra — Stream Music, Videos & Radio" />
+    <meta
+      name="twitter:description"
+      content="A beautiful streaming experience for music, videos, podcasts, and live radio."
+    />
+    <meta name="twitter:image" content="https://zovyra.com/og-cover.png" />
+
+    <!-- Security -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
   </head>
 
   <body>
+    <noscript>
+      You need JavaScript enabled to run Zovyra.
+    </noscript>
+
+    <!-- Root App -->
     <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+
+    <!-- Main App Entry -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

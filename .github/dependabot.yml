@@ -1,0 +1,92 @@
+# Dependabot Security Configuration
+
+version: 2
+updates:
+  # NPM dependencies
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Enochrwa"
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: "chore(deps):"
+      include: "scope"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "@types/*"
+        update-types:
+          - version-update:semver-patch
+
+  # Frontend dependencies
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Enochrwa"
+    labels:
+      - dependencies
+      - frontend
+    commit-message:
+      prefix: "chore(deps):"
+      include: "scope"
+
+  # Server dependencies
+  - package-ecosystem: npm
+    directory: "/server"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Enochrwa"
+    labels:
+      - dependencies
+      - server
+    commit-message:
+      prefix: "chore(deps):"
+      include: "scope"
+
+  # Docker
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    labels:
+      - dependencies
+      - docker
+    reviewers:
+      - "Enochrwa"
+    commit-message:
+      prefix: "chore(docker):"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    labels:
+      - dependencies
+      - github-actions
+    reviewers:
+      - "Enochrwa"
+    commit-message:
+      prefix: "chore(ci):"
+      include: "scope"

@@ -1,0 +1,23 @@
+#!/bin/sh
+# Husky commit-msg hook for commitlint
+
+echo "🔍 Validating commit message..."
+
+# Get the commit message
+COMMIT_MSG=$(cat "$1")
+
+# Check if it matches conventional commits
+if ! echo "$COMMIT_MSG" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?!?:'; then
+  echo "❌ Commit message does not follow conventional commits format!"
+  echo ""
+  echo "📋 Valid format examples:"
+  echo "  feat: add new feature"
+  echo "  fix: resolve issue"
+  echo "  docs: update documentation"
+  echo "  refactor: reorganize code"
+  echo "  test: add or update tests"
+  echo ""
+  exit 1
+fi
+
+echo "✅ Commit message is valid!"

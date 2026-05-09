@@ -1,14 +1,31 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "zovyra",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "build:analyze": "vite build --mode production --analyze",
+    "preview": "vite preview",
+    "start": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext ts,tsx --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run type-check && npm run lint && npm run format:check",
+    "clean": "rm -rf dist node_modules .vite",
+    "reinstall": "npm run clean && npm install",
+    "deps:check": "npm outdated",
+    "deps:update": "npm update",
+    "security:audit": "npm audit",
+    "security:fix": "npm audit fix",
+    "prepare": "husky install",
+    "prebuild": "npm run check",
+    "postbuild": "echo Build completed successfully",
+    "ci": "npm run check && npm run build"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -89,11 +106,17 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.3",
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vite-plugin-compression": "^0.5.1"
   }
 }
