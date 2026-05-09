@@ -18,13 +18,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Save } from 'lucide-react';
 import { API_BASE } from '@/lib/utils';
-import { Playlist } from '@/types/media';
-
-interface SmartPlaylistCondition {
-  field: string;
-  operator: string;
-  value: string;
-}
+import { Playlist, SmartPlaylistCondition, SmartPlaylistOperator } from '@/types/media';
 
 interface SmartPlaylistModalProps {
   isOpen: boolean;
@@ -81,7 +75,7 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
 
   const updateCondition = (index: number, updates: Partial<SmartPlaylistCondition>) => {
     const newConditions = [...conditions];
-    newConditions[index] = { ...newConditions[index], ...updates };
+    newConditions[index] = { ...newConditions[index], ...updates } as SmartPlaylistCondition;
     setConditions(newConditions);
     fetchPreview(newConditions, matchMode);
   };
@@ -94,12 +88,18 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
         body: JSON.stringify({ conditions: conds, matchMode: mode }),
       });
       if (res.ok) {
-        const { count } = await res.json();
+        const { count } = (await res.json()) as { count: number };
         setPreviewCount(count);
       }
-      } catch (error) {
-        console.error('Failed to fetch preview', error);
-      }
+    } catch (error) {
+      console.error('Failed to fetch preview', error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+
+    const playlist = {
       name,
       definition: {
         matchMode,
@@ -114,7 +114,7 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
         body: JSON.stringify(playlist),
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as Playlist;
         onSave(data);
         onClose();
       }
@@ -186,7 +186,7 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
 
                 <Select
                   value={condition.operator}
-                  onValueChange={(v) => updateCondition(index, { operator: v })}
+                  onValueChange={(v) => updateCondition(index, { operator: v as SmartPlaylistOperator })}
                 >
                   <SelectTrigger className="flex-1 border-zinc-700 bg-zinc-800">
                     <SelectValue />
@@ -202,7 +202,7 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
 
                 <Input
                   placeholder="Value..."
-                  value={condition.value}
+                  value={condition.value as string}
                   onChange={(e) => updateCondition(index, { value: e.target.value })}
                   className="flex-1 border-zinc-700 bg-zinc-800"
                 />

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import axios from 'axios';
-import { PassThrough } from 'stream';
 
 const router = Router();
 
@@ -12,7 +11,7 @@ router.get('/search', async (req, res) => {
             params: { name, limit, order: 'clickcount', reverse: 'true' }
         });
         res.json(response.data);
-    } catch (error) {
+    } catch {
         res.status(500).json({ error: 'Radio search failed' });
     }
 });
@@ -23,7 +22,7 @@ router.get('/by-tag/:tag', async (req, res) => {
             params: { limit: 20, order: 'clickcount', reverse: 'true' }
         });
         res.json(response.data);
-    } catch (error) {
+    } catch {
         res.status(500).json({ error: 'Radio search by tag failed' });
     }
 });
@@ -44,9 +43,15 @@ router.get('/proxy', async (req, res) => {
             }
         });
 
-        const icyMetaInt = parseInt(response.headers['icy-metaint'] as string);
+        const icyMetaIntHeader = response.headers['icy-metaint'];
+        const icyMetaInt = typeof icyMetaIntHeader === 'string' ? parseInt(icyMetaIntHeader) : undefined;
 
-        res.setHeader('Content-Type', response.headers['content-type'] || 'audio/mpeg');
+        const contentType = response.headers['content-type'];
+        if (typeof contentType === 'string') {
+            res.setHeader('Content-Type', contentType);
+        } else {
+            res.setHeader('Content-Type', 'audio/mpeg');
+        }
 
         if (icyMetaInt) {
             // Very basic ICY metadata extraction for the proof of concept
@@ -56,7 +61,7 @@ router.get('/proxy', async (req, res) => {
         } else {
             response.data.pipe(res);
         }
-    } catch (error) {
+    } catch {
         res.status(500).send('Proxy error');
     }
 });

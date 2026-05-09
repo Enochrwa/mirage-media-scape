@@ -578,3 +578,21 @@ pub fn generate_waveform_fingerprint(path: String) -> Result<String, napi::Error
 
     Ok(fingerprint)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_metadata_invalid_path() {
+        // We expect an error when the path is invalid
+        let result = extract_metadata("non_existent_file.mp3".to_string());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_subtitle_tracks_invalid_path() {
+        let result = get_subtitle_tracks("non_existent_file.mkv".to_string());
+        assert!(result.is_err());
+    }
+}

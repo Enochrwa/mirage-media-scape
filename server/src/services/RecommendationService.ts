@@ -1,48 +1,45 @@
 import db from '../db';
-
-export interface AudioFeatures {
-    bpm: number;
-    loudness: number;
-}
+import { Track } from '../types/database';
 
 export class RecommendationService {
-    static findSimilar(targetId: string, limit: number = 10): any[] {
-        const target = db.prepare('SELECT bpm, loudness FROM tracks WHERE id = ?').get(targetId) as AudioFeatures | undefined;
+    /**
+     * Finds tracks similar to the target track based on BPM, Key, and Loudness.
+     * Uses a multi-pass approach:
+     * 1. Direct BPM match (+/- 10%)
+     * 2. Key/Camelot Match
+     * 3. Loudness similarity
+     */
+    static findSimilar(targetId: string, limit: number = 10): Track[] {
+        const target = db.prepare('SELECT * FROM tracks WHERE id = ?').get(targetId) as Track | undefined;
+        if (!target) return [];
 
-        if (!target || !target.bpm || target.loudness === null) {
-            return [];
-        }
+        // Simple vector similarity in SQL for efficiency
+        // We prioritize BPM and Key
+        const bpmMin = (target.bpm || 120) * 0.9;
+        const bpmMax = (target.bpm || 120) * 1.1;
 
-        // Optimization: Fetch only tracks with similar BPM (+/- 30) to reduce in-memory processing
-        const allTracks = db.prepare(`
-            SELECT id, title, artist, bpm, loudness
-            FROM tracks
-            WHERE id != ? AND bpm BETWEEN ? AND ?
-        `).all(targetId, target.bpm - 30, target.bpm + 30) as (AudioFeatures & { id: string })[];
+        const similar = db.prepare(`
+            SELECT * FROM tracks
+            WHERE id != ?
+            AND (
+                (bpm BETWEEN ? AND ?)
+                OR (camelot_key = ?)
+                OR (ABS(loudness - ?) < 3.0)
+            )
+            ORDER BY
+                (CASE WHEN camelot_key = ? THEN 1 ELSE 0 END) DESC,
+                ABS(bpm - ?) ASC
+            LIMIT ?
+        `).all(
+            target.id,
+            bpmMin, bpmMax,
+            target.camelot_key,
+            target.loudness || -10,
+            target.camelot_key,
+            target.bpm || 120,
+            limit
+        ) as Track[];
 
-        const scored = allTracks.map(track => {
-            if (!track.bpm || track.loudness === null) return { ...track, score: 0 };
-
-            const score = this.calculateSimilarity(target, track);
-            return { ...track, score };
-        });
-
-        return scored
-            .filter(t => t.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, limit);
-    }
-
-    private static calculateSimilarity(a: AudioFeatures, b: AudioFeatures): number {
-        // Simple Euclidean distance normalized for BPM and Loudness
-        // BPM range ~60-200, Loudness range ~ -60 to 0
-        const bpmDiff = Math.abs(a.bpm - b.bpm) / 140;
-        const loudnessDiff = Math.abs(a.loudness - b.loudness) / 60;
-
-        // Weight BPM more for "mood" similarity
-        const distance = Math.sqrt(Math.pow(bpmDiff * 0.7, 2) + Math.pow(loudnessDiff * 0.3, 2));
-
-        // Return similarity (1 - distance)
-        return Math.max(0, 1 - distance);
+        return similar;
     }
 }

@@ -1,9 +1,10 @@
 import db from '../db';
+import { Track } from '../types/database';
 
 export interface SmartPlaylistRule {
     field: string;
-    operator: 'is' | 'contains' | 'gt' | 'lt' | 'between';
-    value: any;
+    operator: 'is' | 'isNot' | 'contains' | 'notContains' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'inLastDays';
+    value: string | number | number[];
 }
 
 export interface SmartPlaylistRules {
@@ -15,9 +16,9 @@ export interface SmartPlaylistRules {
 }
 
 export class SmartPlaylistService {
-    static evaluate(rules: SmartPlaylistRules): any[] {
+    static evaluate(rules: SmartPlaylistRules): Track[] {
         let sql = 'SELECT * FROM tracks';
-        const params: any[] = [];
+        const params: (string | number)[] = [];
         const whereClauses: string[] = [];
 
         for (const condition of rules.conditions) {
@@ -46,51 +47,54 @@ export class SmartPlaylistService {
             params.push(rules.limit);
         }
 
-        return db.prepare(sql).all(...params);
+        return db.prepare(sql).all(...params) as Track[];
     }
 
-    private static buildClause(condition: any, params: any[]): string | null {
+    private static buildClause(condition: SmartPlaylistRule, params: (string | number)[]): string | null {
         const field = condition.field;
         // Basic validation of field names to prevent SQL injection
         const allowedFields = ['title', 'artist', 'album', 'genre', 'year', 'bpm', 'duration', 'loudness', 'added_at', 'key', 'camelot_key', 'play_count', 'last_played'];
         if (!allowedFields.includes(field)) return null;
 
         let sqlField = field;
-        if (field === 'title' || field === 'artist' || field === 'album' || field === 'genre') {
+        if (['title', 'artist', 'album', 'genre'].includes(field)) {
             sqlField = `LOWER(${field})`;
         }
 
+        const value = condition.value;
+
         switch (condition.operator) {
             case 'is':
-                params.push(condition.value);
+                params.push(value as string | number);
                 return `${sqlField} = ?`;
             case 'isNot':
-                params.push(condition.value);
+                params.push(value as string | number);
                 return `${sqlField} != ?`;
             case 'contains':
-                params.push(`%${condition.value.toLowerCase()}%`);
+                params.push(`%${(value as string).toLowerCase()}%`);
                 return `${sqlField} LIKE ?`;
             case 'notContains':
-                params.push(`%${condition.value.toLowerCase()}%`);
+                params.push(`%${(value as string).toLowerCase()}%`);
                 return `${sqlField} NOT LIKE ?`;
             case 'gt':
             case 'gte':
-                params.push(condition.value);
+                params.push(value as string | number);
                 return `${field} ${condition.operator === 'gt' ? '>' : '>='} ?`;
             case 'lt':
             case 'lte':
-                params.push(condition.value);
+                params.push(value as string | number);
                 return `${field} ${condition.operator === 'lt' ? '<' : '<='} ?`;
             case 'between':
-                if (Array.isArray(condition.value) && condition.value.length === 2) {
-                    params.push(condition.value[0], condition.value[1]);
+                if (Array.isArray(value) && value.length === 2) {
+                    params.push(value[0], value[1]);
                     return `${field} BETWEEN ? AND ?`;
                 }
                 return null;
-            case 'inLastDays':
-                const cutoff = Date.now() - (condition.value * 86400000);
+            case 'inLastDays': {
+                const cutoff = Date.now() - (Number(value) * 86400000);
                 params.push(cutoff);
                 return `${field} > ?`;
+            }
             default:
                 return null;
         }

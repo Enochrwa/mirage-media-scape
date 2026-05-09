@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
-import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.esm.js';
+import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpeg';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { cn } from '@/lib/utils';
@@ -15,35 +15,21 @@ import {
   Repeat,
   Shuffle,
   Heart,
-  Share2,
   BookmarkPlus,
-  Mic,
-  Radio,
-  Headphones,
-  Settings,
-  Zap,
-  Music,
-  Timer,
-  Rewind,
-  FastForward,
-  Download,
-  Star,
-  TrendingUp,
   Activity,
-  Eye,
-  EyeOff,
+  Zap,
   Maximize,
   Minimize,
   X,
-  Palette,
   SlidersHorizontal,
+  Download,
 } from 'lucide-react';
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { MediaFile, Playlist } from '@/types/media';
+import { MediaFile } from '@/types/media';
 
 type AudioPlayerButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'ghost' | 'outline';
@@ -61,12 +47,6 @@ type SliderProps = {
   min?: number;
   step?: number;
   onValueChange: (value: [number]) => void;
-  className?: string;
-};
-
-type SwitchProps = {
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
   className?: string;
 };
 
@@ -146,26 +126,6 @@ const Slider = ({ value, max, min = 0, step = 1, onValueChange, className = '' }
   );
 };
 
-const Switch = ({ checked, onCheckedChange, className = '' }: SwitchProps) => (
-  <button
-    role="switch"
-    aria-checked={checked}
-    onClick={() => onCheckedChange(!checked)}
-    className={cn(
-      'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
-      checked ? 'bg-purple-600' : 'bg-gray-600',
-      className,
-    )}
-  >
-    <span
-      className={cn(
-        'pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform',
-        checked ? 'translate-x-5' : 'translate-x-0',
-      )}
-    />
-  </button>
-);
-
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -206,26 +166,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [sleepTimer, setSleepTimer] = useState(0);
-  const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
-  const [bassBoost, setBassBoost] = useState(0);
-  const [trebleBoost, setTrebleBoost] = useState(0);
-  const [surroundSound, setSurroundSound] = useState(false);
-  const [noiseReduction, setNoiseReduction] = useState(false);
-  const [autoGain, setAutoGain] = useState(true);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [ambientMode, setAmbientMode] = useState(false);
-  const [particleEffect, setParticleEffect] = useState(true);
-  const [moodLighting, setMoodLighting] = useState('auto');
-  const [rating, setRating] = useState(0);
-  const [recordingMode, setRecordingMode] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
-  const [showMoodMenu, setShowMoodMenu] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   const [trimRegion, setTrimRegion] = useState<{ start: number; end: number } | null>(null);
@@ -282,11 +225,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     });
 
     ws.on('interaction', (newProgress) => {
-        const engine = playbackEngine;
-        // Seek on interaction
         const seekTime = newProgress * ws.getDuration();
         setCurrentTime(seekTime);
-      }
     });
 
     return () => {
@@ -324,11 +264,19 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return <Volume2 size={20} />;
   };
 
-  const handleSleepTimer = (minutes: number) => {
-    setSleepTimer(minutes);
-    setShowTimerMenu(false);
-      playbackEngine.startSleepTimer(minutes * 60);
-    console.log('Toast:', message);
+  const toggleTrimming = () => {
+    if (!regionsRef.current) return;
+    if (isTrimming) {
+        regionsRef.current.clearRegions();
+        setTrimRegion(null);
+    } else {
+        regionsRef.current.addRegion({
+            start: 0,
+            end: duration * 0.1,
+            color: 'rgba(139, 92, 246, 0.3)',
+        });
+    }
+    setIsTrimming(!isTrimming);
   };
 
   const handleConfirmTrim = async () => {
@@ -342,9 +290,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `trimmed_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Trim successful!');
     } catch (e) {
-      showToast('Trim failed');
+      console.error('Trim failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -361,9 +308,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `normalized_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Normalization complete!');
     } catch (e) {
-      showToast('Normalization failed');
+        console.error('Normalization failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -380,9 +326,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `boosted_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Volume boost applied!');
     } catch (e) {
-      showToast('Boost failed');
+        console.error('Boost failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -399,9 +344,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `faded_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Fades applied!');
     } catch (e) {
-      showToast('Fades failed');
+        console.error('Fades failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -439,7 +383,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
           <img
             src={currentFile.cover || '/placeholder.svg'}
             alt={currentFile.title}
-            className="h-64 w-64 animate-pulse-slow rounded-full shadow-2xl"
+            className="h-64 w-64 rounded-full shadow-2xl"
           />
           <h1 className="text-5xl font-bold">{currentFile.title}</h1>
           <p className="text-2xl text-gray-400">{currentFile.artist}</p>
@@ -654,6 +598,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
               </Button>
               <Button
                 variant="ghost"
+                size="icon"
+                onClick={() => setShowLyrics(!showLyrics)}
+                className={showLyrics ? 'text-purple-400' : 'text-gray-400'}
+              >
+                <X size={20} />
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => setPlayerFullscreen(true)}
                 className="text-gray-400"
               >
@@ -670,34 +622,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
           {showAdvancedControls && (
             <div className="mt-4 space-y-6 rounded-xl bg-black/40 p-6">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Bass Boost</label>
-                  <Slider
-                    value={[bassBoost]}
-                    min={-12}
-                    max={12}
-                    onValueChange={(v: number[]) => setBassBoost(v[0])}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-gray-300">Treble Boost</label>
-                  <Slider
-                    value={[trebleBoost]}
-                    min={-12}
-                    max={12}
-                    onValueChange={(v: number[]) => setTrebleBoost(v[0])}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-4 border-t border-white/10 pt-4">
-                <Button variant="outline" onClick={toggleTrimming}>
+              <div className="grid grid-cols-2 gap-8 border-t border-white/10 pt-4">
+                <Button variant="outline" onClick={toggleTrimming} disabled={isProcessing}>
                   {isTrimming ? 'Cancel' : 'Trim'}
                 </Button>
                 {isTrimming && trimRegion && (
-                  <Button onClick={handleConfirmTrim}>Confirm Trim</Button>
+                  <Button onClick={handleConfirmTrim} disabled={isProcessing}>Confirm Trim</Button>
                 )}
-                <Button variant="outline" onClick={handleNormalize}>
+                <Button variant="outline" onClick={handleNormalize} disabled={isProcessing}>
                   Normalize
                 </Button>
                 <div className="flex items-center gap-2">
@@ -708,7 +640,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                     onChange={(e) => setVolumeBoost(parseInt(e.target.value))}
                     className="w-16 rounded bg-gray-800 p-1"
                   />
-                  <Button variant="outline" onClick={handleVolumeBoost}>
+                  <Button variant="outline" onClick={handleVolumeBoost} disabled={isProcessing}>
                     Apply
                   </Button>
                 </div>
@@ -732,7 +664,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                     className="w-16 rounded bg-gray-800 p-1"
                   />
                 </div>
-                <Button variant="outline" onClick={handleApplyFades} className="self-end">
+                <Button variant="outline" onClick={handleApplyFades} className="self-end" disabled={isProcessing}>
                   Apply Fades
                 </Button>
               </div>

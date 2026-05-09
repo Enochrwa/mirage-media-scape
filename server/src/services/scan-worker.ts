@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
-import { TrackMetadata } from '../sonic-native';
-import os from 'os';
+import { TrackMetadata, AudioMetadata } from '../sonic-native';
+import { Track } from '../types/database';
 
 const native = require('../../sonic-native.node');
 
@@ -21,16 +21,15 @@ function isMediaFile(filename: string): boolean {
 }
 
 async function scan() {
-    let total = 0;
     let scanned = 0;
-    let newTracks: any[] = [];
+    let newTracks: Track[] = [];
 
     const allFiles: string[] = [];
     for (const folder of folders) {
         walk(folder, allFiles);
     }
 
-    total = allFiles.length;
+    const total = allFiles.length;
     parentPort?.postMessage({ type: 'SCAN_START', total });
 
     for (const filePath of allFiles) {
@@ -52,7 +51,7 @@ async function scan() {
             const metadata: TrackMetadata = native.extractMetadata(filePath);
 
             // Perform deep analysis for audio files
-            let analysis = null;
+            let analysis: AudioMetadata | null = null;
             if (!filePath.endsWith('.mp4') && !filePath.endsWith('.mkv')) {
                 try {
                     analysis = native.analyzeAudio(filePath);
@@ -69,7 +68,7 @@ async function scan() {
                 fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArt));
             }
 
-            const trackData = {
+            const trackData: Track = {
                 id,
                 title: metadata.title || path.basename(filePath),
                 artist: metadata.artist || 'Unknown Artist',
@@ -90,6 +89,7 @@ async function scan() {
                 camelot_key: analysis?.camelotKey || null,
                 bpm_confidence: analysis?.bpmConfidence || null,
                 cover_cache_path: coverCachePath,
+                thumbnail_path: null,
                 missing: 0,
                 metadata_json: JSON.stringify({ ...metadata, analysis })
             };
@@ -107,7 +107,7 @@ async function scan() {
                 trackData.sample_rate, trackData.channels, trackData.file_path,
                 trackData.file_size, trackData.mtime, trackData.added_at,
                 trackData.loudness, trackData.bpm, trackData.key, trackData.camelot_key,
-                trackData.bpm_confidence, trackData.cover_cache_path, null, trackData.missing,
+                trackData.bpm_confidence, trackData.cover_cache_path, trackData.thumbnail_path, trackData.missing,
                 trackData.metadata_json
             );
 

@@ -1,18 +1,19 @@
 import { Request, Response } from 'express';
 import db from '../db';
-import { SmartPlaylistService } from '../services/SmartPlaylistService';
+import { SmartPlaylistService, SmartPlaylistRules } from '../services/SmartPlaylistService';
 import crypto from 'crypto';
+import { SmartPlaylist } from '../types/database';
 
 export const getAllSmartPlaylists = (req: Request, res: Response) => {
-    const playlists = db.prepare('SELECT * FROM smart_playlists ORDER BY name ASC').all();
-    res.json(playlists.map((p: any) => ({
+    const playlists = db.prepare('SELECT * FROM smart_playlists ORDER BY name ASC').all() as SmartPlaylist[];
+    res.json(playlists.map((p: SmartPlaylist) => ({
         ...p,
-        definition: JSON.parse(p.definition)
+        definition: JSON.parse(p.definition) as SmartPlaylistRules
     })));
 };
 
 export const createSmartPlaylist = (req: Request, res: Response) => {
-    const { name, definition } = req.body;
+    const { name, definition } = req.body as { name: string; definition: SmartPlaylistRules };
     if (!name || !definition) {
         return res.status(400).json({ error: 'Name and definition are required' });
     }
@@ -41,7 +42,7 @@ export const getSmartPlaylistTracks = (req: Request, res: Response) => {
     }
 
     try {
-        const definition = JSON.parse(playlist.definition);
+        const definition = JSON.parse(playlist.definition) as SmartPlaylistRules;
         const tracks = SmartPlaylistService.evaluate(definition);
         res.json(tracks);
     } catch (error) {
@@ -51,7 +52,7 @@ export const getSmartPlaylistTracks = (req: Request, res: Response) => {
 };
 
 export const previewSmartPlaylist = (req: Request, res: Response) => {
-    const { conditions, matchMode } = req.body;
+    const { conditions, matchMode } = req.body as SmartPlaylistRules;
     try {
         const tracks = SmartPlaylistService.evaluate({ conditions, matchMode });
         res.json({ count: tracks.length });

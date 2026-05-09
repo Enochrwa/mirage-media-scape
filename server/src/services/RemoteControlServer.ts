@@ -26,7 +26,7 @@ export class RemoteControlServer {
 
             ws.on('message', (data) => {
                 try {
-                    const msg = JSON.parse(data.toString());
+                    const msg = JSON.parse(data.toString()) as Record<string, unknown>;
                     if (type === 'player') {
                         // Broadcast state from player to all remotes
                         this.broadcast(this.remotes, msg);
@@ -41,7 +41,7 @@ export class RemoteControlServer {
         });
     }
 
-    private broadcast(clients: Set<WebSocket>, msg: any) {
+    private broadcast(clients: Set<WebSocket>, msg: Record<string, unknown>) {
         const data = JSON.stringify(msg);
         clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
