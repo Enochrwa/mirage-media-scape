@@ -114,7 +114,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
               cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : null,
               file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
               file_path: track.file_path,
-              type: track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv') ? 'video' : 'audio',
+              type:
+                track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv')
+                  ? 'video'
+                  : 'audio',
               duration: track.duration,
               loudness: track.loudness,
               bpm: track.bpm,
@@ -154,7 +157,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : null,
           file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
           file_path: track.file_path,
-          type: track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv') ? 'video' : 'audio',
+          type:
+            track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv')
+              ? 'video'
+              : 'audio',
           duration: track.duration,
           loudness: track.loudness,
           bpm: track.bpm,

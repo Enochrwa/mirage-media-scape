@@ -7,15 +7,15 @@ vi.mock('idb', () => ({
   openDB: vi.fn().mockResolvedValue({
     getAll: vi.fn().mockResolvedValue([]),
     transaction: vi.fn().mockReturnValue({
-        store: {
-            clear: vi.fn(),
-            put: vi.fn()
-        },
-        done: Promise.resolve()
+      store: {
+        clear: vi.fn(),
+        put: vi.fn(),
+      },
+      done: Promise.resolve(),
     }),
     objectStoreNames: {
-        contains: vi.fn().mockReturnValue(true)
-    }
+      contains: vi.fn().mockReturnValue(true),
+    },
   }),
 }));
 

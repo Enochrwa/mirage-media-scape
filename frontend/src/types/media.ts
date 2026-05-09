@@ -20,7 +20,17 @@ export interface MediaFile {
   sampleRate: number | null;
 }
 
-export type SmartPlaylistOperator = 'is' | 'isNot' | 'contains' | 'notContains' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'inLastDays';
+export type SmartPlaylistOperator =
+  | 'is'
+  | 'isNot'
+  | 'contains'
+  | 'notContains'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'between'
+  | 'inLastDays';
 
 export interface SmartPlaylistCondition {
   field: string;

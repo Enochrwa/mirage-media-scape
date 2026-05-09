@@ -24,11 +24,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
   const COLUMN_COUNT = 5;
   const ROW_COUNT = Math.ceil(files.length / COLUMN_COUNT);
 
-  const Cell = ({
-    columnIndex,
-    rowIndex,
-    style,
-  }: GridChildComponentProps) => {
+  const Cell = ({ columnIndex, rowIndex, style }: GridChildComponentProps) => {
     const index = rowIndex * COLUMN_COUNT + columnIndex;
     const file = files[index];
 

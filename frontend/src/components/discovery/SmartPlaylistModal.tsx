@@ -186,7 +186,9 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
 
                 <Select
                   value={condition.operator}
-                  onValueChange={(v) => updateCondition(index, { operator: v as SmartPlaylistOperator })}
+                  onValueChange={(v) =>
+                    updateCondition(index, { operator: v as SmartPlaylistOperator })
+                  }
                 >
                   <SelectTrigger className="flex-1 border-zinc-700 bg-zinc-800">
                     <SelectValue />

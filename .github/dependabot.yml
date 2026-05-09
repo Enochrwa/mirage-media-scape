@@ -4,89 +4,89 @@ version: 2
 updates:
   # NPM dependencies
   - package-ecosystem: npm
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: '04:00'
     open-pull-requests-limit: 5
     reviewers:
-      - "Enochrwa"
+      - 'Enochrwa'
     labels:
       - dependencies
       - npm
     commit-message:
-      prefix: "chore(deps):"
-      include: "scope"
+      prefix: 'chore(deps):'
+      include: 'scope'
     allow:
-      - dependency-type: "all"
+      - dependency-type: 'all'
     ignore:
-      - dependency-name: "@types/*"
+      - dependency-name: '@types/*'
         update-types:
           - version-update:semver-patch
 
   # Frontend dependencies
   - package-ecosystem: npm
-    directory: "/frontend"
+    directory: '/frontend'
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: '04:00'
     open-pull-requests-limit: 5
     reviewers:
-      - "Enochrwa"
+      - 'Enochrwa'
     labels:
       - dependencies
       - frontend
     commit-message:
-      prefix: "chore(deps):"
-      include: "scope"
+      prefix: 'chore(deps):'
+      include: 'scope'
 
   # Server dependencies
   - package-ecosystem: npm
-    directory: "/server"
+    directory: '/server'
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: '04:00'
     open-pull-requests-limit: 5
     reviewers:
-      - "Enochrwa"
+      - 'Enochrwa'
     labels:
       - dependencies
       - server
     commit-message:
-      prefix: "chore(deps):"
-      include: "scope"
+      prefix: 'chore(deps):'
+      include: 'scope'
 
   # Docker
   - package-ecosystem: docker
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: '04:00'
     labels:
       - dependencies
       - docker
     reviewers:
-      - "Enochrwa"
+      - 'Enochrwa'
     commit-message:
-      prefix: "chore(docker):"
-      include: "scope"
+      prefix: 'chore(docker):'
+      include: 'scope'
 
   # GitHub Actions
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "04:00"
+      time: '04:00'
     labels:
       - dependencies
       - github-actions
     reviewers:
-      - "Enochrwa"
+      - 'Enochrwa'
     commit-message:
-      prefix: "chore(ci):"
-      include: "scope"
+      prefix: 'chore(ci):'
+      include: 'scope'

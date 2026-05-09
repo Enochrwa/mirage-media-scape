@@ -86,7 +86,11 @@ const Card = ({ children, className = '' }: ComponentWithClassName) => (
   </div>
 );
 
-const Badge = ({ children, variant = 'default', className = '' }: ComponentWithClassName & { variant?: 'default' | 'secondary' | 'outline' }) => (
+const Badge = ({
+  children,
+  variant = 'default',
+  className = '',
+}: ComponentWithClassName & { variant?: 'default' | 'secondary' | 'outline' }) => (
   <div
     className={cn(
       'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
@@ -225,14 +229,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     });
 
     ws.on('interaction', (newProgress) => {
-        const seekTime = newProgress * ws.getDuration();
-        setCurrentTime(seekTime);
+      const seekTime = newProgress * ws.getDuration();
+      setCurrentTime(seekTime);
     });
 
     return () => {
       ws.destroy();
     };
-}, [currentFile, setCurrentTime, setDuration]);
+  }, [currentFile, setCurrentTime, setDuration]);
 
   useEffect(() => {
     if (wavesurferRef.current && duration > 0) {
@@ -267,14 +271,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const toggleTrimming = () => {
     if (!regionsRef.current) return;
     if (isTrimming) {
-        regionsRef.current.clearRegions();
-        setTrimRegion(null);
+      regionsRef.current.clearRegions();
+      setTrimRegion(null);
     } else {
-        regionsRef.current.addRegion({
-            start: 0,
-            end: duration * 0.1,
-            color: 'rgba(139, 92, 246, 0.3)',
-        });
+      regionsRef.current.addRegion({
+        start: 0,
+        end: duration * 0.1,
+        color: 'rgba(139, 92, 246, 0.3)',
+      });
     }
     setIsTrimming(!isTrimming);
   };
@@ -309,7 +313,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-        console.error('Normalization failed', e);
+      console.error('Normalization failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -327,7 +331,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-        console.error('Boost failed', e);
+      console.error('Boost failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -345,7 +349,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-        console.error('Fades failed', e);
+      console.error('Fades failed', e);
     } finally {
       setIsProcessing(false);
     }
@@ -627,7 +631,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                   {isTrimming ? 'Cancel' : 'Trim'}
                 </Button>
                 {isTrimming && trimRegion && (
-                  <Button onClick={handleConfirmTrim} disabled={isProcessing}>Confirm Trim</Button>
+                  <Button onClick={handleConfirmTrim} disabled={isProcessing}>
+                    Confirm Trim
+                  </Button>
                 )}
                 <Button variant="outline" onClick={handleNormalize} disabled={isProcessing}>
                   Normalize
@@ -664,7 +670,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                     className="w-16 rounded bg-gray-800 p-1"
                   />
                 </div>
-                <Button variant="outline" onClick={handleApplyFades} className="self-end" disabled={isProcessing}>
+                <Button
+                  variant="outline"
+                  onClick={handleApplyFades}
+                  className="self-end"
+                  disabled={isProcessing}
+                >
                   Apply Fades
                 </Button>
               </div>

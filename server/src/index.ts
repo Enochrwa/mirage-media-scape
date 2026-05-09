@@ -20,7 +20,7 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-    cors: { origin: '*' }
+  cors: { origin: '*' },
 });
 
 setIo(io);
@@ -46,5 +46,5 @@ app.use('/api/covers', express.static(path.join(__dirname, '../cache/covers')));
 const PORT = process.env.PORT || 3001;
 
 httpServer.listen(PORT, () => {
-    console.log(`Sonic Server running on port ${PORT}`);
+  console.log(`Sonic Server running on port ${PORT}`);
 });
