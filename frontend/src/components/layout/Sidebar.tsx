@@ -90,17 +90,6 @@ export function Sidebar() {
               <Heart className="w-5 h-5" />
               Liked Songs
             </Link>
-            <div className="pt-4 border-t border-white/5 mt-4 space-y-1">
-              {playlists.map((playlist) => (
-                <Link
-                  key={playlist.id}
-                  to={`/playlists/${playlist.id}`}
-                  className="block px-2 py-1 text-sm hover:text-white transition-colors truncate"
-                >
-                  {playlist.name}
-                </Link>
-              ))}
-            </div>
           </nav>
         </div>
       </div>

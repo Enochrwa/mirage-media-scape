@@ -74,10 +74,6 @@ export function PlaybackController() {
 
   const { files } = useLibraryStore();
 
-  const handleSeek = (value: number[]) => {
-    seekTo(value[0]);
-  };
-
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0] / 100);
   };
@@ -92,7 +88,6 @@ export function PlaybackController() {
 
   return (
     <div className="h-24 bg-zinc-950 border-t border-white/10 px-4 flex items-center justify-between z-50">
-      {/* Current Track Info */}
       <div className="flex items-center gap-4 w-[30%]">
         <div className="w-14 h-14 bg-zinc-800 rounded-md overflow-hidden shadow-lg">
           <img
@@ -128,7 +123,6 @@ export function PlaybackController() {
         </Button>
       </div>
 
-      {/* Player Controls */}
       <div className="flex flex-col items-center gap-2 max-w-[40%] w-full">
         <div className="flex items-center gap-6">
           <Button
@@ -174,31 +168,6 @@ export function PlaybackController() {
           >
             <Repeat className="w-4 h-4" />
           </Button>
-          <div className="flex items-center bg-zinc-900 rounded-md p-0.5 border border-white/5">
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-[10px] font-bold text-cyan-400 hover:text-cyan-300"
-                onClick={setLoopA}
-                title="Set Loop Point A ([)"
-            >A</Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-[10px] font-bold text-orange-400 hover:text-orange-300"
-                onClick={setLoopB}
-                title="Set Loop Point B (])"
-            >B</Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-7 w-7", playbackEngine.abLoop.isActive ? "text-purple-400" : "text-zinc-500")}
-                onClick={toggleABLoop}
-                title="Toggle A-B Loop (\)"
-            >
-                <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-          </div>
         </div>
         <div className="flex items-center gap-2 w-full">
           <span className="text-[10px] text-gray-400 min-w-[35px] text-right">
@@ -213,44 +182,7 @@ export function PlaybackController() {
         </div>
       </div>
 
-      {/* Volume & Extras */}
       <div className="flex items-center justify-end gap-3 w-[30%] relative">
-        {showEQ && (
-          <div className="absolute bottom-full right-0 mb-4 z-50">
-            <EqualizerControls onClose={() => setShowEQ(false)} />
-          </div>
-        )}
-        <div className="flex flex-col items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("text-gray-400 hover:text-white", showEQ && "text-purple-500")}
-            onClick={(e) => { e.stopPropagation(); setShowEQ(!showEQ); }}
-          >
-            <Activity className="w-4 h-4" />
-          </Button>
-          {currentFile.bpm && (
-            <span className="text-[9px] font-mono text-zinc-500">{Math.round(currentFile.bpm)}</span>
-          )}
-        </div>
-        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-          <Mic2 className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-          <ListMusic className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn("text-gray-400 hover:text-white", spatialAudio && "text-cyan-400")}
-          onClick={toggleSpatialAudio}
-          title="Toggle Spatial Audio (HRTF)"
-        >
-          <Globe2 className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-          <MonitorSpeaker className="w-4 h-4" />
-        </Button>
         <div className="flex items-center gap-2 w-24">
           <Volume2 className="w-4 h-4 text-gray-400" />
           <Slider
@@ -261,18 +193,6 @@ export function PlaybackController() {
             className="h-1"
           />
         </div>
-        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-          <Maximize2 className="w-4 h-4" />
-        </Button>
-
-        {resourceState !== 'normal' && (
-          <div className="absolute -top-6 right-4 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-            <span className="text-[9px] font-bold text-yellow-400 uppercase tracking-widest">
-              {resourceState === 'critical' ? 'Critical Power' : 'Low Power Mode'}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
