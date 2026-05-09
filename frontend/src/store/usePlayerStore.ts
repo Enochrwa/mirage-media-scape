@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { MediaFile } from '@/types/media';
-import { playbackEngine, PlaybackState } from '@/lib/PlaybackEngine';
+import { playbackEngine, PlaybackState, PlaybackEngine } from '@/lib/PlaybackEngine';
 
 interface PlayerState {
+  playbackEngine: PlaybackEngine;
   currentFile: MediaFile | null;
   isPlaying: boolean;
   volume: number;
@@ -11,6 +12,7 @@ interface PlayerState {
   shuffle: boolean;
   repeat: boolean;
   isPlayerFullscreen: boolean;
+  showMobilePlayer: boolean;
 
   // Actions
   setCurrentFile: (file: MediaFile | null) => void;
@@ -21,6 +23,8 @@ interface PlayerState {
   setShuffle: (shuffle: boolean) => void;
   setRepeat: (repeat: boolean) => void;
   setPlayerFullscreen: (fullscreen: boolean) => void;
+  setShowMobilePlayer: (show: boolean) => void;
+  closePlayer: () => void;
 
   playFile: (file: MediaFile) => Promise<void>;
   pausePlayback: () => void;
@@ -34,6 +38,7 @@ interface PlayerState {
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
+  playbackEngine,
   error: null,
   setError: (error) => set({ error }),
   currentFile: null,
@@ -44,6 +49,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   shuffle: false,
   repeat: false,
   isPlayerFullscreen: false,
+  showMobilePlayer: false,
 
   setCurrentFile: (file) => set({ currentFile: file }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -56,6 +62,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setShuffle: (shuffle) => set({ shuffle }),
   setRepeat: (repeat) => set({ repeat }),
   setPlayerFullscreen: (isPlayerFullscreen) => set({ isPlayerFullscreen }),
+  setShowMobilePlayer: (showMobilePlayer) => set({ showMobilePlayer }),
+  closePlayer: () => {
+    get().pausePlayback();
+    set({ currentFile: null });
+  },
 
   playFile: async (file) => {
     set({ currentFile: file, isPlaying: true, currentTime: 0 });
@@ -104,7 +115,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   seekTo: (time) => {
     set({ currentTime: time });
-    // Note: Actual seeking on the engine should be handled by components or a more direct link
   },
 
   nextTrack: (files) => {
@@ -140,7 +150,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 }));
 
-// Initialize listeners
 playbackEngine.subscribe((state: PlaybackState) => {
   usePlayerStore.setState({ isPlaying: state === 'PLAYING' });
 });

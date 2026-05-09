@@ -1,11 +1,12 @@
 import {
-  Play, Pause, SkipBack, SkipForward, Repeat, Shuffle,
-  Volume2, Mic2, ListMusic, MonitorSpeaker, Maximize2, Heart, Activity,
-  Globe2, RotateCcw
+  Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Shuffle, Heart,
+  Mic2, ListMusic, Maximize2, MonitorSpeaker, Globe2, Activity,
+  RotateCcw
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { usePlayerStore } from "@/store/usePlayerStore";
+import { useLibraryStore } from "@/store/useLibraryStore";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/utils";
 import WaveformSeekBar from "./WaveformSeekBar";
@@ -69,7 +70,9 @@ export function PlaybackController() {
     currentTime,
     duration,
     seekTo
-  } = useMedia();
+  } = usePlayerStore();
+
+  const { files } = useLibraryStore();
 
   const handleSeek = (value: number[]) => {
     seekTo(value[0]);
@@ -140,7 +143,7 @@ export function PlaybackController() {
             variant="ghost"
             size="icon"
             className="text-gray-400 hover:text-white"
-            onClick={(e) => { e.stopPropagation(); previousTrack(); }}
+            onClick={(e) => { e.stopPropagation(); previousTrack(files); }}
           >
             <SkipBack className="w-5 h-5 fill-current" />
           </Button>
@@ -159,7 +162,7 @@ export function PlaybackController() {
             variant="ghost"
             size="icon"
             className="text-gray-400 hover:text-white"
-            onClick={(e) => { e.stopPropagation(); nextTrack(); }}
+            onClick={(e) => { e.stopPropagation(); nextTrack(files); }}
           >
             <SkipForward className="w-5 h-5 fill-current" />
           </Button>

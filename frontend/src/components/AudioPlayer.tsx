@@ -1,104 +1,24 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
-import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
+import RegionsPlugin, { Region } from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpeg';
 import { cn } from '@/lib/utils';
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, 
   Repeat, Shuffle, Heart, Share2, BookmarkPlus,
-  Mic, Radio, Headphones, Settings, Zap, Music,
-  Timer, Rewind, FastForward, Download, Star,
-  TrendingUp, Activity, Eye, EyeOff, Maximize, Minimize, X,
-  Palette, SlidersHorizontal
+  Zap, Activity, Maximize, Minimize, X,
+  SlidersHorizontal, Download
 } from 'lucide-react';
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { MediaFile, Playlist } from '@/types/media';
-
-// Re-using the simplified UI components for consistency
-const Button = ({ children, variant = "default", size = "default", className = "", onClick, ...props }: any) => (
-  <button 
-    onClick={onClick}
-    className={cn(
-      "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background",
-      variant === "ghost" ? "hover:bg-accent hover:text-accent-foreground" :
-      variant === "outline" ? "border border-input hover:bg-accent hover:text-accent-foreground" :
-      "bg-primary text-primary-foreground hover:bg-primary/90",
-      size === "sm" ? "h-9 px-3 rounded-md text-xs" :
-      size === "icon" ? "h-10 w-10" :
-      "h-10 px-4 py-2",
-      className
-    )}
-    {...props}
-  >
-    {children}
-  </button>
-);
-
-const Card = ({ children, className = "" }: any) => (
-  <div className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}>
-    {children}
-  </div>
-);
-
-const Badge = ({ children, variant = "default", className = "" }: any) => (
-  <div className={cn(
-    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-    variant === "secondary" ? "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80" :
-    variant === "outline" ? "text-foreground" :
-    "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-    className
-  )}>
-    {children}
-  </div>
-);
-
-const Slider = ({ value, max, min = 0, step = 1, onValueChange, className = "" }: any) => {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(e.target.value);
-    onValueChange([newValue]);
-  };
-
-  return (
-    <div className={cn("relative flex w-full touch-none select-none items-center", className)}>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value[0]}
-        onChange={handleChange}
-        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${(value[0] / max) * 100}%, rgb(55, 65, 81) ${(value[0] / max) * 100}%, rgb(55, 65, 81) 100%)`
-        }}
-      />
-    </div>
-  );
-};
-
-const Switch = ({ checked, onCheckedChange, className = "" }: any) => (
-  <button
-    role="switch"
-    aria-checked={checked}
-    onClick={() => onCheckedChange(!checked)}
-    className={cn(
-      "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-      checked ? "bg-purple-600" : "bg-gray-600",
-      className
-    )}
-  >
-    <span
-      className={cn(
-        "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
-        checked ? "translate-x-5" : "translate-x-0"
-      )}
-    />
-  </button>
-);
+import { MediaFile } from '@/types/media';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -140,26 +60,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [sleepTimer, setSleepTimer] = useState(0);
-  const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
-  const [bassBoost, setBassBoost] = useState(0);
-  const [trebleBoost, setTrebleBoost] = useState(0);
-  const [surroundSound, setSurroundSound] = useState(false);
-  const [noiseReduction, setNoiseReduction] = useState(false);
-  const [autoGain, setAutoGain] = useState(true);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [ambientMode, setAmbientMode] = useState(false);
-  const [particleEffect, setParticleEffect] = useState(true);
-  const [moodLighting, setMoodLighting] = useState('auto');
-  const [rating, setRating] = useState(0);
-  const [recordingMode, setRecordingMode] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
-  const [showMoodMenu, setShowMoodMenu] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   const [trimRegion, setTrimRegion] = useState<{ start: number, end: number } | null>(null);
@@ -167,11 +71,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const [volumeBoost, setVolumeBoost] = useState(0);
   const [fadeInDuration, setFadeInDuration] = useState(0);
   const [fadeOutDuration, setFadeOutDuration] = useState(0);
+  const [bassBoost, setBassBoost] = useState(0);
+  const [trebleBoost, setTrebleBoost] = useState(0);
   
   // Refs
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
-  const regionsRef = useRef<any>(null);
+  const regionsRef = useRef<RegionsPlugin | null>(null);
+
+  const toggleTrimming = () => {
+    setIsTrimming(!isTrimming);
+    if (!isTrimming && regionsRef.current) {
+        regionsRef.current.addRegion({
+            start: 0,
+            end: duration / 4,
+            color: 'rgba(255, 0, 0, 0.1)'
+        });
+    } else if (regionsRef.current) {
+        regionsRef.current.clearRegions();
+    }
+  };
 
   useEffect(() => {
     if (!waveformRef.current || !currentFile) return;
@@ -195,17 +114,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     });
 
     wavesurferRef.current = ws;
-    ws.setMuted(true); // Single source of truth is PlaybackEngine
+    ws.setMuted(true);
     
     const wsRegions = ws.registerPlugin(RegionsPlugin.create());
     regionsRef.current = wsRegions;
 
-    wsRegions.on('region-updated', (region) => {
+    wsRegions.on('region-updated', (region: Region) => {
         const regions = wsRegions.getRegions();
-        if (Object.keys(regions).length > 1) {
-            const firstRegionKey = Object.keys(regions)[0];
-            if (regions[firstRegionKey].id !== region.id) {
-                regions[firstRegionKey].remove();
+        if (regions.length > 1) {
+            const firstRegion = regions[0];
+            if (firstRegion.id !== region.id) {
+                firstRegion.remove();
             }
         }
         setTrimRegion({ start: region.start, end: region.end });
@@ -215,10 +134,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       setDuration(ws.getDuration());
     });
 
-    ws.on('interaction', (newProgress) => {
-        const engine = (window as any).playbackEngine;
+    ws.on('interaction', (newProgress: number) => {
+        const engine = usePlayerStore.getState().playbackEngine;
         if (engine) {
-            // Seek on interaction
             const seekTime = newProgress * ws.getDuration();
             setCurrentTime(seekTime);
         }
@@ -261,13 +179,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   const handleSleepTimer = (minutes: number) => {
     setSleepTimer(minutes);
-    setShowTimerMenu(false);
-    const engine = (window as any).playbackEngine;
+    const engine = usePlayerStore.getState().playbackEngine;
     if (engine) engine.startSleepTimer(minutes * 60);
-  };
-
-  const showToast = (message: string) => {
-    console.log('Toast:', message);
   };
 
   const handleConfirmTrim = async () => {
@@ -281,8 +194,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
         a.download = `trimmed_${currentFile.title}.wav`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Trim successful!');
-    } catch (e) { showToast('Trim failed'); }
+    } catch (e) { console.error('Trim failed'); }
     finally { setIsProcessing(false); }
   };
 
@@ -297,40 +209,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
         a.download = `normalized_${currentFile.title}.wav`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Normalization complete!');
-    } catch (e) { showToast('Normalization failed'); }
-    finally { setIsProcessing(false); }
-  };
-
-  const handleVolumeBoost = async () => {
-      if (!currentFile || volumeBoost === 0) return;
-      setIsProcessing(true);
-      try {
-          const blob = await changeVolume(currentFile.file, volumeBoost);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `boosted_${currentFile.title}.wav`;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast('Volume boost applied!');
-      } catch (e) { showToast('Boost failed'); }
-      finally { setIsProcessing(false); }
-  };
-
-  const handleApplyFades = async () => {
-    if (!currentFile) return;
-    setIsProcessing(true);
-    try {
-        const blob = await applyFade(currentFile.file, duration, fadeInDuration, fadeOutDuration);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `faded_${currentFile.title}.wav`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast('Fades applied!');
-    } catch (e) { showToast('Fades failed'); }
+    } catch (e) { console.error('Normalization failed'); }
     finally { setIsProcessing(false); }
   };
 
@@ -356,7 +235,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
         <div className="w-full max-w-3xl space-y-6">
           <div className="flex items-center gap-4">
             <span className="font-mono text-gray-400 w-16">{formatTime(currentTime)}</span>
-            <Slider value={[currentTime]} max={duration} onValueChange={(v: number[]) => setCurrentTime(v[0])} className="flex-1" />
+            <Slider value={[currentTime]} max={duration} onValueChange={(v) => setCurrentTime(v[0])} className="flex-1" />
             <span className="font-mono text-gray-400 w-16">{formatTime(duration)}</span>
           </div>
           <div className="flex items-center justify-center gap-6">
@@ -375,7 +254,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     <div className="w-full mx-auto h-[95vh] bg-gradient-to-br from-slate-900 via-purple-900/20 to-cyan-900/20 p-4 flex items-center justify-center">
       <Card className="relative overflow-hidden w-full h-full bg-slate-900/95 backdrop-blur-xl border border-white/20 shadow-2xl">
         <div className="relative z-10 p-8 space-y-8 overflow-y-auto h-full">
-          {/* Header */}
           <div className="flex items-start gap-8">
             <img src={currentFile.cover || '/placeholder.svg'} alt={currentFile.title} className="w-32 h-32 rounded-2xl object-cover shadow-2xl" />
             <div className="flex-1 min-w-0 space-y-4">
@@ -403,16 +281,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
           </div>
 
-          {/* Waveform / Lyrics */}
           <div className="relative h-48 bg-black/20 rounded-2xl overflow-hidden border border-white/10">
             {showLyrics ? <LyricsDisplay artist={currentFile.artist || ''} title={currentFile.title} currentTime={currentTime} className="h-full" /> : <div ref={waveformRef} className="h-full w-full" />}
           </div>
 
-          {/* Controls */}
           <div className="space-y-6">
             <div className="flex items-center gap-4 text-white">
               <span className="font-mono text-gray-400 w-16">{formatTime(currentTime)}</span>
-              <Slider value={[currentTime]} max={duration} onValueChange={(v: number[]) => setCurrentTime(v[0])} className="flex-1" />
+              <Slider value={[currentTime]} max={duration} onValueChange={(v) => setCurrentTime(v[0])} className="flex-1" />
               <span className="font-mono text-gray-400 w-16">{formatTime(duration)}</span>
             </div>
 
@@ -429,11 +305,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             </div>
           </div>
 
-          {/* Advanced Panels */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={handleVolumeClick} className="text-gray-400"><VolumeIcon /></Button>
-                <Slider value={[volume]} max={1} step={0.01} onValueChange={handleVolumeChange} className="w-24" />
+                <Slider value={[volume]} max={1} step={0.01} onValueChange={(v) => handleVolumeChange(v)} className="w-24" />
             </div>
             <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={() => setShowEqualizer(!showEqualizer)} className={showEqualizer ? "text-purple-400" : "text-gray-400"}><Activity size={20}/></Button>
@@ -449,33 +324,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                 <div className="grid grid-cols-2 gap-8">
                     <div className="space-y-2">
                         <label className="text-gray-300 text-sm">Bass Boost</label>
-                        <Slider value={[bassBoost]} min={-12} max={12} onValueChange={(v: number[]) => setBassBoost(v[0])} />
+                        <Slider value={[bassBoost]} min={-12} max={12} onValueChange={(v) => setBassBoost(v[0])} />
                     </div>
                     <div className="space-y-2">
                         <label className="text-gray-300 text-sm">Treble Boost</label>
-                        <Slider value={[trebleBoost]} min={-12} max={12} onValueChange={(v: number[]) => setTrebleBoost(v[0])} />
+                        <Slider value={[trebleBoost]} min={-12} max={12} onValueChange={(v) => setTrebleBoost(v[0])} />
                     </div>
                 </div>
                 <div className="pt-4 border-t border-white/10 flex flex-wrap gap-4">
                     <Button variant="outline" onClick={toggleTrimming}>{isTrimming ? 'Cancel' : 'Trim'}</Button>
                     {isTrimming && trimRegion && <Button onClick={handleConfirmTrim}>Confirm Trim</Button>}
                     <Button variant="outline" onClick={handleNormalize}>Normalize</Button>
-                    <div className="flex items-center gap-2">
-                        <label className="text-gray-300 text-sm">Boost dB</label>
-                        <input type="number" value={volumeBoost} onChange={(e) => setVolumeBoost(parseInt(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
-                        <Button variant="outline" onClick={handleVolumeBoost}>Apply</Button>
-                    </div>
-                </div>
-                <div className="pt-4 border-t border-white/10 flex gap-4">
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-400">Fade In (s)</label>
-                        <input type="number" value={fadeInDuration} onChange={(e) => setFadeInDuration(parseFloat(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-400">Fade Out (s)</label>
-                        <input type="number" value={fadeOutDuration} onChange={(e) => setFadeOutDuration(parseFloat(e.target.value))} className="w-16 bg-gray-800 p-1 rounded" />
-                    </div>
-                    <Button variant="outline" onClick={handleApplyFades} className="self-end">Apply Fades</Button>
                 </div>
             </div>
           )}

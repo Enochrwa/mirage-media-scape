@@ -8,14 +8,14 @@ To create a media player that feels instantaneous and adapts to the user's mood.
 
 ## 🛠 Tech Stack
 
-- **Frontend:** React, TypeScript, Tailwind CSS, Vite.
+- **Frontend:** React, TypeScript, Zustand, Tailwind CSS, Vite.
 - **Backend Orchestration:** Node.js (TypeScript), Express, Socket.io.
 - **Performance Core:** Rust (FFmpeg bindings, NAPI-RS).
 - **UI Components:** Shadcn UI, Lucide Icons.
 
 ## 📂 Project Structure
 
-- `src/`: React frontend application.
+- `frontend/`: React frontend application.
 - `server/`: Node.js backend services.
 - `native/`: Rust core for high-performance audio/video processing.
 - `docs/`: Technical research and implementation details.
@@ -25,6 +25,7 @@ To create a media player that feels instantaneous and adapts to the user's mood.
 - **AI Mood Engine:** Dynamic queue adjustment based on energy levels.
 - **Responsive Interface:** Seamless transition between desktop and mobile player views.
 - **High Performance:** Native decoding and analysis offloaded to Rust.
+- **Strictly Typed:** Full TypeScript safety across the application.
 
 ## 🛠 Getting Started
 
@@ -35,10 +36,23 @@ To create a media player that feels instantaneous and adapts to the user's mood.
 
 ### Installation
 1. Clone the repository.
-2. Install frontend dependencies: `npm install`
-3. Install server dependencies: `cd server && npm install`
-4. Build native modules: `cd native && npm install` (if using napi-rs build scripts)
+2. Install all dependencies from root:
+   ```bash
+   npm run install:all
+   ```
 
-### Running
-- Frontend: `npm run dev`
-- Backend: `cd server && npm run dev`
+### Development
+- Run both Frontend and Backend concurrently from root:
+  ```bash
+  npm run dev
+  ```
+
+- Run individually:
+  - Frontend: `npm run dev:frontend`
+  - Backend: `npm run dev:server`
+
+### Docker
+You can also run the entire platform using Docker:
+```bash
+docker-compose up --build
+```

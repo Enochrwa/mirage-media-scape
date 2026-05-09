@@ -127,3 +127,7 @@ server/dist
 *.db
 *.db-wal
 *.db-shm
+
+# Project specific
+frontend/node_modules
+frontend/dist
