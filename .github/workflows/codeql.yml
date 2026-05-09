@@ -26,24 +26,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript', 'typescript']
+        language: ['javascript-typescript']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
       - name: Build JavaScript/TypeScript
         run: |
-          npm ci
-          cd frontend && npm ci && npm run build
-          cd ../server && npm ci && npm run build
+          npm install
+          cd frontend && npm install && npm run build
+          cd ../server && npm install && npm run build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
