@@ -1,30 +1,41 @@
-
 import React, { useState, useEffect } from 'react';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuContent } from '@radix-ui/react-dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from '@radix-ui/react-dropdown-menu';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { 
-  Search, Music, Film, ListMusic, Upload, Settings, 
-  Home, ChevronLeft, ChevronRight, Menu, Heart, Globe, 
-  LayoutDashboard, Share2, Sparkles, User, Disc, BarChart3, Radio
+import {
+  Search,
+  Music,
+  Film,
+  ListMusic,
+  Upload,
+  Settings,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  Heart,
+  Globe,
+  LayoutDashboard,
+  Share2,
+  Sparkles,
+  User,
+  Disc,
+  BarChart3,
+  Radio,
 } from 'lucide-react';
 import { SmartPlaylistModal } from './discovery/SmartPlaylistModal';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type SidebarItemProps = {
   icon: React.ReactNode;
@@ -40,8 +51,10 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
     <Button
       variant="ghost"
       className={cn(
-        "w-full justify-start gap-3 px-3 font-normal relative",
-        active ? "bg-accent text-accent-foreground" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        'relative w-full justify-start gap-3 px-3 font-normal',
+        active
+          ? 'bg-accent text-accent-foreground'
+          : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       )}
       onClick={onClick}
     >
@@ -66,7 +79,15 @@ type SidebarProps = {
   className?: string;
 };
 
-export type SidebarView = 'home' | 'music' | 'videos' | 'playlists' | 'upload' | 'settings' | 'favorites' | 'dashboard';
+export type SidebarView =
+  | 'home'
+  | 'music'
+  | 'videos'
+  | 'playlists'
+  | 'upload'
+  | 'settings'
+  | 'favorites'
+  | 'dashboard';
 
 const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const location = useLocation();
@@ -76,13 +97,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isSmartPlaylistModalOpen, setIsSmartPlaylistModalOpen] = useState(false);
   const { playlists, smartPlaylists, fetchSmartPlaylists, files } = useLibraryStore();
-  
+
   useEffect(() => {
     // Set active view based on current route
     const path = location.pathname;
     if (path === '/') setView('home');
-    else if (path === '/library' && files.filter(f => f.type === 'audio').length) setView('music');
-    else if (path === '/library' && files.filter(f => f.type === 'video').length) setView('videos');
+    else if (path === '/library' && files.filter((f) => f.type === 'audio').length)
+      setView('music');
+    else if (path === '/library' && files.filter((f) => f.type === 'video').length)
+      setView('videos');
     else if (path === '/playlists') setView('playlists');
     else if (path === '/upload') setView('upload');
     else if (path === '/settings') setView('settings');
@@ -90,9 +113,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
     else if (path === '/dashboard') setView('dashboard');
   }, [location.pathname, files]);
 
-  const audioCount = files.filter(file => file.type === 'audio').length;
-  const videoCount = files.filter(file => file.type === 'video').length;
-  
+  const audioCount = files.filter((file) => file.type === 'audio').length;
+  const videoCount = files.filter((file) => file.type === 'video').length;
+
   // Mobile menu
   const MobileMenu = () => (
     <Sheet open={showMobileMenu} onOpenChange={setShowMobileMenu}>
@@ -102,16 +125,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="p-0">
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
-                <Music className="w-4 h-4 text-white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary">
+                <Music className="h-4 w-4 text-white" />
               </div>
               <h2 className="text-lg font-semibold tracking-tight">Mirage</h2>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto px-2 py-4">
             {/* Same content as desktop sidebar */}
             <div className="mb-4">
@@ -121,11 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 active={view === 'home'}
                 to="/"
               />
-              <SidebarItem
-                icon={<Search size={20} />}
-                label={t('Search')}
-                onClick={() => {}}
-              />
+              <SidebarItem icon={<Search size={20} />} label={t('Search')} onClick={() => {}} />
               <SidebarItem
                 icon={<LayoutDashboard size={20} />}
                 label={t('Dashboard')}
@@ -184,17 +203,18 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-3 px-3 font-normal"
-                  >
+                  <Button variant="ghost" className="w-full justify-start gap-3 px-3 font-normal">
                     <Globe size={20} />
                     <span className="truncate">{t('Language')}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>
+                    English
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>
+                    Español
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -202,18 +222,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <Separator className="my-4 bg-sidebar-border" />
 
             <div className="mb-2">
-              <div className="flex items-center justify-between px-4 mb-1">
-                <p className="text-xs text-sidebar-foreground/60 font-medium">{t('YOUR PLAYLISTS')}</p>
+              <div className="mb-1 flex items-center justify-between px-4">
+                <p className="text-xs font-medium text-sidebar-foreground/60">
+                  {t('YOUR PLAYLISTS')}
+                </p>
                 <button
                   onClick={() => setIsSmartPlaylistModalOpen(true)}
-                  className="text-zinc-500 hover:text-purple-400 transition-colors"
+                  className="text-zinc-500 transition-colors hover:text-purple-400"
                   title="Create Smart Playlist"
                 >
                   <Sparkles size={14} />
                 </button>
               </div>
               <div className="space-y-1">
-                {playlists.map(playlist => (
+                {playlists.map((playlist) => (
                   <Button
                     key={playlist.id}
                     variant="ghost"
@@ -222,7 +244,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     {playlist.name}
                   </Button>
                 ))}
-                {smartPlaylists.map(playlist => (
+                {smartPlaylists.map((playlist) => (
                   <Button
                     key={playlist.id}
                     variant="ghost"
@@ -248,57 +270,59 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       </SheetContent>
     </Sheet>
   );
-  
+
   return (
-    <div className={cn(
-      "group relative flex flex-col h-screen bg-sidebar transition-all duration-300 ease-in-out",
-      collapsed ? "w-[60px]" : "w-[240px]",
-      className
-    )}>
+    <div
+      className={cn(
+        'group relative flex h-screen flex-col bg-sidebar transition-all duration-300 ease-in-out',
+        collapsed ? 'w-[60px]' : 'w-[240px]',
+        className,
+      )}
+    >
       <div className="flex items-center justify-between p-4">
         {!collapsed ? (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
-              <Music className="w-4 h-4 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary">
+              <Music className="h-4 w-4 text-white" />
             </div>
             <h2 className="text-lg font-semibold tracking-tight">Mirage</h2>
           </div>
         ) : (
-          <div className="w-8 h-8 mx-auto rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
-            <Music className="w-4 h-4 text-white" />
+          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary">
+            <Music className="h-4 w-4 text-white" />
           </div>
         )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn("ml-auto", collapsed && "mx-auto")} 
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('ml-auto', collapsed && 'mx-auto')}
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </Button>
       </div>
-      
-      <div className={cn(
-        "flex-1 overflow-y-auto scrollbar-hide px-2 py-4",
-        collapsed && "items-center"
-      )}>
+
+      <div
+        className={cn(
+          'scrollbar-hide flex-1 overflow-y-auto px-2 py-4',
+          collapsed && 'items-center',
+        )}
+      >
         <div className="mb-4">
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Home size={20} />} 
-                      label="" 
-                      active={view === 'home'} 
-                      to="/" 
+                    <SidebarItem
+                      icon={<Home size={20} />}
+                      label=""
+                      active={view === 'home'}
+                      to="/"
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  Home
-                </TooltipContent>
+                <TooltipContent side="right">Home</TooltipContent>
               </Tooltip>
             ) : (
               <SidebarItem
@@ -309,32 +333,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem
-                      icon={<Search size={20} />}
-                      label=""
-                      onClick={() => {}}
-                    />
+                    <SidebarItem icon={<Search size={20} />} label="" onClick={() => {}} />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  {t('Search')}
-                </TooltipContent>
+                <TooltipContent side="right">{t('Search')}</TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem
-                icon={<Search size={20} />}
-                label={t('Search')}
-                onClick={() => {}}
-              />
+              <SidebarItem icon={<Search size={20} />} label={t('Search')} onClick={() => {}} />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <>
@@ -349,9 +363,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                       />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {t('Dashboard')}
-                  </TooltipContent>
+                  <TooltipContent side="right">{t('Dashboard')}</TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
@@ -365,9 +377,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                       />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {t('Statistics')}
-                  </TooltipContent>
+                  <TooltipContent side="right">{t('Statistics')}</TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
@@ -381,9 +391,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                       />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="right">
-                    Internet Radio
-                  </TooltipContent>
+                  <TooltipContent side="right">Internet Radio</TooltipContent>
                 </Tooltip>
               </>
             ) : (
@@ -410,27 +418,25 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             )}
           </TooltipProvider>
         </div>
-        
+
         <Separator className="my-4 bg-sidebar-border" />
-        
+
         <div className="space-y-1">
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Music size={20} />} 
-                      label="" 
+                    <SidebarItem
+                      icon={<Music size={20} />}
+                      label=""
                       active={view === 'music'}
                       to="/music"
                       badge={!collapsed ? audioCount : undefined}
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  Music ({audioCount})
-                </TooltipContent>
+                <TooltipContent side="right">Music ({audioCount})</TooltipContent>
               </Tooltip>
             ) : (
               <SidebarItem
@@ -442,7 +448,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
@@ -470,16 +476,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<ListMusic size={20} />} 
-                      label="" 
-                      active={view === 'playlists'} 
+                    <SidebarItem
+                      icon={<ListMusic size={20} />}
+                      label=""
+                      active={view === 'playlists'}
                       to="/playlists"
                     />
                   </div>
@@ -489,70 +495,66 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<ListMusic size={20} />} 
+              <SidebarItem
+                icon={<ListMusic size={20} />}
                 label={t('Playlists')}
-                active={view === 'playlists'} 
+                active={view === 'playlists'}
                 to="/playlists"
                 badge={playlists.length}
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Heart size={20} />} 
-                      label="" 
-                      active={view === 'favorites'} 
+                    <SidebarItem
+                      icon={<Heart size={20} />}
+                      label=""
+                      active={view === 'favorites'}
                       to="/favorites"
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  {t('Favorites')}
-                </TooltipContent>
+                <TooltipContent side="right">{t('Favorites')}</TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Heart size={20} />} 
+              <SidebarItem
+                icon={<Heart size={20} />}
                 label={t('Favorites')}
-                active={view === 'favorites'} 
+                active={view === 'favorites'}
                 to="/favorites"
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <SidebarItem 
-                      icon={<Upload size={20} />} 
-                      label="" 
-                      active={view === 'upload'} 
+                    <SidebarItem
+                      icon={<Upload size={20} />}
+                      label=""
+                      active={view === 'upload'}
                       to="/upload"
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  {t('Upload')}
-                </TooltipContent>
+                <TooltipContent side="right">{t('Upload')}</TooltipContent>
               </Tooltip>
             ) : (
-              <SidebarItem 
-                icon={<Upload size={20} />} 
+              <SidebarItem
+                icon={<Upload size={20} />}
                 label={t('Upload')}
-                active={view === 'upload'} 
+                active={view === 'upload'}
                 to="/upload"
               />
             )}
           </TooltipProvider>
-          
+
           <TooltipProvider>
             {collapsed ? (
               <Tooltip>
@@ -568,53 +570,58 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>
+                          English
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>
+                          Español
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  {t('Language')}
-                </TooltipContent>
+                <TooltipContent side="right">{t('Language')}</TooltipContent>
               </Tooltip>
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-3 px-3 font-normal"
-                  >
+                  <Button variant="ghost" className="w-full justify-start gap-3 px-3 font-normal">
                     <Globe size={20} />
                     <span className="truncate">{t('Language')}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>English</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>Español</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('en')}>
+                    English
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => i18n.changeLanguage('es')}>
+                    Español
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
           </TooltipProvider>
         </div>
-        
+
         {!collapsed && (
           <>
             <Separator className="my-4 bg-sidebar-border" />
-            
+
             <div className="mb-2">
-              <div className="flex items-center justify-between px-4 mb-1">
-                <p className="text-xs text-sidebar-foreground/60 font-medium">{t('YOUR PLAYLISTS')}</p>
+              <div className="mb-1 flex items-center justify-between px-4">
+                <p className="text-xs font-medium text-sidebar-foreground/60">
+                  {t('YOUR PLAYLISTS')}
+                </p>
                 <button
                   onClick={() => setIsSmartPlaylistModalOpen(true)}
-                  className="text-zinc-500 hover:text-purple-400 transition-colors"
+                  className="text-zinc-500 transition-colors hover:text-purple-400"
                   title="Create Smart Playlist"
                 >
                   <Sparkles size={14} />
                 </button>
               </div>
               <div className="space-y-1">
-                {playlists.map(playlist => (
+                {playlists.map((playlist) => (
                   <Button
                     key={playlist.id}
                     variant="ghost"
@@ -628,7 +635,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           </>
         )}
       </div>
-      
+
       <div className="p-2">
         <TooltipProvider>
           {collapsed ? (
@@ -643,9 +650,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="right">
-                {t('Settings')}
-              </TooltipContent>
+              <TooltipContent side="right">{t('Settings')}</TooltipContent>
             </Tooltip>
           ) : (
             <SidebarItem
@@ -657,9 +662,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           )}
         </TooltipProvider>
       </div>
-      
+
       {/* Mobile menu trigger */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
+      <div className="fixed left-4 top-4 z-50 md:hidden">
         <MobileMenu />
       </div>
 

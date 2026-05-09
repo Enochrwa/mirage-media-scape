@@ -120,7 +120,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   nextTrack: (files) => {
     if (files.length === 0) return;
     const { currentFile, shuffle, repeat } = get();
-    const currentIndex = files.findIndex(file => file.id === currentFile?.id);
+    const currentIndex = files.findIndex((file) => file.id === currentFile?.id);
 
     if (shuffle) {
       let nextIndex;
@@ -140,7 +140,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   previousTrack: (files) => {
     if (files.length === 0) return;
     const { currentFile, repeat } = get();
-    const currentIndex = files.findIndex(file => file.id === currentFile?.id);
+    const currentIndex = files.findIndex((file) => file.id === currentFile?.id);
 
     if (currentIndex > 0) {
       get().playFile(files[currentIndex - 1]);

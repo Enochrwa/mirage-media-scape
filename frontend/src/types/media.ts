@@ -20,9 +20,20 @@ export interface MediaFile {
   sampleRate?: string;
 }
 
+export interface SmartPlaylistCondition {
+  field: string;
+  operator: string;
+  value: string;
+}
+
+export interface SmartPlaylistDefinition {
+  matchMode: 'all' | 'any';
+  conditions: SmartPlaylistCondition[];
+}
+
 export interface Playlist {
   id: string;
   name: string;
   files: MediaFile[];
-  rules?: any;
+  rules?: SmartPlaylistDefinition;
 }

@@ -5,11 +5,21 @@ import { io, Socket } from 'socket.io-client';
 import { openDB, IDBPDatabase } from 'idb';
 import * as mm from 'music-metadata';
 
+interface IncomingTrack {
+  id: string;
+  file_path: string;
+  title: string;
+  artist?: string;
+  cover_cache_path?: string;
+  genre?: string;
+  year?: number;
+}
+
 interface LibraryState {
   files: MediaFile[];
   playlists: Playlist[];
   smartPlaylists: Playlist[];
-  scanProgress: { scanned: number, total: number, percentage: number } | null;
+  scanProgress: { scanned: number; total: number; percentage: number } | null;
   db: IDBPDatabase | null;
   socket: Socket | null;
 
@@ -61,20 +71,21 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         scanProgress: {
           scanned: data.scanned,
           total: data.total,
-          percentage: Math.round((data.scanned / data.total) * 100)
-        }
+          percentage: Math.round((data.scanned / data.total) * 100),
+        },
       });
     });
 
     socket.on('NEW_TRACKS', (data) => {
-      set(state => {
+      set((state) => {
         const newFiles = [...state.files];
-        data.tracks.forEach((track: any) => {
-          if (!newFiles.find(f => f.id === track.id)) {
+        const tracks = (data.tracks as IncomingTrack[]) || [];
+        tracks.forEach((track) => {
+          if (!newFiles.find((f) => f.id === track.id)) {
             newFiles.push({
               ...track,
               file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
-              type: 'audio'
+              type: 'audio',
             });
           }
         });
@@ -95,11 +106,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       const response = await fetch(`${API_BASE}/api/tracks`);
       if (response.ok) {
-        const data = await response.json();
-        const mappedTracks = data.map((track: any) => ({
+        const data = (await response.json()) as IncomingTrack[];
+        const mappedTracks = data.map((track) => ({
           ...track,
           file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
-          type: track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv') ? 'video' : 'audio'
+          type:
+            track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv')
+              ? 'video'
+              : 'audio',
         }));
         set({ files: mappedTracks });
       }
@@ -125,14 +139,17 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       await fetch(`${API_BASE}/api/scanner/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: path })
+        body: JSON.stringify({ directory: path }),
       });
     } else if ('showDirectoryPicker' in window) {
       try {
-        const handle = await (window as any).showDirectoryPicker();
+        const win = window as Window & {
+          showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+        };
+        const handle = await win.showDirectoryPicker?.();
         // Here we would ideally scan the directory in the web context
         // This logic is complex, for now let's keep it consistent with MediaContext
-        console.log("Web directory picker not fully implemented in store yet");
+        console.log('Web directory picker not fully implemented in store yet');
       } catch (e) {
         console.error('Directory picker failed', e);
       }
@@ -143,33 +160,33 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     const newPlaylist: Playlist = {
       id: `playlist-${Date.now()}`,
       name,
-      files: []
+      files: [],
     };
-    set(state => ({ playlists: [...state.playlists, newPlaylist] }));
+    set((state) => ({ playlists: [...state.playlists, newPlaylist] }));
   },
 
   addToPlaylist: (playlistId, fileId) => {
-    const file = get().files.find(f => f.id === fileId);
+    const file = get().files.find((f) => f.id === fileId);
     if (!file) return;
 
-    set(state => ({
-      playlists: state.playlists.map(playlist => {
-        if (playlist.id === playlistId && !playlist.files.some(f => f.id === fileId)) {
+    set((state) => ({
+      playlists: state.playlists.map((playlist) => {
+        if (playlist.id === playlistId && !playlist.files.some((f) => f.id === fileId)) {
           return { ...playlist, files: [...playlist.files, file] };
         }
         return playlist;
-      })
+      }),
     }));
   },
 
   removeFromPlaylist: (playlistId, fileId) => {
-    set(state => ({
-      playlists: state.playlists.map(playlist => {
+    set((state) => ({
+      playlists: state.playlists.map((playlist) => {
         if (playlist.id === playlistId) {
-          return { ...playlist, files: playlist.files.filter(f => f.id !== fileId) };
+          return { ...playlist, files: playlist.files.filter((f) => f.id !== fileId) };
         }
         return playlist;
-      })
+      }),
     }));
   },
 }));

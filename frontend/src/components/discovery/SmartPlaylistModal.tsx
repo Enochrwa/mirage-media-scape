@@ -1,16 +1,35 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Save } from 'lucide-react';
 import { API_BASE } from '@/lib/utils';
+import { Playlist } from '@/types/media';
+
+interface SmartPlaylistCondition {
+  field: string;
+  operator: string;
+  value: string;
+}
 
 interface SmartPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (playlist: any) => void;
+  onSave: (playlist: Playlist) => void;
 }
 
 const FIELDS = [
@@ -40,10 +59,16 @@ const OPERATORS = [
   { value: 'inLastDays', label: 'in the last (days)' },
 ];
 
-export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, onClose, onSave }) => {
+export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+}) => {
   const [name, setName] = useState('');
   const [matchMode, setMatchMode] = useState<'all' | 'any'>('all');
-  const [conditions, setConditions] = useState([{ field: 'title', operator: 'contains', value: '' }]);
+  const [conditions, setConditions] = useState<SmartPlaylistCondition[]>([
+    { field: 'title', operator: 'contains', value: '' },
+  ]);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
 
   const addCondition = () => {
@@ -54,41 +79,39 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
     setConditions(conditions.filter((_, i) => i !== index));
   };
 
-  const updateCondition = (index: number, updates: any) => {
+  const updateCondition = (index: number, updates: Partial<SmartPlaylistCondition>) => {
     const newConditions = [...conditions];
     newConditions[index] = { ...newConditions[index], ...updates };
     setConditions(newConditions);
     fetchPreview(newConditions, matchMode);
   };
 
-  const fetchPreview = async (conds: any[], mode: string) => {
+  const fetchPreview = async (conds: SmartPlaylistCondition[], mode: 'all' | 'any') => {
     try {
       const res = await fetch(`${API_BASE}/api/playlists/smart/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conditions: conds, matchMode: mode })
+        body: JSON.stringify({ conditions: conds, matchMode: mode }),
       });
       if (res.ok) {
         const { count } = await res.json();
         setPreviewCount(count);
       }
-    } catch (e) {}
-  };
-
-  const handleSave = async () => {
-    const playlist = {
+      } catch (error) {
+        console.error('Failed to fetch preview', error);
+      }
       name,
       definition: {
         matchMode,
-        conditions
-      }
+        conditions,
+      },
     };
 
     try {
       const response = await fetch(`${API_BASE}/api/playlists/smart`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(playlist)
+        body: JSON.stringify(playlist),
       });
       if (response.ok) {
         const data = await response.json();
@@ -102,12 +125,12 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-zinc-900 text-white border-zinc-800">
+      <DialogContent className="border-zinc-800 bg-zinc-900 text-white sm:max-w-[600px]">
         <DialogHeader>
-          <div className="flex justify-between items-center pr-8">
+          <div className="flex items-center justify-between pr-8">
             <DialogTitle>Create Smart Playlist</DialogTitle>
             {previewCount !== null && (
-              <span className="bg-purple-500/20 text-purple-400 text-xs px-2 py-1 rounded-full font-bold">
+              <span className="rounded-full bg-purple-500/20 px-2 py-1 text-xs font-bold text-purple-400">
                 {previewCount} tracks match
               </span>
             )}
@@ -120,8 +143,8 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
             <Input
               placeholder="My Awesome Mix"
               value={name}
-              onChange={e => setName(e.target.value)}
-              className="bg-zinc-800 border-zinc-700 focus:ring-purple-500"
+              onChange={(e) => setName(e.target.value)}
+              className="border-zinc-700 bg-zinc-800 focus:ring-purple-500"
             />
           </div>
 
@@ -130,8 +153,8 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
               <Label>Rules</Label>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-zinc-400">Match</span>
-                <Select value={matchMode} onValueChange={(v: any) => setMatchMode(v)}>
-                  <SelectTrigger className="w-24 bg-zinc-800 border-zinc-700">
+                <Select value={matchMode} onValueChange={(v: 'all' | 'any') => setMatchMode(v)}>
+                  <SelectTrigger className="w-24 border-zinc-700 bg-zinc-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -147,33 +170,41 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
               <div key={index} className="flex items-center gap-2">
                 <Select
                   value={condition.field}
-                  onValueChange={v => updateCondition(index, { field: v })}
+                  onValueChange={(v) => updateCondition(index, { field: v })}
                 >
-                  <SelectTrigger className="flex-1 bg-zinc-800 border-zinc-700">
+                  <SelectTrigger className="flex-1 border-zinc-700 bg-zinc-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                    {FIELDS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
                 <Select
                   value={condition.operator}
-                  onValueChange={v => updateCondition(index, { operator: v })}
+                  onValueChange={(v) => updateCondition(index, { operator: v })}
                 >
-                  <SelectTrigger className="flex-1 bg-zinc-800 border-zinc-700">
+                  <SelectTrigger className="flex-1 border-zinc-700 bg-zinc-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {OPERATORS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {OPERATORS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
                 <Input
                   placeholder="Value..."
                   value={condition.value}
-                  onChange={e => updateCondition(index, { value: e.target.value })}
-                  className="flex-1 bg-zinc-800 border-zinc-700"
+                  onChange={(e) => updateCondition(index, { value: e.target.value })}
+                  className="flex-1 border-zinc-700 bg-zinc-800"
                 />
 
                 <Button
@@ -201,7 +232,9 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({ isOpen, 
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} className="bg-purple-600 hover:bg-purple-700">
             <Save size={16} className="mr-2" />
             Save Playlist

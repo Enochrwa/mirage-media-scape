@@ -1,12 +1,18 @@
-
 import React, { useState, useRef } from 'react';
-import { useLibraryStore } from '@/store/useLibraryStore'; import { MediaFile, MediaType } from '@/types/media';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { MediaFile, MediaType } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 import { Upload, X, FileAudio, FileVideo, Image } from 'lucide-react';
 
@@ -24,35 +30,35 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
   const [album, setAlbum] = useState('');
   const [mediaType, setMediaType] = useState<MediaType>('audio');
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
     } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
-  
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       handleFileSelect(file);
     }
   };
-  
+
   const handleFileSelect = (file: File) => {
     const fileType = file.type;
-    
+
     if (fileType.startsWith('audio/')) {
       setMediaType('audio');
       setSelectedFile(file);
@@ -61,23 +67,23 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
       setSelectedFile(file);
     } else {
       toast({
-        title: "Unsupported File Type",
-        description: "Please select an audio or video file.",
-        variant: "destructive"
+        title: 'Unsupported File Type',
+        description: 'Please select an audio or video file.',
+        variant: 'destructive',
       });
     }
   };
-  
+
   const handleCoverSelect = (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
-        title: "Unsupported File Type",
-        description: "Please select an image file for the cover.",
-        variant: "destructive"
+        title: 'Unsupported File Type',
+        description: 'Please select an image file for the cover.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     setSelectedCoverFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -85,34 +91,34 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     };
     reader.readAsDataURL(file);
   };
-  
+
   const handleUpload = () => {
     if (!selectedFile) {
       toast({
-        title: "No File Selected",
-        description: "Please select a file to upload.",
-        variant: "destructive"
+        title: 'No File Selected',
+        description: 'Please select a file to upload.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     if (!title) {
       toast({
-        title: "Title Required",
-        description: "Please enter a title for the media file.",
-        variant: "destructive"
+        title: 'Title Required',
+        description: 'Please enter a title for the media file.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     // Create object URL for the file
     const fileUrl = URL.createObjectURL(selectedFile);
     let coverUrl = coverPreview || '/placeholder.svg';
-    
+
     if (selectedCoverFile) {
       coverUrl = URL.createObjectURL(selectedCoverFile);
     }
-    
+
     const newFile: MediaFile = {
       id: `file-${Date.now()}`,
       title,
@@ -120,16 +126,16 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
       album: album || undefined,
       cover: coverUrl,
       file: fileUrl,
-      type: mediaType
+      type: mediaType,
     };
-    
+
     addFile(newFile);
-    
+
     toast({
-      title: "File Uploaded Successfully",
-      description: `${newFile.title} has been added to your library.`
+      title: 'File Uploaded Successfully',
+      description: `${newFile.title} has been added to your library.`,
     });
-    
+
     // Reset form
     setSelectedFile(null);
     setSelectedCoverFile(null);
@@ -138,29 +144,31 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     setAlbum('');
     setCoverPreview(null);
   };
-  
+
   const clearSelectedFile = () => {
     setSelectedFile(null);
   };
-  
+
   const clearSelectedCover = () => {
     setSelectedCoverFile(null);
     setCoverPreview(null);
   };
-  
+
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn('space-y-6', className)}>
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Upload Media</h1>
-        <p className="text-muted-foreground mt-2">Add your own music and video files to your library.</p>
+        <p className="mt-2 text-muted-foreground">
+          Add your own music and video files to your library.
+        </p>
       </div>
-      
-      <Card className="p-6 space-y-6">
-        <div 
+
+      <Card className="space-y-6 p-6">
+        <div
           className={cn(
-            "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-            dragActive ? "border-accent bg-accent/10" : "border-muted",
-            selectedFile ? "bg-secondary/30" : "hover:bg-secondary/30"
+            'cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors',
+            dragActive ? 'border-accent bg-accent/10' : 'border-muted',
+            selectedFile ? 'bg-secondary/30' : 'hover:bg-secondary/30',
           )}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -171,21 +179,21 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
           {selectedFile ? (
             <div className="flex flex-col items-center gap-2">
               {mediaType === 'audio' ? (
-                <FileAudio className="w-12 h-12 text-accent" />
+                <FileAudio className="h-12 w-12 text-accent" />
               ) : (
-                <FileVideo className="w-12 h-12 text-accent" />
+                <FileVideo className="h-12 w-12 text-accent" />
               )}
               <div className="flex items-center gap-2">
                 <p className="text-lg font-medium">{selectedFile.name}</p>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
+                <Button
+                  size="icon"
+                  variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
                     clearSelectedFile();
                   }}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -194,13 +202,15 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              <Upload className="w-12 h-12 text-muted-foreground" />
+              <Upload className="h-12 w-12 text-muted-foreground" />
               <p className="text-lg font-medium">Drag and drop a file here</p>
               <p className="text-sm text-muted-foreground">or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-2">Supported formats: MP3, WAV, MP4, WEBM</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Supported formats: MP3, WAV, MP4, WEBM
+              </p>
             </div>
           )}
-          <Input 
+          <Input
             type="file"
             ref={fileInputRef}
             className="hidden"
@@ -212,8 +222,8 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
             }}
           />
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -224,7 +234,7 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter media title"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="artist">Artist</Label>
               <Input
@@ -234,7 +244,7 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter artist name"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="album">Album</Label>
               <Input
@@ -244,13 +254,10 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter album name"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="media-type">Type</Label>
-              <Select 
-                value={mediaType} 
-                onValueChange={(value) => setMediaType(value as MediaType)}
-              >
+              <Select value={mediaType} onValueChange={(value) => setMediaType(value as MediaType)}>
                 <SelectTrigger id="media-type">
                   <SelectValue placeholder="Select media type" />
                 </SelectTrigger>
@@ -261,42 +268,42 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
               </Select>
             </div>
           </div>
-          
+
           <div className="space-y-4">
             <Label>Cover Image</Label>
-            <div 
+            <div
               className={cn(
-                "border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors",
-                coverPreview ? "border-accent" : "border-muted hover:bg-secondary/30"
+                'flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-4 transition-colors',
+                coverPreview ? 'border-accent' : 'border-muted hover:bg-secondary/30',
               )}
               onClick={() => coverInputRef.current?.click()}
             >
               {coverPreview ? (
                 <div className="relative w-full">
-                  <img 
-                    src={coverPreview} 
+                  <img
+                    src={coverPreview}
                     alt="Cover Preview"
-                    className="rounded-md w-full h-48 object-cover"
+                    className="h-48 w-full rounded-md object-cover"
                   />
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="absolute top-2 right-2 bg-black/50 hover:bg-black/70"
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-2 top-2 bg-black/50 hover:bg-black/70"
                     onClick={(e) => {
                       e.stopPropagation();
                       clearSelectedCover();
                     }}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
                 <>
-                  <Image className="w-10 h-10 text-muted-foreground" />
+                  <Image className="h-10 w-10 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Click to add a cover image</p>
                 </>
               )}
-              <Input 
+              <Input
                 type="file"
                 ref={coverInputRef}
                 className="hidden"
@@ -310,12 +317,8 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
             </div>
           </div>
         </div>
-        
-        <Button 
-          className="w-full"
-          onClick={handleUpload}
-          disabled={!selectedFile || !title}
-        >
+
+        <Button className="w-full" onClick={handleUpload} disabled={!selectedFile || !title}>
           Upload
         </Button>
       </Card>

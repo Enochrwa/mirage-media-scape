@@ -9,7 +9,12 @@ interface LyricsDisplayProps {
   className?: string;
 }
 
-export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({ artist, title, currentTime, className }) => {
+export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
+  artist,
+  title,
+  currentTime,
+  className,
+}) => {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,23 +49,23 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({ artist, title, cur
 
   if (lyrics.length === 0) {
     return (
-      <div className={cn("flex items-center justify-center text-zinc-500 italic", className)}>
+      <div className={cn('flex items-center justify-center italic text-zinc-500', className)}>
         No synced lyrics found
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className={cn("overflow-y-auto space-y-6 px-4 py-32", className)}>
+    <div ref={containerRef} className={cn('space-y-6 overflow-y-auto px-4 py-32', className)}>
       {lyrics.map((line, i) => (
         <div
           key={i}
           data-index={i}
           className={cn(
-            "text-2xl font-bold transition-all duration-500 cursor-pointer hover:text-white",
+            'cursor-pointer text-2xl font-bold transition-all duration-500 hover:text-white',
             i === activeIndex
-              ? "text-white scale-110 origin-left opacity-100"
-              : "text-zinc-600 opacity-40 hover:opacity-100"
+              ? 'origin-left scale-110 text-white opacity-100'
+              : 'text-zinc-600 opacity-40 hover:opacity-100',
           )}
           onClick={() => {
             // Logic to seek could go here if needed, via context

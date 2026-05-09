@@ -6,11 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: [
-      'dist',
-      'node_modules',
-      'coverage'
-    ]
+    ignores: ['dist', 'node_modules', 'coverage'],
   },
 
   js.configs.recommended,
@@ -20,22 +16,19 @@ export default [
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      globals: globals.browser
+      globals: globals.browser,
     },
     plugins: {
       'react-hooks': reactHooks,
-      'react-refresh': reactRefresh
+      'react-refresh': reactRefresh,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
 
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true }
-      ],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
       '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn'
-    }
-  }
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
 ];

@@ -8,8 +8,8 @@ export const getFFmpeg = async (): Promise<FFmpeg> => {
     return ffmpeg;
   }
   ffmpeg = new FFmpeg();
-  
-  // This loads the core and wasm files from a CDN. 
+
+  // This loads the core and wasm files from a CDN.
   // No need to host them ourselves for this implementation.
   await ffmpeg.load();
 
@@ -19,7 +19,7 @@ export const getFFmpeg = async (): Promise<FFmpeg> => {
 export const trimAudio = async (
   audioUrl: string,
   startTime: number,
-  endTime: number
+  endTime: number,
 ): Promise<Blob> => {
   const ffmpegInstance = await getFFmpeg();
   const inputFileName = `input_${Date.now()}.audio`;
@@ -64,20 +64,14 @@ export const normalizeVolume = async (audioUrl: string): Promise<Blob> => {
   await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
 
   // Using a single-pass loudnorm filter with common parameters.
-  const command = [
-    '-i',
-    inputFileName,
-    '-af',
-    'loudnorm=I=-16:TP=-1.5:LRA=11',
-    outputFileName,
-  ];
+  const command = ['-i', inputFileName, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', outputFileName];
 
   console.log('Running ffmpeg command:', command.join(' '));
 
   await ffmpegInstance.exec(command);
 
   const data = await ffmpegInstance.readFile(outputFileName);
-  
+
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
 
@@ -88,7 +82,7 @@ export const applyFade = async (
   audioUrl: string,
   audioDuration: number,
   fadeInDuration: number,
-  fadeOutDuration: number
+  fadeOutDuration: number,
 ): Promise<Blob> => {
   const ffmpegInstance = await getFFmpeg();
   const inputFileName = `input_fade_${Date.now()}.audio`;
@@ -103,24 +97,18 @@ export const applyFade = async (
   if (fadeOutDuration > 0) {
     const fadeOutStartTime = audioDuration - fadeOutDuration;
     if (fadeOutStartTime > 0) {
-        fadeFilters.push(`afade=t=out:st=${fadeOutStartTime}:d=${fadeOutDuration}`);
+      fadeFilters.push(`afade=t=out:st=${fadeOutStartTime}:d=${fadeOutDuration}`);
     }
   }
 
   if (fadeFilters.length === 0) {
-      console.warn("No fade effect to apply.");
-      const data = await ffmpegInstance.readFile(inputFileName);
-      await ffmpegInstance.deleteFile(inputFileName);
-      return new Blob([data], { type: 'audio/wav' });
+    console.warn('No fade effect to apply.');
+    const data = await ffmpegInstance.readFile(inputFileName);
+    await ffmpegInstance.deleteFile(inputFileName);
+    return new Blob([data], { type: 'audio/wav' });
   }
 
-  const command = [
-    '-i',
-    inputFileName,
-    '-af',
-    fadeFilters.join(','),
-    outputFileName,
-  ];
+  const command = ['-i', inputFileName, '-af', fadeFilters.join(','), outputFileName];
 
   console.log('Running ffmpeg command:', command.join(' '));
 
@@ -141,20 +129,14 @@ export const changeVolume = async (audioUrl: string, gain: number): Promise<Blob
 
   await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
 
-  const command = [
-    '-i',
-    inputFileName,
-    '-af',
-    `volume=${gain}dB`,
-    outputFileName,
-  ];
-  
+  const command = ['-i', inputFileName, '-af', `volume=${gain}dB`, outputFileName];
+
   console.log('Running ffmpeg command:', command.join(' '));
 
   await ffmpegInstance.exec(command);
 
   const data = await ffmpegInstance.readFile(outputFileName);
-  
+
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
 

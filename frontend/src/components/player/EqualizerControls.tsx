@@ -47,7 +47,7 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
         frequencies[i] = 20 * Math.pow(1000, i / width);
       }
 
-      const response = (playbackEngine as any).eq.getFrequencyResponse(frequencies);
+      const response = playbackEngine.getFrequencyResponse(frequencies);
 
       ctx.clearRect(0, 0, width, height);
       ctx.beginPath();
@@ -75,26 +75,30 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
   }, [gains]);
 
   return (
-    <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 w-full max-w-2xl shadow-2xl backdrop-blur-xl">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold flex items-center gap-2">
-          <span className="w-2 h-6 bg-purple-500 rounded-full" />
+    <div className="w-full max-w-2xl rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-2xl backdrop-blur-xl">
+      <div className="mb-6 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-lg font-bold">
+          <span className="h-6 w-2 rounded-full bg-purple-500" />
           Parametric Equalizer
         </h3>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={resetEQ} className="text-xs">Reset</Button>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={resetEQ} className="text-xs">
+            Reset
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      <div className="mb-8 bg-black/40 rounded-lg p-4 overflow-hidden">
-        <canvas ref={canvasRef} width={600} height={150} className="w-full h-[150px]" />
+      <div className="mb-8 overflow-hidden rounded-lg bg-black/40 p-4">
+        <canvas ref={canvasRef} width={600} height={150} className="h-[150px] w-full" />
       </div>
 
-      <div className="flex justify-between items-end h-64 gap-4 px-4">
+      <div className="flex h-64 items-end justify-between gap-4 px-4">
         {BANDS.map((band, i) => (
-          <div key={band.label} className="flex flex-col items-center gap-4 flex-1">
-            <div className="relative h-48 w-full flex justify-center">
+          <div key={band.label} className="flex flex-1 flex-col items-center gap-4">
+            <div className="relative flex h-48 w-full justify-center">
               <Slider
                 orientation="vertical"
                 value={[gains[i]]}
@@ -107,9 +111,10 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
             </div>
             <div className="text-center">
               <div className="text-xs font-bold text-white">{band.label}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">{band.sub}</div>
-              <div className="text-[10px] font-mono mt-1 text-purple-400">
-                {gains[i] > 0 ? '+' : ''}{gains[i].toFixed(1)}dB
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">{band.sub}</div>
+              <div className="mt-1 font-mono text-[10px] text-purple-400">
+                {gains[i] > 0 ? '+' : ''}
+                {gains[i].toFixed(1)}dB
               </div>
             </div>
           </div>

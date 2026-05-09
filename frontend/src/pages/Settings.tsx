@@ -1,17 +1,29 @@
-
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from "@/components/theme-provider";
+import { useTheme } from '@/components/theme-provider';
 import MainLayout from '@/components/MainLayout';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Globe, Moon, Sun, User, Bell, Shield, Download, Save } from 'lucide-react';
-import { toast } from "@/hooks/use-toast";
+import { toast } from '@/hooks/use-toast';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -19,32 +31,32 @@ const Settings = () => {
   const [language, setLanguage] = useState(i18n.language);
   const [notifications, setNotifications] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
-  const [downloadQuality, setDownloadQuality] = useState("high");
-  
+  const [downloadQuality, setDownloadQuality] = useState('high');
+
   const handleSaveSettings = () => {
     toast({
-      title: "Settings saved",
-      description: "Your settings have been updated successfully.",
+      title: 'Settings saved',
+      description: 'Your settings have been updated successfully.',
     });
   };
-  
+
   return (
     <MainLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="animate-fade-in space-y-6">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-1">Settings</h1>
+          <h1 className="mb-1 text-4xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">Manage your application preferences</p>
         </div>
-        
+
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid grid-cols-5 max-w-2xl mb-6">
+          <TabsList className="mb-6 grid max-w-2xl grid-cols-5">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="general" className="space-y-6">
             <Card>
               <CardHeader>
@@ -52,16 +64,21 @@ const Settings = () => {
                   <Globe className="h-5 w-5" />
                   Language
                 </CardTitle>
-                <CardDescription>Select your preferred language for the application interface</CardDescription>
+                <CardDescription>
+                  Select your preferred language for the application interface
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-6">
                   <div className="grid gap-3">
                     <Label htmlFor="language">Language</Label>
-                    <Select value={language} onValueChange={(value) => {
-                      i18n.changeLanguage(value);
-                      setLanguage(value);
-                    }}>
+                    <Select
+                      value={language}
+                      onValueChange={(value) => {
+                        i18n.changeLanguage(value);
+                        setLanguage(value);
+                      }}
+                    >
                       <SelectTrigger id="language">
                         <SelectValue placeholder="Select language" />
                       </SelectTrigger>
@@ -77,14 +94,16 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
                   Media Settings
                 </CardTitle>
-                <CardDescription>Configure default media playback and download settings</CardDescription>
+                <CardDescription>
+                  Configure default media playback and download settings
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-6">
@@ -95,13 +114,9 @@ const Settings = () => {
                         Automatically play media when selected
                       </p>
                     </div>
-                    <Switch
-                      id="autoplay"
-                      checked={autoplay}
-                      onCheckedChange={setAutoplay}
-                    />
+                    <Switch id="autoplay" checked={autoplay} onCheckedChange={setAutoplay} />
                   </div>
-                  
+
                   <div className="grid gap-3">
                     <Label htmlFor="quality">Download quality</Label>
                     <Select value={downloadQuality} onValueChange={setDownloadQuality}>
@@ -119,12 +134,12 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="appearance" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                  {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   Theme
                 </CardTitle>
                 <CardDescription>Customize the appearance of the application</CardDescription>
@@ -133,7 +148,10 @@ const Settings = () => {
                 <div className="grid gap-6">
                   <div className="grid gap-3">
                     <Label htmlFor="theme">Theme mode</Label>
-                    <Select value={theme} onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}>
+                    <Select
+                      value={theme}
+                      onValueChange={(value) => setTheme(value as 'light' | 'dark' | 'system')}
+                    >
                       <SelectTrigger id="theme">
                         <SelectValue placeholder="Select theme" />
                       </SelectTrigger>
@@ -148,7 +166,7 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="account" className="space-y-6">
             <Card>
               <CardHeader>
@@ -178,7 +196,7 @@ const Settings = () => {
               </CardFooter>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="notifications" className="space-y-6">
             <Card>
               <CardHeader>
@@ -207,7 +225,7 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="privacy" className="space-y-6">
             <Card>
               <CardHeader>

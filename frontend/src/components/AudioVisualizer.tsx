@@ -7,21 +7,32 @@ interface AudioVisualizerProps {
   isPlaying: boolean;
   intensity?: number;
   colorScheme?: 'default' | 'neon' | 'fire' | 'ocean' | 'galaxy' | 'matrix' | 'rainbow';
-  visualizerType?: 'bars' | 'wave' | 'circle' | 'spectrum' | 'orbit' | 'dna' | 'particle' | 'liquid';
+  visualizerType?:
+    | 'bars'
+    | 'wave'
+    | 'circle'
+    | 'spectrum'
+    | 'orbit'
+    | 'dna'
+    | 'particle'
+    | 'liquid';
   showControls?: boolean;
   responsive?: boolean;
 }
 
-const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ 
-  className, 
+const visualizerTypes = ['bars', 'wave', 'circle', 'spectrum'] as const;
+type VisualizerType = AudioVisualizerProps['visualizerType'];
+
+const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
+  className,
   isPlaying,
   intensity = 0.7,
   colorScheme = 'default',
   visualizerType = 'bars',
   showControls = true,
-  responsive = true
+  responsive = true,
 }) => {
-  const [currentType, setCurrentType] = useState(visualizerType);
+  const [currentType, setCurrentType] = useState<VisualizerType>(visualizerType);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -34,10 +45,12 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     ocean: ['#0080FF', '#00BFFF', '#1E90FF', '#4169E1'],
     galaxy: ['#9932CC', '#8A2BE2', '#4B0082', '#6A5ACD'],
     matrix: ['#00FF00', '#32CD32', '#7FFF00', '#ADFF2F'],
-    rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3']
+    rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'],
   };
 
-  const getColors = () => colorSchemes[colorScheme] || colorSchemes.default;
+  const visualizerTypes = ['bars', 'wave', 'circle', 'spectrum'] as const;
+  type VisualizerType = (typeof visualizerTypes)[number];
+  const getColors = () => colorSchemes[colorScheme] ?? colorSchemes.default;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -52,7 +65,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
-      
+
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
 
@@ -130,20 +143,19 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   }, [isPlaying, currentType, colorScheme, intensity]);
 
   return (
-    <div className={cn("relative w-full h-full select-none overflow-hidden", className)}>
+    <div className={cn('relative h-full w-full select-none overflow-hidden', className)}>
       <canvas
         ref={canvasRef}
         width={responsive ? 800 : 400}
         height={responsive ? 400 : 200}
-        className="w-full h-full cursor-pointer"
+        className="h-full w-full cursor-pointer"
         onClick={() => {
-          const types: any[] = ['bars', 'wave', 'circle', 'spectrum'];
-          const idx = types.indexOf(currentType);
-          setCurrentType(types[(idx + 1) % types.length]);
+          const idx = visualizerTypes.indexOf(currentType);
+          setCurrentType(visualizerTypes[(idx + 1) % visualizerTypes.length]);
         }}
       />
       {showControls && (
-        <div className="absolute bottom-2 left-2 text-[10px] text-white/40 bg-black/20 px-2 py-1 rounded-full uppercase tracking-tighter">
+        <div className="absolute bottom-2 left-2 rounded-full bg-black/20 px-2 py-1 text-[10px] uppercase tracking-tighter text-white/40">
           {currentType} mode
         </div>
       )}

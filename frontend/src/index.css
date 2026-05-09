@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
@@ -54,27 +53,27 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans selection:bg-accent/30;
+    @apply bg-background font-sans text-foreground selection:bg-accent/30;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply bg-black/30 backdrop-blur-lg border border-white/10 shadow-xl;
+    @apply border border-white/10 bg-black/30 shadow-xl backdrop-blur-lg;
   }
-  
+
   .glassmorphic {
-    @apply bg-secondary/50 backdrop-blur-md border border-white/5 shadow-lg;
+    @apply border border-white/5 bg-secondary/50 shadow-lg backdrop-blur-md;
   }
 
   .content-auto {
     content-visibility: auto;
   }
-  
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

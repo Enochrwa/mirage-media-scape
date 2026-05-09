@@ -1,17 +1,17 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export const API_BASE = 'http://localhost:3001';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export function formatDuration(seconds: number): string {
-  if (isNaN(seconds) || seconds === Infinity) return "0:00";
+  if (isNaN(seconds) || seconds === Infinity) return '0:00';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export interface SubtitleCue {
@@ -22,19 +22,23 @@ export interface SubtitleCue {
 
 export function parseSRT(content: string): SubtitleCue[] {
   const blocks = content.trim().split(/\n\r?\n\r?/);
-  return blocks.map(block => {
-    const lines = block.split(/\r?\n/);
-    if (lines.length < 3) return null;
+  return blocks
+    .map((block) => {
+      const lines = block.split(/\r?\n/);
+      if (lines.length < 3) return null;
 
-    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})/);
-    if (!timeMatch) return null;
+      const timeMatch = lines[1].match(
+        /(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})/,
+      );
+      if (!timeMatch) return null;
 
-    const start = timeToSeconds(timeMatch[1]);
-    const end = timeToSeconds(timeMatch[2]);
-    const text = lines.slice(2).join('\n');
+      const start = timeToSeconds(timeMatch[1]);
+      const end = timeToSeconds(timeMatch[2]);
+      const text = lines.slice(2).join('\n');
 
-    return { start, end, text };
-  }).filter((cue): cue is SubtitleCue => cue !== null);
+      return { start, end, text };
+    })
+    .filter((cue): cue is SubtitleCue => cue !== null);
 }
 
 function timeToSeconds(timeStr: string): number {

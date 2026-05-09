@@ -34,6 +34,6 @@ export class APIClient {
   }
 
   static getRecommendations(trackId: string) {
-      return this.request(`/api/tracks/${trackId}/recommendations`);
+    return this.request(`/api/tracks/${trackId}/recommendations`);
   }
 }

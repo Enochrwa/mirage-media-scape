@@ -1,12 +1,45 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX, 
-  Maximize, Minimize, Heart, Share2, BookmarkPlus, Globe, MoreHorizontal,
-  Settings, Zap, Eye, Palette, Rewind, FastForward, RotateCcw, RotateCw,
-  Monitor, Smartphone, Tablet, PictureInPicture, Download, Subtitles,
-  Filter, Sparkles, Wind, Waves, Sun, Moon, Star, Camera, Mic, X,
-  Repeat
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  Volume1,
+  VolumeX,
+  Maximize,
+  Minimize,
+  Heart,
+  Share2,
+  BookmarkPlus,
+  Globe,
+  MoreHorizontal,
+  Settings,
+  Zap,
+  Eye,
+  Palette,
+  Rewind,
+  FastForward,
+  RotateCcw,
+  RotateCw,
+  Monitor,
+  Smartphone,
+  Tablet,
+  PictureInPicture,
+  Download,
+  Subtitles,
+  Filter,
+  Sparkles,
+  Wind,
+  Waves,
+  Sun,
+  Moon,
+  Star,
+  Camera,
+  Mic,
+  X,
+  Repeat,
 } from 'lucide-react';
 import { SubtitleCue, parseSRT } from '@/lib/utils';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -19,22 +52,32 @@ const formatTime = (seconds: number): string => {
 };
 
 // Particle system for visual effects
-const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string }) => {
-  const [particles, setParticles] = useState<Array<{ id: number, x: number, y: number, size: number, opacity: number, vx: number, vy: number }>>([]);
+const ParticleSystem = ({ isActive, theme }: { isActive: boolean; theme: string }) => {
+  const [particles, setParticles] = useState<
+    Array<{
+      id: number;
+      x: number;
+      y: number;
+      size: number;
+      opacity: number;
+      vx: number;
+      vy: number;
+    }>
+  >([]);
 
   useEffect(() => {
     if (!isActive) return;
 
     const interval = setInterval(() => {
-      setParticles(prev => {
+      setParticles((prev) => {
         const newParticles = prev
-          .map(p => ({
+          .map((p) => ({
             ...p,
             x: p.x + p.vx,
             y: p.y + p.vy,
-            opacity: p.opacity - 0.02
+            opacity: p.opacity - 0.02,
           }))
-          .filter(p => p.opacity > 0);
+          .filter((p) => p.opacity > 0);
 
         // Add new particles
         if (Math.random() > 0.7) {
@@ -45,7 +88,7 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
             size: Math.random() * 4 + 2,
             opacity: 1,
             vx: (Math.random() - 0.5) * 2,
-            vy: -Math.random() * 3 - 1
+            vy: -Math.random() * 3 - 1,
           });
         }
 
@@ -59,16 +102,19 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
   if (!isActive) return null;
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {particles.map(particle => (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {particles.map((particle) => (
         <div
           key={particle.id}
           className={cn(
-            "absolute rounded-full",
-            theme === 'fire' ? 'bg-orange-400' :
-            theme === 'water' ? 'bg-blue-400' :
-            theme === 'electric' ? 'bg-yellow-400' :
-            'bg-purple-400'
+            'absolute rounded-full',
+            theme === 'fire'
+              ? 'bg-orange-400'
+              : theme === 'water'
+                ? 'bg-blue-400'
+                : theme === 'electric'
+                  ? 'bg-yellow-400'
+                  : 'bg-purple-400',
           )}
           style={{
             left: particle.x,
@@ -76,7 +122,7 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
             width: particle.size,
             height: particle.size,
             opacity: particle.opacity,
-            boxShadow: `0 0 ${particle.size * 2}px currentColor`
+            boxShadow: `0 0 ${particle.size * 2}px currentColor`,
           }}
         />
       ))}
@@ -85,12 +131,16 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean, theme: string 
 };
 
 const VideoPlayer: React.FC = () => {
-  const { currentFile, setCurrentTime: updateCurrentTime, setDuration: updateDuration } = usePlayerStore();
-  const playbackEngine = (window as any).playbackEngine; // We might need to export this properly
+  const {
+    currentFile,
+    setCurrentTime: updateCurrentTime,
+    setDuration: updateDuration,
+    playbackEngine,
+  } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -126,7 +176,7 @@ const VideoPlayer: React.FC = () => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -139,48 +189,48 @@ const VideoPlayer: React.FC = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    
+
     if (!ctx) return;
 
     const audioContext = new AudioContext();
     const analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaElementSource(video);
-    
+
     source.connect(analyser);
     analyser.connect(audioContext.destination);
-    
+
     analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
     const draw = () => {
       if (!visualizerActive) return;
-      
+
       requestAnimationFrame(draw);
       analyser.getByteFrequencyData(dataArray);
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      const barWidth = canvas.width / bufferLength * 2.5;
+
+      const barWidth = (canvas.width / bufferLength) * 2.5;
       let barHeight;
       let x = 0;
-      
+
       for (let i = 0; i < bufferLength; i++) {
         barHeight = dataArray[i] / 2;
-        
+
         const red = barHeight + 25 * (i / bufferLength);
         const green = 250 * (i / bufferLength);
         const blue = 50;
-        
+
         ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.8)`;
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-        
+
         x += barWidth + 1;
       }
     };
-    
+
     draw();
-    
+
     return () => {
       audioContext.close();
     };
@@ -206,7 +256,7 @@ const VideoPlayer: React.FC = () => {
       if (e.touches.length === 1) {
         const deltaX = e.touches[0].clientX - startX;
         const deltaY = e.touches[0].clientY - startY;
-        
+
         // Horizontal swipe for seeking
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
           const seekDelta = (deltaX / window.innerWidth) * 60; // 60 seconds max
@@ -216,7 +266,7 @@ const VideoPlayer: React.FC = () => {
             videoRef.current.currentTime = newTime;
           }
         }
-        
+
         // Vertical swipe for volume
         if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
           const volumeDelta = -(deltaY / window.innerHeight);
@@ -239,12 +289,12 @@ const VideoPlayer: React.FC = () => {
   // Smart rewind feature
   const handleSmartRewind = useCallback(() => {
     if (!smartRewind || !videoRef.current) return;
-    
+
     // Rewind to last significant moment (simulate scene detection)
     const smartPositions = [0, 30, 65, 120, 180, 240, 300, 360, 420, 480];
     const currentPos = Math.floor(currentTime);
-    const previousScene = smartPositions.reverse().find(pos => pos < currentPos) || 0;
-    
+    const previousScene = smartPositions.reverse().find((pos) => pos < currentPos) || 0;
+
     setCurrentTime(previousScene);
     videoRef.current.currentTime = previousScene;
   }, [smartRewind, currentTime]);
@@ -256,32 +306,32 @@ const VideoPlayer: React.FC = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    
+
     if (!ctx) return;
 
     const updateAmbient = () => {
       if (!ambientLighting) return;
-      
+
       canvas.width = 1;
       canvas.height = 1;
       ctx.drawImage(video, 0, 0, 1, 1);
-      
+
       const pixel = ctx.getImageData(0, 0, 1, 1).data;
       const avgColor = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
-      
+
       if (videoContainerRef.current) {
         videoContainerRef.current.style.boxShadow = `0 0 50px ${avgColor}`;
       }
-      
+
       requestAnimationFrame(updateAmbient);
     };
-    
+
     updateAmbient();
   }, [ambientLighting]);
 
   const togglePlayback = () => {
     if (!videoRef.current) return;
-    
+
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
@@ -325,7 +375,7 @@ const VideoPlayer: React.FC = () => {
 
   const toggleFullscreen = async () => {
     if (!videoContainerRef.current) return;
-    
+
     try {
       if (!isFullscreen) {
         await videoContainerRef.current.requestFullscreen();
@@ -367,7 +417,7 @@ const VideoPlayer: React.FC = () => {
 
   const togglePiP = async () => {
     if (!videoRef.current) return;
-    
+
     try {
       if (isPiP) {
         await document.exitPictureInPicture();
@@ -382,16 +432,16 @@ const VideoPlayer: React.FC = () => {
 
   const handleMouseMove = () => {
     setControlsVisible(true);
-    
+
     if (mouseMovementTimeout) {
       clearTimeout(mouseMovementTimeout);
     }
-    
+
     if (isPlaying && !showSettings) {
       const timeout = setTimeout(() => {
         setControlsVisible(false);
       }, 3000);
-      
+
       setMouseMovementTimeout(timeout);
     }
   };
@@ -406,7 +456,7 @@ const VideoPlayer: React.FC = () => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
-    
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
@@ -414,7 +464,7 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const engine = (window as any).playbackEngine;
+const engine = playbackEngine;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;
@@ -430,13 +480,13 @@ const VideoPlayer: React.FC = () => {
 
       // Handle Subtitles
       if (subtitlesEnabled && cues.length > 0) {
-        const cue = cues.find(c => time >= c.start && time <= c.end);
+        const cue = cues.find((c) => time >= c.start && time <= c.end);
         setActiveCue(cue || null);
       }
     };
     const handleLoadedMetadata = () => {
-        setDuration(video.duration);
-        updateDuration(video.duration);
+      setDuration(video.duration);
+      updateDuration(video.duration);
     };
     const handleEnded = () => setIsPlaying(false);
 
@@ -449,97 +499,105 @@ const VideoPlayer: React.FC = () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [playbackEngine, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">
-      <div className="w-full max-w-[95vw] mx-auto h-[95vh] flex flex-col">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">
+      <div className="mx-auto flex h-[95vh] w-full max-w-[95vw] flex-col">
         {/* Main Video Container */}
-        <div 
+        <div
           className={cn(
-            "relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-500 flex-1",
-            immersiveMode && "rounded-none",
-            ambientLighting && "transition-shadow duration-300",
-            "bg-black shadow-2xl",
+            'relative flex-1 overflow-hidden rounded-xl transition-all duration-500 sm:rounded-2xl',
+            immersiveMode && 'rounded-none',
+            ambientLighting && 'transition-shadow duration-300',
+            'bg-black shadow-2xl',
             // Device preview styles
-            devicePreview === 'mobile' ? "max-w-sm mx-auto aspect-[9/16]" :
-            devicePreview === 'tablet' ? "max-w-4xl mx-auto aspect-[4/3]" :
-            "w-full h-full"
+            devicePreview === 'mobile'
+              ? 'mx-auto aspect-[9/16] max-w-sm'
+              : devicePreview === 'tablet'
+                ? 'mx-auto aspect-[4/3] max-w-4xl'
+                : 'h-full w-full',
           )}
           ref={videoContainerRef}
           onMouseMove={handleMouseMove}
           style={{
-            filter: aiEnhancement ? 'contrast(1.2) saturate(1.3) brightness(1.1)' : 'none'
+            filter: aiEnhancement ? 'contrast(1.2) saturate(1.3) brightness(1.1)' : 'none',
           }}
         >
           {/* Particle System */}
           <ParticleSystem isActive={visualizerActive} theme={particleTheme} />
-          
+
           {/* Audio Visualizer Canvas */}
           <canvas
             ref={canvasRef}
             className={cn(
-              "absolute inset-0 pointer-events-none mix-blend-screen transition-opacity",
-              visualizerActive ? "opacity-60" : "opacity-0"
+              'pointer-events-none absolute inset-0 mix-blend-screen transition-opacity',
+              visualizerActive ? 'opacity-60' : 'opacity-0',
             )}
             width={800}
             height={400}
           />
-          
+
           {/* Main Video */}
           <video
             ref={videoRef}
             className={cn(
-              "w-full h-full object-cover cursor-pointer transition-all duration-300",
-              immersiveMode && "object-fill"
+              'h-full w-full cursor-pointer object-cover transition-all duration-300',
+              immersiveMode && 'object-fill',
             )}
             src={currentFile?.file}
             onClick={togglePlayback}
             playsInline
             style={{
-              filter: `brightness(${aiEnhancement ? 1.1 : 1}) contrast(${aiEnhancement ? 1.2 : 1}) saturate(${aiEnhancement ? 1.3 : 1})`
+              filter: `brightness(${aiEnhancement ? 1.1 : 1}) contrast(${aiEnhancement ? 1.2 : 1}) saturate(${aiEnhancement ? 1.3 : 1})`,
             }}
           />
-          
+
           {/* Top Controls Overlay */}
-          <div className={cn(
-            "absolute top-0 left-0 right-0 bg-gradient-to-b from-black/90 via-black/60 to-transparent p-3 sm:p-6 transition-all duration-300",
-            controlsVisible || showSettings ? "opacity-100" : "opacity-0"
-          )}>
+          <div
+            className={cn(
+              'absolute left-0 right-0 top-0 bg-gradient-to-b from-black/90 via-black/60 to-transparent p-3 transition-all duration-300 sm:p-6',
+              controlsVisible || showSettings ? 'opacity-100' : 'opacity-0',
+            )}
+          >
             <div className="flex items-start justify-between">
-              <div className="text-white space-y-1 flex-1 min-w-0">
-                <h3 className="font-bold text-sm sm:text-xl truncate">{currentFile?.title}</h3>
-                <p className="text-xs sm:text-sm opacity-80 truncate">{currentFile?.artist}</p>
-                <div className="flex items-center gap-2 sm:gap-4 text-xs opacity-70">
+              <div className="min-w-0 flex-1 space-y-1 text-white">
+                <h3 className="truncate text-sm font-bold sm:text-xl">{currentFile?.title}</h3>
+                <p className="truncate text-xs opacity-80 sm:text-sm">{currentFile?.artist}</p>
+                <div className="flex items-center gap-2 text-xs opacity-70 sm:gap-4">
                   <span>Quality: {qualityMode.toUpperCase()}</span>
                   <span>Rate: {playbackRate}x</span>
                   {aiEnhancement && <span className="text-blue-400">AI Enhanced</span>}
                 </div>
               </div>
-              
-              <div className="flex gap-1 sm:gap-2 flex-shrink-0 ml-2">
+
+              <div className="ml-2 flex flex-shrink-0 gap-1 sm:gap-2">
                 <button
                   onClick={() => setIsFavorite(!isFavorite)}
                   className={cn(
-                    "p-1.5 sm:p-2 rounded-full backdrop-blur-sm transition-all hover:scale-110",
-                    isFavorite ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white hover:bg-white/20"
+                    'rounded-full p-1.5 backdrop-blur-sm transition-all hover:scale-110 sm:p-2',
+                    isFavorite
+                      ? 'bg-red-500/20 text-red-400'
+                      : 'bg-white/10 text-white hover:bg-white/20',
                   )}
                 >
-                  <Heart size={isMobile ? 16 : 20} fill={isFavorite ? "currentColor" : "none"} />
+                  <Heart size={isMobile ? 16 : 20} fill={isFavorite ? 'currentColor' : 'none'} />
                 </button>
-                
+
                 <button
                   onClick={() => navigator.clipboard.writeText(currentFile?.title || '')}
-                  className="p-1.5 sm:p-2 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm transition-all hover:scale-110"
+                  className="rounded-full bg-white/10 p-1.5 text-white backdrop-blur-sm transition-all hover:scale-110 hover:bg-white/20 sm:p-2"
                 >
                   <Share2 size={isMobile ? 16 : 20} />
                 </button>
-                
+
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className={cn(
-                    "p-1.5 sm:p-2 rounded-full backdrop-blur-sm transition-all hover:scale-110",
-                    showSettings ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white hover:bg-white/20"
+                    'rounded-full p-1.5 backdrop-blur-sm transition-all hover:scale-110 sm:p-2',
+                    showSettings
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-white/10 text-white hover:bg-white/20',
                   )}
                 >
                   <Settings size={isMobile ? 16 : 20} />
@@ -550,29 +608,57 @@ const VideoPlayer: React.FC = () => {
 
           {/* Advanced Settings Panel */}
           {showSettings && (
-            <div className="absolute top-16 sm:top-20 right-2 sm:right-4 bg-black/95 backdrop-blur-md rounded-xl p-3 sm:p-4 text-white w-72 sm:w-80 z-50 max-h-80 overflow-y-auto">
-              <h4 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+            <div className="absolute right-2 top-16 z-50 max-h-80 w-72 overflow-y-auto rounded-xl bg-black/95 p-3 text-white backdrop-blur-md sm:right-4 sm:top-20 sm:w-80 sm:p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-semibold sm:mb-4">
                 <Sparkles size={16} />
                 Advanced Controls
               </h4>
-              
+
               <div className="space-y-3 sm:space-y-4">
                 {/* Feature Toggles */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { key: 'aiEnhancement', label: 'AI Enhance', icon: Zap, active: aiEnhancement, setter: setAiEnhancement, color: 'blue' },
-                    { key: 'visualizer', label: 'Visualizer', icon: Eye, active: visualizerActive, setter: setVisualizerActive, color: 'purple' },
-                    { key: 'ambient', label: 'Ambient', icon: Sun, active: ambientLighting, setter: setAmbientLighting, color: 'orange' },
-                    { key: 'gesture', label: 'Gesture', icon: Wind, active: gestureControl, setter: setGestureControl, color: 'green' }
+                    {
+                      key: 'aiEnhancement',
+                      label: 'AI Enhance',
+                      icon: Zap,
+                      active: aiEnhancement,
+                      setter: setAiEnhancement,
+                      color: 'blue',
+                    },
+                    {
+                      key: 'visualizer',
+                      label: 'Visualizer',
+                      icon: Eye,
+                      active: visualizerActive,
+                      setter: setVisualizerActive,
+                      color: 'purple',
+                    },
+                    {
+                      key: 'ambient',
+                      label: 'Ambient',
+                      icon: Sun,
+                      active: ambientLighting,
+                      setter: setAmbientLighting,
+                      color: 'orange',
+                    },
+                    {
+                      key: 'gesture',
+                      label: 'Gesture',
+                      icon: Wind,
+                      active: gestureControl,
+                      setter: setGestureControl,
+                      color: 'green',
+                    },
                   ].map(({ key, label, icon: Icon, active, setter, color }) => (
                     <button
                       key={key}
                       onClick={() => setter(!active)}
                       className={cn(
-                        "p-2 sm:p-3 rounded-lg transition-all hover:scale-105 flex items-center gap-2 text-sm",
-                        active 
-                          ? `bg-${color}-500/20 text-${color}-400 border border-${color}-400/30` 
-                          : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10"
+                        'flex items-center gap-2 rounded-lg p-2 text-sm transition-all hover:scale-105 sm:p-3',
+                        active
+                          ? `bg-${color}-500/20 text-${color}-400 border border-${color}-400/30`
+                          : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white',
                       )}
                     >
                       <Icon size={14} />
@@ -580,25 +666,27 @@ const VideoPlayer: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                
+
                 {/* Device Preview */}
                 <div className="space-y-2">
-                  <span className="text-sm flex items-center gap-2">
-                    <Monitor size={14} className="text-orange-400 flex-shrink-0" />
+                  <span className="flex items-center gap-2 text-sm">
+                    <Monitor size={14} className="flex-shrink-0 text-orange-400" />
                     Device Preview
                   </span>
                   <div className="flex gap-2">
                     {[
                       { key: 'desktop', icon: Monitor, label: 'Desktop' },
                       { key: 'tablet', icon: Tablet, label: 'Tablet' },
-                      { key: 'mobile', icon: Smartphone, label: 'Mobile' }
+                      { key: 'mobile', icon: Smartphone, label: 'Mobile' },
                     ].map(({ key, icon: Icon, label }) => (
                       <button
                         key={key}
                         onClick={() => setDevicePreview(key)}
                         className={cn(
-                          "p-2 rounded-lg transition-all flex-1 flex flex-col items-center gap-1",
-                          devicePreview === key ? "bg-white/20 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+                          'flex flex-1 flex-col items-center gap-1 rounded-lg p-2 transition-all',
+                          devicePreview === key
+                            ? 'bg-white/20 text-white'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10',
                         )}
                         title={`${label} View`}
                       >
@@ -608,21 +696,23 @@ const VideoPlayer: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Particle Theme */}
                 <div className="space-y-2">
-                  <span className="text-sm flex items-center gap-2">
-                    <Palette size={14} className="text-green-400 flex-shrink-0" />
+                  <span className="flex items-center gap-2 text-sm">
+                    <Palette size={14} className="flex-shrink-0 text-green-400" />
                     Particle Theme
                   </span>
                   <div className="grid grid-cols-2 gap-2">
-                    {['electric', 'fire', 'water', 'cosmic'].map(theme => (
+                    {['electric', 'fire', 'water', 'cosmic'].map((theme) => (
                       <button
                         key={theme}
                         onClick={() => setParticleTheme(theme)}
                         className={cn(
-                          "px-3 py-2 rounded-lg text-xs capitalize transition-all",
-                          particleTheme === theme ? "bg-white/20 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+                          'rounded-lg px-3 py-2 text-xs capitalize transition-all',
+                          particleTheme === theme
+                            ? 'bg-white/20 text-white'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10',
                         )}
                       >
                         {theme}
@@ -637,40 +727,34 @@ const VideoPlayer: React.FC = () => {
           <SubtitleManager />
 
           {/* Bottom Controls */}
-          <div className={cn(
-            "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 sm:p-6 transition-all duration-300",
-            controlsVisible || showSettings ? "opacity-100" : "opacity-0"
-          )}>
+          <div
+            className={cn(
+              'absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 transition-all duration-300 sm:p-6',
+              controlsVisible || showSettings ? 'opacity-100' : 'opacity-0',
+            )}
+          >
             <div className="space-y-3 sm:space-y-4">
               {/* Progress Bar */}
-              <div className="flex items-center gap-2 sm:gap-3 text-white">
-                <span className="text-xs font-mono w-10 sm:w-12 text-right">
+              <div className="flex items-center gap-2 text-white sm:gap-3">
+                <span className="w-10 text-right font-mono text-xs sm:w-12">
                   {formatTime(currentTime)}
                 </span>
-                <div className="flex-1 relative group">
+                <div className="group relative flex-1">
                   <input
                     type="range"
                     min="0"
                     max={duration}
                     value={currentTime}
                     onChange={(e) => handleProgressChange([parseFloat(e.target.value)])}
-                    className="w-full h-1 sm:h-2 bg-white/20 rounded-full appearance-none cursor-pointer 
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 
-                      sm:[&::-webkit-slider-thumb]:w-4 sm:[&::-webkit-slider-thumb]:h-4 
-                      [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full 
-                      [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg
-                      [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125
-                      group-hover:[&::-webkit-slider-thumb]:scale-125"
+                    className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/20 sm:h-2 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125 group-hover:[&::-webkit-slider-thumb]:scale-125 sm:[&::-webkit-slider-thumb]:h-4 sm:[&::-webkit-slider-thumb]:w-4"
                     style={{
-                      background: `linear-gradient(to right, #ffffff ${(currentTime / duration) * 100}%, rgba(255,255,255,0.2) ${(currentTime / duration) * 100}%)`
+                      background: `linear-gradient(to right, #ffffff ${(currentTime / duration) * 100}%, rgba(255,255,255,0.2) ${(currentTime / duration) * 100}%)`,
                     }}
                   />
                 </div>
-                <span className="text-xs font-mono w-10 sm:w-12">
-                  {formatTime(duration)}
-                </span>
+                <span className="w-10 font-mono text-xs sm:w-12">{formatTime(duration)}</span>
               </div>
-              
+
               {/* Main Controls */}
               <div className="flex items-center justify-between">
                 {/* Left Controls */}
@@ -679,41 +763,45 @@ const VideoPlayer: React.FC = () => {
                     <>
                       <button
                         onClick={handleSmartRewind}
-                        className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"
+                        className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
                         title="Smart Rewind"
                       >
                         <RotateCcw size={16} />
                       </button>
-                      
-                      <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110">
+
+                      <button className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2">
                         <SkipBack size={16} />
                       </button>
                     </>
                   )}
-                  
+
                   {/* Enhanced Play Button */}
-                  <button 
+                  <button
                     onClick={togglePlayback}
-                    className="w-10 h-10 sm:w-12 sm:h-12 bg-white text-black hover:bg-white/90 rounded-full flex items-center justify-center transition-all hover:scale-105 shadow-lg"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg transition-all hover:scale-105 hover:bg-white/90 sm:h-12 sm:w-12"
                   >
-                    {isPlaying ? <Pause size={isMobile ? 18 : 20} /> : <Play size={isMobile ? 18 : 20} className="ml-0.5" />}
+                    {isPlaying ? (
+                      <Pause size={isMobile ? 18 : 20} />
+                    ) : (
+                      <Play size={isMobile ? 18 : 20} className="ml-0.5" />
+                    )}
                   </button>
-                  
+
                   {!isMobile && (
                     <>
-                      <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110">
+                      <button className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2">
                         <SkipForward size={16} />
                       </button>
-                      
+
                       {/* Playback Speed */}
-                      <div className="relative group">
-                        <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110 flex items-center gap-1">
+                      <div className="group relative">
+                        <button className="flex items-center gap-1 rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2">
                           <FastForward size={14} />
                           <span className="text-xs">{playbackRate}x</span>
                         </button>
-                        <div className="absolute bottom-full mb-2 left-0 bg-black/90 rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-full left-0 mb-2 rounded-lg bg-black/90 p-2 opacity-0 transition-opacity group-hover:opacity-100">
                           <div className="flex flex-col gap-1">
-                            {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
+                            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
                               <button
                                 key={rate}
                                 onClick={() => {
@@ -721,8 +809,10 @@ const VideoPlayer: React.FC = () => {
                                   if (videoRef.current) videoRef.current.playbackRate = rate;
                                 }}
                                 className={cn(
-                                  "px-3 py-1 text-xs rounded transition-colors whitespace-nowrap",
-                                  playbackRate === rate ? "bg-white/20 text-white" : "text-white/70 hover:text-white"
+                                  'whitespace-nowrap rounded px-3 py-1 text-xs transition-colors',
+                                  playbackRate === rate
+                                    ? 'bg-white/20 text-white'
+                                    : 'text-white/70 hover:text-white',
                                 )}
                               >
                                 {rate}x
@@ -734,20 +824,20 @@ const VideoPlayer: React.FC = () => {
                     </>
                   )}
                 </div>
-                
+
                 {/* Right Controls */}
                 <div className="flex items-center gap-1 sm:gap-3">
                   {/* Volume Controls */}
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={handleVolumeClick}
-                      className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"
+                      className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
                     >
                       <VolumeIcon />
                     </button>
                     {!isMobile && (
                       <>
-                        <div className="w-16 sm:w-24 relative group">
+                        <div className="group relative w-16 sm:w-24">
                           <input
                             type="range"
                             min="0"
@@ -755,34 +845,31 @@ const VideoPlayer: React.FC = () => {
                             step="0.01"
                             value={volume}
                             onChange={(e) => handleVolumeChange([parseFloat(e.target.value)])}
-                            className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer
-                              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 
-                              sm:[&::-webkit-slider-thumb]:w-3 sm:[&::-webkit-slider-thumb]:h-3 
-                              [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full 
-                              [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform 
-                              [&::-webkit-slider-thumb]:hover:scale-125"
+                            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/20 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125 sm:[&::-webkit-slider-thumb]:h-3 sm:[&::-webkit-slider-thumb]:w-3"
                             style={{
-                              background: `linear-gradient(to right, #ffffff ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%)`
+                              background: `linear-gradient(to right, #ffffff ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%)`,
                             }}
                           />
                         </div>
-                        <span className="text-xs text-white/70 w-6 sm:w-8 text-center">
+                        <span className="w-6 text-center text-xs text-white/70 sm:w-8">
                           {Math.round(volume * 100)}
                         </span>
                       </>
                     )}
                   </div>
-                  
+
                   {/* Additional Controls */}
                   {!isMobile && (
                     <>
                       {/* A-B Loop */}
-                      <div className="flex items-center bg-white/5 rounded-full px-1">
+                      <div className="flex items-center rounded-full bg-white/5 px-1">
                         <button
                           onClick={setPointA}
                           className={cn(
-                            "px-2 py-1 text-[10px] font-bold rounded-full transition-all",
-                            playbackEngine.abLoop.pointA !== null ? "text-purple-400" : "text-white/40"
+                            'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
+                            playbackEngine.abLoop.pointA !== null
+                              ? 'text-purple-400'
+                              : 'text-white/40',
                           )}
                         >
                           A
@@ -790,18 +877,23 @@ const VideoPlayer: React.FC = () => {
                         <button
                           onClick={setPointB}
                           className={cn(
-                            "px-2 py-1 text-[10px] font-bold rounded-full transition-all",
-                            playbackEngine.abLoop.pointB !== null ? "text-purple-400" : "text-white/40"
+                            'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
+                            playbackEngine.abLoop.pointB !== null
+                              ? 'text-purple-400'
+                              : 'text-white/40',
                           )}
                         >
                           B
                         </button>
                         <button
                           onClick={toggleLoop}
-                          disabled={playbackEngine.abLoop.pointA === null || playbackEngine.abLoop.pointB === null}
+                          disabled={
+                            playbackEngine.abLoop.pointA === null ||
+                            playbackEngine.abLoop.pointB === null
+                          }
                           className={cn(
-                            "p-1.5 rounded-full transition-all",
-                            isLooping ? "text-purple-400" : "text-white/60 disabled:opacity-30"
+                            'rounded-full p-1.5 transition-all',
+                            isLooping ? 'text-purple-400' : 'text-white/60 disabled:opacity-30',
                           )}
                         >
                           <Repeat size={14} />
@@ -809,7 +901,7 @@ const VideoPlayer: React.FC = () => {
                       </div>
 
                       {/* Subtitles */}
-                      <div className="relative group">
+                      <div className="group relative">
                         <input
                           type="file"
                           ref={fileInputRef}
@@ -830,42 +922,50 @@ const VideoPlayer: React.FC = () => {
                             fileInputRef.current?.click();
                           }}
                           className={cn(
-                            "p-1.5 sm:p-2 rounded-full transition-all hover:scale-110",
-                            subtitlesEnabled ? "bg-yellow-500/20 text-yellow-400" : "text-white hover:bg-white/10"
+                            'rounded-full p-1.5 transition-all hover:scale-110 sm:p-2',
+                            subtitlesEnabled
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'text-white hover:bg-white/10',
                           )}
-                          title={cues.length === 0 ? "Load Subtitles" : "Toggle Subtitles (Right-click to change)"}
+                          title={
+                            cues.length === 0
+                              ? 'Load Subtitles'
+                              : 'Toggle Subtitles (Right-click to change)'
+                          }
                         >
                           <Subtitles size={16} />
                         </button>
                       </div>
-                      
+
                       {/* Picture in Picture */}
                       <button
                         onClick={togglePiP}
                         className={cn(
-                          "p-1.5 sm:p-2 rounded-full transition-all hover:scale-110",
-                          isPiP ? "bg-blue-500/20 text-blue-400" : "text-white hover:bg-white/10"
+                          'rounded-full p-1.5 transition-all hover:scale-110 sm:p-2',
+                          isPiP ? 'bg-blue-500/20 text-blue-400' : 'text-white hover:bg-white/10',
                         )}
                         title="Picture in Picture"
                       >
                         <PictureInPicture size={16} />
                       </button>
-                      
+
                       {/* Quality Selector */}
-                      <div className="relative group">
-                        <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110 flex items-center gap-1">
+                      <div className="group relative">
+                        <button className="flex items-center gap-1 rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2">
                           <Filter size={14} />
                           <span className="text-xs uppercase">{qualityMode}</span>
                         </button>
-                        <div className="absolute bottom-full mb-2 right-0 bg-black/90 rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-full right-0 mb-2 rounded-lg bg-black/90 p-2 opacity-0 transition-opacity group-hover:opacity-100">
                           <div className="flex flex-col gap-1">
-                            {['auto', '4k', '1080p', '720p', '480p'].map(quality => (
+                            {['auto', '4k', '1080p', '720p', '480p'].map((quality) => (
                               <button
                                 key={quality}
                                 onClick={() => setQualityMode(quality)}
                                 className={cn(
-                                  "px-3 py-1 text-xs rounded transition-colors whitespace-nowrap text-left",
-                                  qualityMode === quality ? "bg-white/20 text-white" : "text-white/70 hover:text-white"
+                                  'whitespace-nowrap rounded px-3 py-1 text-left text-xs transition-colors',
+                                  qualityMode === quality
+                                    ? 'bg-white/20 text-white'
+                                    : 'text-white/70 hover:text-white',
                                 )}
                               >
                                 {quality.toUpperCase()}
@@ -874,7 +974,7 @@ const VideoPlayer: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Download */}
                       <button
                         onClick={() => {
@@ -884,110 +984,114 @@ const VideoPlayer: React.FC = () => {
                           link.download = `${currentFile.title}.mp4`;
                           link.click();
                         }}
-                        className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"
+                        className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
                         title="Download Video"
                       >
                         <Download size={16} />
                       </button>
                     </>
                   )}
-                  
+
                   {/* Fullscreen */}
-                  <button 
+                  <button
                     onClick={toggleFullscreen}
-                    className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full transition-all hover:scale-110"
+                    className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
                     title="Toggle Fullscreen"
                   >
-                    {isFullscreen ? <Minimize size={isMobile ? 16 : 18} /> : <Maximize size={isMobile ? 16 : 18} />}
+                    {isFullscreen ? (
+                      <Minimize size={isMobile ? 16 : 18} />
+                    ) : (
+                      <Maximize size={isMobile ? 16 : 18} />
+                    )}
                   </button>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* Loading Spinner */}
           {!videoRef.current?.readyState && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <div className="w-8 h-8 sm:w-12 sm:h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
             </div>
           )}
-          
+
           {/* Gesture Indicators */}
           {gestureControl && (
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-1/2 left-4 transform -translate-y-1/2 text-white/50 text-xs">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 transform text-xs text-white/50">
                 <div className="flex flex-col items-center gap-1">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 border border-white/30 rounded-full flex items-center justify-center">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 sm:h-8 sm:w-8">
                     <Volume2 size={12} />
                   </div>
                   <span className="hidden sm:block">Volume</span>
                 </div>
               </div>
-              <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 text-white/50 text-xs">
+              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 transform text-xs text-white/50">
                 <div className="flex items-center gap-1">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 border border-white/30 rounded-full flex items-center justify-center">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 sm:h-8 sm:w-8">
                     <SkipBack size={12} />
                   </div>
                   <span className="hidden sm:block">Seek</span>
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 border border-white/30 rounded-full flex items-center justify-center">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 sm:h-8 sm:w-8">
                     <SkipForward size={12} />
                   </div>
                 </div>
               </div>
             </div>
           )}
-          
+
           {/* Active Subtitle */}
           {subtitlesEnabled && activeCue && (
-            <div className="absolute bottom-24 left-0 right-0 flex justify-center pointer-events-none px-4">
-              <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded text-white text-lg sm:text-2xl font-medium text-center shadow-2xl border border-white/10 max-w-[80%]">
+            <div className="pointer-events-none absolute bottom-24 left-0 right-0 flex justify-center px-4">
+              <div className="max-w-[80%] rounded border border-white/10 bg-black/60 px-4 py-2 text-center text-lg font-medium text-white shadow-2xl backdrop-blur-md sm:text-2xl">
                 {activeCue.text}
               </div>
             </div>
           )}
 
           {/* Feature Indicators */}
-          <div className="absolute top-4 left-4 flex flex-col gap-2">
+          <div className="absolute left-4 top-4 flex flex-col gap-2">
             {aiEnhancement && (
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 text-blue-400 text-xs flex items-center gap-1">
+              <div className="flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-1 text-xs text-blue-400 backdrop-blur-sm sm:px-3">
                 <Zap size={10} />
                 <span className="hidden sm:inline">AI Enhanced</span>
               </div>
             )}
-            
+
             {visualizerActive && (
-              <div className="bg-purple-500/20 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 text-purple-400 text-xs flex items-center gap-1">
+              <div className="flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-1 text-xs text-purple-400 backdrop-blur-sm sm:px-3">
                 <Waves size={10} />
                 <span className="hidden sm:inline">Visualizer</span>
               </div>
             )}
           </div>
         </div>
-        
+
         {/* External Control Panel - Only on larger screens */}
         {!isMobile && (
-          <div className="mt-4 bg-gradient-to-r from-gray-900 to-black rounded-xl p-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold flex items-center gap-2 text-sm">
+          <div className="mt-4 flex-shrink-0 rounded-xl bg-gradient-to-r from-gray-900 to-black p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Star size={14} className="text-yellow-400" />
                 Experience Controls
               </h3>
               <div className="flex items-center gap-2 text-xs text-white/60">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
                 Live Enhancements Active
               </div>
             </div>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="space-y-1">
-                <label className="text-white/80 text-xs flex items-center gap-1">
+                <label className="flex items-center gap-1 text-xs text-white/80">
                   <Camera size={12} />
                   Video Quality
                 </label>
-                <select 
+                <select
                   value={qualityMode}
                   onChange={(e) => setQualityMode(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-white/40"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-xs text-white focus:border-white/40 focus:outline-none"
                 >
                   <option value="auto">Auto</option>
                   <option value="4k">4K Ultra</option>
@@ -996,16 +1100,16 @@ const VideoPlayer: React.FC = () => {
                   <option value="480p">480p</option>
                 </select>
               </div>
-              
+
               <div className="space-y-1">
-                <label className="text-white/80 text-xs flex items-center gap-1">
+                <label className="flex items-center gap-1 text-xs text-white/80">
                   <Palette size={12} />
                   Effect Theme
                 </label>
-                <select 
+                <select
                   value={particleTheme}
                   onChange={(e) => setParticleTheme(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-white/40"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-xs text-white focus:border-white/40 focus:outline-none"
                 >
                   <option value="electric">Electric</option>
                   <option value="fire">Fire</option>
@@ -1013,9 +1117,9 @@ const VideoPlayer: React.FC = () => {
                   <option value="cosmic">Cosmic</option>
                 </select>
               </div>
-              
+
               <div className="space-y-1">
-                <label className="text-white/80 text-xs flex items-center gap-1">
+                <label className="flex items-center gap-1 text-xs text-white/80">
                   <FastForward size={12} />
                   Playback Speed
                 </label>
@@ -1030,47 +1134,83 @@ const VideoPlayer: React.FC = () => {
                     setPlaybackRate(rate);
                     if (videoRef.current) videoRef.current.playbackRate = rate;
                   }}
-                  className="w-full h-1"
+                  className="h-1 w-full"
                 />
-                <div className="text-center text-white/60 text-xs">{playbackRate}x</div>
+                <div className="text-center text-xs text-white/60">{playbackRate}x</div>
               </div>
-              
+
               <div className="space-y-1">
-                <label className="text-white/80 text-xs flex items-center gap-1">
+                <label className="flex items-center gap-1 text-xs text-white/80">
                   <Mic size={12} />
                   Audio Level
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">
-                    <div 
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                    <div
                       className="h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-400 transition-all duration-100"
                       style={{ width: `${volume * 100}%` }}
                     />
                   </div>
-                  <span className="text-white/60 text-xs w-8">{Math.round(volume * 100)}</span>
+                  <span className="w-8 text-xs text-white/60">{Math.round(volume * 100)}</span>
                 </div>
               </div>
             </div>
-            
+
             {/* Feature Toggles */}
-            <div className="mt-3 pt-3 border-t border-white/10">
-              <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
                 {[
-                  { key: 'aiEnhancement', label: 'AI Enhance', icon: Zap, active: aiEnhancement, setter: setAiEnhancement },
-                  { key: 'visualizer', label: 'Visualizer', icon: Eye, active: visualizerActive, setter: setVisualizerActive },
-                  { key: 'ambient', label: 'Ambient', icon: Sun, active: ambientLighting, setter: setAmbientLighting },
-                  { key: 'gesture', label: 'Gesture', icon: Wind, active: gestureControl, setter: setGestureControl },
-                  { key: 'smart', label: 'Smart AI', icon: RotateCcw, active: smartRewind, setter: setSmartRewind },
-                  { key: 'immersive', label: 'Immerse', icon: Maximize, active: immersiveMode, setter: setImmersiveMode }
+                  {
+                    key: 'aiEnhancement',
+                    label: 'AI Enhance',
+                    icon: Zap,
+                    active: aiEnhancement,
+                    setter: setAiEnhancement,
+                  },
+                  {
+                    key: 'visualizer',
+                    label: 'Visualizer',
+                    icon: Eye,
+                    active: visualizerActive,
+                    setter: setVisualizerActive,
+                  },
+                  {
+                    key: 'ambient',
+                    label: 'Ambient',
+                    icon: Sun,
+                    active: ambientLighting,
+                    setter: setAmbientLighting,
+                  },
+                  {
+                    key: 'gesture',
+                    label: 'Gesture',
+                    icon: Wind,
+                    active: gestureControl,
+                    setter: setGestureControl,
+                  },
+                  {
+                    key: 'smart',
+                    label: 'Smart AI',
+                    icon: RotateCcw,
+                    active: smartRewind,
+                    setter: setSmartRewind,
+                  },
+                  {
+                    key: 'immersive',
+                    label: 'Immerse',
+                    icon: Maximize,
+                    active: immersiveMode,
+                    setter: setImmersiveMode,
+                  },
                 ].map(({ key, label, icon: Icon, active, setter }) => (
                   <button
                     key={key}
                     onClick={() => setter(!active)}
                     className={cn(
-                      "p-2 rounded-lg transition-all hover:scale-105 flex flex-col items-center gap-1",
-                      active 
-                        ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20 text-white border border-blue-400/30" 
-                        : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10"
+                      'flex flex-col items-center gap-1 rounded-lg p-2 transition-all hover:scale-105',
+                      active
+                        ? 'border border-blue-400/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 text-white'
+                        : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white',
                     )}
                   >
                     <Icon size={14} />
