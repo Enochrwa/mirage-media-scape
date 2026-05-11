@@ -33,9 +33,9 @@ export class ParametricEQ {
   }
 
   getFrequencyResponse(frequencies: Float32Array): Float32Array {
-    const totalMag = new Float32Array(frequencies.length).fill(1);
-    const magResponse = new Float32Array(frequencies.length);
-    const phaseResponse = new Float32Array(frequencies.length);
+    const totalMag = new Float32Array(frequencies.length) as any.fill(1);
+    const magResponse = new Float32Array(frequencies.length) as any;
+    const phaseResponse = new Float32Array(frequencies.length) as any;
 
     for (const band of this.bands) {
       band.getFrequencyResponse(frequencies, magResponse, phaseResponse);
@@ -108,8 +108,15 @@ export class PlaybackEngine {
   private compressor: DynamicsCompressorNode;
 
   constructor() {
-    const win = window as Window & { webkitAudioContext?: typeof AudioContext };
-    this.ctx = new (win.AudioContext || win.webkitAudioContext)();
+    const win = window as Window & {
+      webkitAudioContext?: {
+        new (contextOptions?: AudioContextOptions): AudioContext;
+        prototype: AudioContext;
+      };
+    };
+    const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+    if (!AudioContextClass) throw new Error('AudioContext not supported');
+    this.ctx = new AudioContextClass();
     this.currentGainNode = this.ctx.createGain();
     this.nextGainNode = this.ctx.createGain();
     this.normalizationGain = this.ctx.createGain();
@@ -218,7 +225,14 @@ export class PlaybackEngine {
     } else {
       // Fallback for older browsers
       const fallbackListener = listener as AudioListener & {
-        setOrientation?: (x: number, y: number, z: number, x2: number, y2: number, z2: number) => void;
+        setOrientation?: (
+          x: number,
+          y: number,
+          z: number,
+          x2: number,
+          y2: number,
+          z2: number,
+        ) => void;
       };
       fallbackListener.setOrientation?.(forward.x, forward.y, forward.z, up.x, up.y, up.z);
     }
@@ -226,17 +240,17 @@ export class PlaybackEngine {
 
   private async reportEvent(type: 'start' | 'end', data: Record<string, unknown>) {
     try {
-      const apiBase = (window as Window & { API_BASE?: string }).API_BASE ?? 'http://localhost:3001';
+      const apiBase =
+        (window as Window & { API_BASE?: string }).API_BASE ?? 'http://localhost:3001';
       const response = await fetch(`${apiBase}/api/stats/event`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...data,
-            type,
-            timestamp: Date.now(),
-          }),
-        },
-      );
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          type,
+          timestamp: Date.now(),
+        }),
+      });
       if (response.ok) {
         const result = await response.json();
         if (type === 'start') this.currentEventId = result.id;
@@ -488,6 +502,9 @@ declare global {
   interface Window {
     playbackEngine: PlaybackEngine;
     API_BASE?: string;
-    webkitAudioContext?: typeof AudioContext;
+    webkitAudioContext?: {
+      new (contextOptions?: AudioContextOptions): AudioContext;
+      prototype: AudioContext;
+    };
   }
 }

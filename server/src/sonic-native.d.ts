@@ -1,1 +1,0 @@
-/app/native/index.d.ts

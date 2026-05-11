@@ -1,10 +1,10 @@
-# Sonic Media Player
+# Zovyra Media Player
 
-Sonic is a high-performance, "addictive" media player designed for the modern web, desktop, and mobile platforms. It leverages **Node.js** for orchestration and **Rust** for native performance.
+Zovyra is a high-performance, "addictive" media player designed for the modern web, desktop, and mobile platforms. It leverages **Node.js** for orchestration and **Rust** for native performance.
 
 ## 🚀 Vision
 
-To create a media player that feels instantaneous and adapts to the user's mood. By combining a sleek React-based UI with a powerful Rust-powered audio engine, Sonic provides low-latency playback and advanced audio analysis (BPM detection, Mood indexing) natively.
+To create a media player that feels instantaneous and adapts to the user's mood. By combining a sleek React-based UI with a powerful Rust-powered audio engine, Zovyra provides low-latency playback and advanced audio analysis (BPM detection, Mood indexing) natively.
 
 ## 🛠 Tech Stack
 

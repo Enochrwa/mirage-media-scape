@@ -4,11 +4,11 @@ import { MoodSlider } from '@/components/discovery/MoodSlider';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
 import { useState } from 'react';
 
-interface SonicLayoutProps {
+interface ZovyraLayoutProps {
   children: React.ReactNode;
 }
 
-export function SonicLayout({ children }: SonicLayoutProps) {
+export function ZovyraLayout({ children }: ZovyraLayoutProps) {
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
 
   return (

@@ -42,7 +42,7 @@ const RemotePage = () => {
       <div className="flex min-h-screen items-center justify-center bg-black p-8 text-center text-white">
         <div className="space-y-4">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent" />
-          <p className="text-zinc-500">Waiting for Sonic Player...</p>
+          <p className="text-zinc-500">Waiting for Zovyra Player...</p>
         </div>
       </div>
     );

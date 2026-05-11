@@ -1,5 +1,16 @@
 export type ResourceState = 'normal' | 'low-power' | 'critical';
 
+interface BatteryManager extends EventTarget {
+  level: number;
+  charging: boolean;
+  chargingTime: number;
+  dischargingTime: number;
+  onchargingchange: ((this: BatteryManager, ev: Event) => any) | null;
+  onchargingtimechange: ((this: BatteryManager, ev: Event) => any) | null;
+  ondischargingtimechange: ((this: BatteryManager, ev: Event) => any) | null;
+  onlevelchange: ((this: BatteryManager, ev: Event) => any) | null;
+}
+
 export class ResourceMonitor {
   private battery: BatteryManager | null = null;
   private lastFrameTime: number = 0;

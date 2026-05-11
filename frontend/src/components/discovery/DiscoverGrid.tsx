@@ -97,7 +97,7 @@ export function DiscoverGrid() {
                 </div>
               </div>
               <h4 className="truncate font-semibold text-white">Daily Mix {i}</h4>
-              <p className="truncate text-sm text-gray-500">By Sonic AI</p>
+              <p className="truncate text-sm text-gray-500">By Zovyra AI</p>
             </div>
           ))}
         </div>

@@ -37,7 +37,7 @@ export function Sidebar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600">
             <Music2 className="h-5 w-5 text-white" />
           </div>
-          Sonic
+          Zovyra
         </Link>
       </div>
 

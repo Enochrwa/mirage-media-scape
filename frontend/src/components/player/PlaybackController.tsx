@@ -103,7 +103,7 @@ export function PlaybackController() {
       <div className="flex w-[30%] items-center gap-4">
         <div className="h-14 w-14 overflow-hidden rounded-md bg-zinc-800 shadow-lg">
           <img
-            src={currentFile.cover || 'https://picsum.photos/seed/sonic/56/56'}
+            src={currentFile.cover || 'https://picsum.photos/seed/zovyra/56/56'}
             alt={currentFile.title}
             className="h-full w-full object-cover"
           />

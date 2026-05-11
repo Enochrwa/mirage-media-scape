@@ -22,7 +22,7 @@ import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 import { ArtistProfile } from './pages/ArtistProfile';
-import { SonicLayout } from './components/SonicLayout';
+import { ZovyraLayout } from './components/ZovyraLayout';
 
 const queryClient = new QueryClient();
 
@@ -44,17 +44,17 @@ const App = () => {
               <Route
                 path="/"
                 element={
-                  <SonicLayout>
+                  <ZovyraLayout>
                     <ArtistProfile />
-                  </SonicLayout>
+                  </ZovyraLayout>
                 }
               />
               <Route
                 path="/artist"
                 element={
-                  <SonicLayout>
+                  <ZovyraLayout>
                     <ArtistProfile />
-                  </SonicLayout>
+                  </ZovyraLayout>
                 }
               />
               <Route path="/home" element={<Home />} />

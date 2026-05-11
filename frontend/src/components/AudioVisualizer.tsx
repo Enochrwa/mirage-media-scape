@@ -20,8 +20,17 @@ interface AudioVisualizerProps {
   responsive?: boolean;
 }
 
-const visualizerTypes = ['bars', 'wave', 'circle', 'spectrum'] as const;
-type VisualizerType = AudioVisualizerProps['visualizerType'];
+const allVisualizerTypes = [
+  'bars',
+  'wave',
+  'circle',
+  'spectrum',
+  'orbit',
+  'dna',
+  'particle',
+  'liquid',
+] as const;
+type VisualizerType = (typeof allVisualizerTypes)[number];
 
 const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   className,
@@ -48,8 +57,6 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'],
   };
 
-  const visualizerTypes = ['bars', 'wave', 'circle', 'spectrum'] as const;
-  type VisualizerType = (typeof visualizerTypes)[number];
   const getColors = () => colorSchemes[colorScheme] ?? colorSchemes.default;
 
   useEffect(() => {
@@ -59,9 +66,9 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    analyserRef.current = playbackEngine.getAnalyser();
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    dataArrayRef.current = new Uint8Array(bufferLength);
+    const analyser = (analyserRef.current = playbackEngine.getAnalyser());
+    const bufferLength = analyser.frequencyBinCount;
+    dataArrayRef.current = new Uint8Array(bufferLength) as any;
 
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
@@ -150,8 +157,8 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         height={responsive ? 400 : 200}
         className="h-full w-full cursor-pointer"
         onClick={() => {
-          const idx = visualizerTypes.indexOf(currentType);
-          setCurrentType(visualizerTypes[(idx + 1) % visualizerTypes.length]);
+          const idx = allVisualizerTypes.indexOf(currentType as any);
+          setCurrentType(allVisualizerTypes[(idx + 1) % allVisualizerTypes.length]);
         }}
       />
       {showControls && (

@@ -1,5 +1,6 @@
 import { Clock, Play, Heart, MoreHorizontal } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { MediaFile } from '@/types/media';
 
 const tracks = [
   {
@@ -62,18 +63,28 @@ export function TrackTable() {
         {tracks.map((track, i) => (
           <div
             key={track.id}
-            onClick={() =>
-              playFile({
+            onClick={() => {
+              const mediaFile: MediaFile = {
                 id: track.id.toString(),
                 title: track.title,
                 artist: track.artist,
                 album: track.album,
+                cover: `https://picsum.photos/seed/${track.id}/40/40`,
                 file: 'https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3',
                 type: 'audio',
+                duration: 193, // 3:13
+                loudness: null,
                 bpm: 124,
                 camelot_key: '8A',
-              })
-            }
+                file_path: 'mock-path',
+                key: null,
+                genre: null,
+                year: null,
+                bitrate: null,
+                sampleRate: null,
+              };
+              playFile(mediaFile);
+            }}
             className="group grid cursor-pointer grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-white/5"
           >
             <div className="text-sm">

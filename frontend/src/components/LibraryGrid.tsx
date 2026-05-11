@@ -1,6 +1,4 @@
-import React, { useMemo } from 'react';
-import { FixedSizeGrid, type GridChildComponentProps } from 'react-window';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
+import React from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { MediaFile } from '@/types/media';
 import { Card } from '@/components/ui/card';
@@ -21,22 +19,13 @@ interface LibraryGridProps {
 const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
   const { playFile } = usePlayerStore();
 
-  const COLUMN_COUNT = 5;
-  const ROW_COUNT = Math.ceil(files.length / COLUMN_COUNT);
-
-  const Cell = ({
-    columnIndex,
-    rowIndex,
-    style,
-  }: GridChildComponentProps) => {
-    const index = rowIndex * COLUMN_COUNT + columnIndex;
-    const file = files[index];
-
-    if (!file) return null;
-
-    return (
-      <div style={{ ...style, padding: '8px' }}>
-        <Card className="group h-full overflow-hidden bg-card transition-colors hover:bg-card/80">
+  return (
+    <div className="grid grid-cols-2 gap-4 overflow-y-auto p-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {files.map((file) => (
+        <Card
+          key={file.id}
+          className="group h-full overflow-hidden bg-card transition-colors hover:bg-card/80"
+        >
           <div className="relative aspect-square overflow-hidden">
             <img
               src={file.cover || '/placeholder.svg'}
@@ -87,30 +76,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
             </DropdownMenu>
           </div>
         </Card>
-      </div>
-    );
-  };
-
-  return (
-    <div className="h-[calc(100vh-250px)] w-full">
-      <AutoSizer>
-        {({ height, width }) => {
-          const columnWidth = width / COLUMN_COUNT;
-          const rowHeight = columnWidth + 80; // Aspect ratio + padding/text
-          return (
-            <FixedSizeGrid
-              columnCount={COLUMN_COUNT}
-              columnWidth={columnWidth}
-              height={height}
-              rowCount={ROW_COUNT}
-              rowHeight={rowHeight}
-              width={width}
-            >
-              {Cell}
-            </FixedSizeGrid>
-          );
-        }}
-      </AutoSizer>
+      ))}
     </div>
   );
 };

@@ -6,6 +6,8 @@ interface SubtitleTrack {
   index: number;
   language?: string;
   label?: string;
+  title?: string;
+  codec?: string;
 }
 import {
   DropdownMenu,

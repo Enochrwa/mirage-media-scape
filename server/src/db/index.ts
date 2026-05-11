@@ -2,12 +2,12 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = path.resolve(__dirname, '../../sonic.db');
+const dbPath = path.resolve(__dirname, '../../zovyra.db');
 
 // Ensure the directory exists
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
 const db = new Database(dbPath);

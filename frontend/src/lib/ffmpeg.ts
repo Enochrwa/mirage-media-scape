@@ -26,7 +26,7 @@ export const trimAudio = async (
   const outputFileName = `output_${Date.now()}.audio`;
 
   // Fetch the file and write it to the virtual file system
-  await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
+  await ffmpegInstance.writeFile(inputFileName, (await fetchFile(audioUrl)) as any);
 
   const command = [
     '-i',
@@ -46,7 +46,7 @@ export const trimAudio = async (
   await ffmpegInstance.exec(command);
 
   // Read the result
-  const data = await ffmpegInstance.readFile(outputFileName);
+  const data = (await ffmpegInstance.readFile(outputFileName)) as any;
 
   // Clean up virtual files
   await ffmpegInstance.deleteFile(inputFileName);
@@ -61,7 +61,7 @@ export const normalizeVolume = async (audioUrl: string): Promise<Blob> => {
   const inputFileName = `input_norm_${Date.now()}.audio`;
   const outputFileName = `output_norm_${Date.now()}.audio`;
 
-  await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
+  await ffmpegInstance.writeFile(inputFileName, (await fetchFile(audioUrl)) as any);
 
   // Using a single-pass loudnorm filter with common parameters.
   const command = ['-i', inputFileName, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', outputFileName];
@@ -70,7 +70,7 @@ export const normalizeVolume = async (audioUrl: string): Promise<Blob> => {
 
   await ffmpegInstance.exec(command);
 
-  const data = await ffmpegInstance.readFile(outputFileName);
+  const data = (await ffmpegInstance.readFile(outputFileName)) as any;
 
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
@@ -88,7 +88,7 @@ export const applyFade = async (
   const inputFileName = `input_fade_${Date.now()}.audio`;
   const outputFileName = `output_fade_${Date.now()}.audio`;
 
-  await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
+  await ffmpegInstance.writeFile(inputFileName, (await fetchFile(audioUrl)) as any);
 
   const fadeFilters: string[] = [];
   if (fadeInDuration > 0) {
@@ -103,7 +103,7 @@ export const applyFade = async (
 
   if (fadeFilters.length === 0) {
     console.warn('No fade effect to apply.');
-    const data = await ffmpegInstance.readFile(inputFileName);
+    const data = (await ffmpegInstance.readFile(inputFileName)) as any;
     await ffmpegInstance.deleteFile(inputFileName);
     return new Blob([data], { type: 'audio/wav' });
   }
@@ -114,7 +114,7 @@ export const applyFade = async (
 
   await ffmpegInstance.exec(command);
 
-  const data = await ffmpegInstance.readFile(outputFileName);
+  const data = (await ffmpegInstance.readFile(outputFileName)) as any;
 
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
@@ -127,7 +127,7 @@ export const changeVolume = async (audioUrl: string, gain: number): Promise<Blob
   const inputFileName = `input_vol_${Date.now()}.audio`;
   const outputFileName = `output_vol_${Date.now()}.audio`;
 
-  await ffmpegInstance.writeFile(inputFileName, await fetchFile(audioUrl));
+  await ffmpegInstance.writeFile(inputFileName, (await fetchFile(audioUrl)) as any);
 
   const command = ['-i', inputFileName, '-af', `volume=${gain}dB`, outputFileName];
 
@@ -135,7 +135,7 @@ export const changeVolume = async (audioUrl: string, gain: number): Promise<Blob
 
   await ffmpegInstance.exec(command);
 
-  const data = await ffmpegInstance.readFile(outputFileName);
+  const data = (await ffmpegInstance.readFile(outputFileName)) as any;
 
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);

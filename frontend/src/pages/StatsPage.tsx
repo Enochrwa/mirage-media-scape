@@ -111,7 +111,7 @@ const StatsPage = () => {
                 <div
                   key={track.id}
                   className="group flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                  onClick={() => playFile(track)}
+                  onClick={() => playFile(track as any)}
                 >
                   <span className="w-6 text-xl font-bold text-zinc-600">{i + 1}</span>
                   <img
@@ -143,7 +143,7 @@ const StatsPage = () => {
                 <div
                   key={`${track.id}-${track.started_at}`}
                   className="flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                  onClick={() => playFile(track)}
+                  onClick={() => playFile(track as any)}
                 >
                   <img
                     src={track.cover_cache_path || '/placeholder.svg'}
