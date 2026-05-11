@@ -78,7 +78,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
       ctx.clearRect(0, 0, width, height);
 
       if (isPlaying && analyserRef.current && dataArrayRef.current) {
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
         const colors = getColors();
 
         if (currentType === 'bars' || currentType === 'spectrum') {

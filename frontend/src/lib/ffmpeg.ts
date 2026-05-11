@@ -53,7 +53,7 @@ export const trimAudio = async (
   await ffmpegInstance.deleteFile(outputFileName);
 
   // Return as a blob
-  return new Blob([data], { type: 'audio/wav' }); // Assuming wav, as the source is wav.
+  return new Blob([data as BlobPart], { type: 'audio/wav' }); // Assuming wav, as the source is wav.
 };
 
 export const normalizeVolume = async (audioUrl: string): Promise<Blob> => {
@@ -75,7 +75,7 @@ export const normalizeVolume = async (audioUrl: string): Promise<Blob> => {
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
 
-  return new Blob([data], { type: 'audio/wav' });
+  return new Blob([data as BlobPart], { type: 'audio/wav' });
 };
 
 export const applyFade = async (
@@ -105,7 +105,7 @@ export const applyFade = async (
     console.warn('No fade effect to apply.');
     const data = (await ffmpegInstance.readFile(inputFileName)) as Uint8Array;
     await ffmpegInstance.deleteFile(inputFileName);
-    return new Blob([data], { type: 'audio/wav' });
+    return new Blob([data as BlobPart], { type: 'audio/wav' });
   }
 
   const command = ['-i', inputFileName, '-af', fadeFilters.join(','), outputFileName];
@@ -119,7 +119,7 @@ export const applyFade = async (
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
 
-  return new Blob([data], { type: 'audio/wav' });
+  return new Blob([data as BlobPart], { type: 'audio/wav' });
 };
 
 export const changeVolume = async (audioUrl: string, gain: number): Promise<Blob> => {
@@ -140,5 +140,5 @@ export const changeVolume = async (audioUrl: string, gain: number): Promise<Blob
   await ffmpegInstance.deleteFile(inputFileName);
   await ffmpegInstance.deleteFile(outputFileName);
 
-  return new Blob([data], { type: 'audio/wav' });
+  return new Blob([data as BlobPart], { type: 'audio/wav' });
 };

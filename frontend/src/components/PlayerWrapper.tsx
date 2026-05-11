@@ -20,8 +20,8 @@ const PlayerWrapper = () => {
   return (
     <Dialog open={!!currentFile} onOpenChange={handleOpenChange}>
       <DialogContent className="h-full max-h-none w-full max-w-none border-0 bg-transparent p-0">
-        {currentFile.type === 'audio' && <AudioPlayer file={currentFile} />}
-        {currentFile.type === 'video' && <VideoPlayer file={currentFile} />}
+        {currentFile.type === 'audio' && <AudioPlayer />}
+        {currentFile.type === 'video' && <VideoPlayer />}
       </DialogContent>
     </Dialog>
   );

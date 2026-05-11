@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaFile } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,7 +66,8 @@ const formatDuration = (seconds: number) => {
 };
 
 const Dashboard = () => {
-  const { files, playFile } = useLibraryStore();
+  const { files } = useLibraryStore();
+  const { playFile } = usePlayerStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   type SortField = keyof MediaFile;
@@ -97,7 +99,7 @@ const Dashboard = () => {
     return 0;
   });
 
-  const toggleSort = (field: string) => {
+  const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {

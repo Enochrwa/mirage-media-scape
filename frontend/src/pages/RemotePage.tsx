@@ -94,7 +94,7 @@ const RemotePage = () => {
           <div className="flex items-center gap-4">
             <Volume2 size={20} className="text-zinc-500" />
             <Slider
-              value={[state.volume * 100]}
+              value={[(state.volume ?? 1) * 100]}
               max={100}
               onValueChange={([v]) => sendCommand('VOLUME', v / 100)}
             />

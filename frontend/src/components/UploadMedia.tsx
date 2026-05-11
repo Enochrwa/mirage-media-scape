@@ -122,21 +122,21 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     const newFile: MediaFile = {
       id: `file-${Date.now()}`,
       title,
-      artist: artist || null,
-      album: album || null,
+      artist: artist || undefined,
+      album: album || undefined,
       cover: coverUrl,
       file: fileUrl,
       type: mediaType,
-      duration: null,
-      loudness: null,
-      bpm: null,
-      camelot_key: null,
+      duration: undefined,
+      loudness: undefined,
+      bpm: undefined,
+      camelot_key: undefined,
       file_path: selectedFile.name, // Mock path
-      key: null,
-      genre: null,
-      year: null,
-      bitrate: null,
-      sampleRate: null,
+      key: undefined,
+      genre: undefined,
+      year: undefined,
+      bitrate: undefined,
+      sampleRate: undefined,
     };
 
     addFile(newFile);

@@ -36,9 +36,10 @@ export class ParametricEQ {
     const totalMag = new Float32Array(frequencies.length).fill(1);
     const magResponse = new Float32Array(frequencies.length);
     const phaseResponse = new Float32Array(frequencies.length);
+    const freqArg = frequencies as Float32Array<ArrayBuffer>;
 
     for (const band of this.bands) {
-      band.getFrequencyResponse(frequencies, magResponse, phaseResponse);
+      band.getFrequencyResponse(freqArg, magResponse, phaseResponse);
       for (let i = 0; i < frequencies.length; i++) {
         totalMag[i] *= magResponse[i];
       }
@@ -109,12 +110,10 @@ export class PlaybackEngine {
 
   constructor() {
     const win = window as Window & {
-      webkitAudioContext?: {
-        new (contextOptions?: AudioContextOptions): AudioContext;
-        prototype: AudioContext;
-      };
+      AudioContext?: typeof AudioContext;
+      webkitAudioContext?: typeof AudioContext;
     };
-    const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+    const AudioContextClass = win.AudioContext ?? win.webkitAudioContext;
     if (!AudioContextClass) throw new Error('AudioContext not supported');
     this.ctx = new AudioContextClass();
     this.currentGainNode = this.ctx.createGain();
@@ -199,6 +198,10 @@ export class PlaybackEngine {
 
   getFrequencyResponse(frequencies: Float32Array): Float32Array {
     return this.eq.getFrequencyResponse(frequencies);
+  }
+
+  setEQBand(index: number, gainDb: number) {
+    this.eq.setBand(index, gainDb);
   }
 
   setSpatialPosition(x: number, y: number, z: number) {

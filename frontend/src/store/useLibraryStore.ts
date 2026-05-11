@@ -110,9 +110,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             const mediaFile: MediaFile = {
               id: track.id,
               title: track.title,
-              artist: track.artist,
-              album: track.album,
-              cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : null,
+              artist: track.artist ?? undefined,
+              album: track.album ?? undefined,
+              cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
               file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
               file_path: track.file_path,
               type:
@@ -120,14 +120,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                   ? 'video'
                   : 'audio',
               duration: track.duration,
-              loudness: track.loudness,
-              bpm: track.bpm,
-              camelot_key: track.camelot_key,
-              key: track.key,
-              genre: track.genre,
-              year: track.year,
-              bitrate: track.bitrate,
-              sampleRate: track.sample_rate,
+              loudness: track.loudness ?? undefined,
+              bpm: track.bpm ?? undefined,
+              camelot_key: track.camelot_key ?? undefined,
+              key: track.key ?? undefined,
+              genre: track.genre ?? undefined,
+              year: track.year ?? undefined,
+              bitrate: track.bitrate != null ? String(track.bitrate) : undefined,
+              sampleRate: track.sample_rate != null ? String(track.sample_rate) : undefined,
             };
             newFiles.push(mediaFile);
           }
@@ -153,9 +153,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         const mappedTracks: MediaFile[] = data.map((track) => ({
           id: track.id,
           title: track.title,
-          artist: track.artist,
-          album: track.album,
-          cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : null,
+          artist: track.artist ?? undefined,
+          album: track.album ?? undefined,
+          cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
           file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
           file_path: track.file_path,
           type:
@@ -163,14 +163,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
               ? 'video'
               : 'audio',
           duration: track.duration,
-          loudness: track.loudness,
-          bpm: track.bpm,
-          camelot_key: track.camelot_key,
-          key: track.key,
-          genre: track.genre,
-          year: track.year,
-          bitrate: track.bitrate,
-          sampleRate: track.sample_rate,
+          loudness: track.loudness ?? undefined,
+          bpm: track.bpm ?? undefined,
+          camelot_key: track.camelot_key ?? undefined,
+          key: track.key ?? undefined,
+          genre: track.genre ?? undefined,
+          year: track.year ?? undefined,
+          bitrate: track.bitrate != null ? String(track.bitrate) : undefined,
+          sampleRate: track.sample_rate != null ? String(track.sample_rate) : undefined,
         }));
         set({ files: mappedTracks });
 

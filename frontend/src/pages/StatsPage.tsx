@@ -20,7 +20,13 @@ interface TopTrack {
   play_count: number;
 }
 
-type HistoryEntry = Record<string, unknown>;
+interface HistoryEntry {
+  id: string;
+  title: string;
+  artist?: string | null;
+  cover_cache_path?: string | null;
+  started_at: string;
+}
 
 const StatsPage = () => {
   const { playFile } = usePlayerStore();
@@ -37,9 +43,9 @@ const StatsPage = () => {
           fetch(`${API_BASE}/api/stats/summary`),
         ]);
 
-        if (topRes.ok) setTopTracks(await topRes.json());
-        if (historyRes.ok) setHistory(await historyRes.json());
-        if (summaryRes.ok) setSummary(await summaryRes.json());
+        if (topRes.ok) setTopTracks((await topRes.json()) as TopTrack[]);
+        if (historyRes.ok) setHistory((await historyRes.json()) as HistoryEntry[]);
+        if (summaryRes.ok) setSummary((await summaryRes.json()) as StatsSummary);
       } catch (e) {
         console.error('Failed to fetch stats', e);
       }
@@ -94,7 +100,7 @@ const StatsPage = () => {
                   <p className="text-sm font-bold uppercase tracking-wider text-zinc-400">
                     Top Artist
                   </p>
-                  <p className="max-w-[150px] truncate text-2xl font-bold">{summary.topArtist}</p>
+                  <p className="max-w-[150px] truncate text-2xl font-bold">{summary.topArtist ?? ''}</p>
                 </div>
               </div>
             </Card>
@@ -147,13 +153,13 @@ const StatsPage = () => {
                   onClick={() => playFile(track as unknown as MediaFile)}
                 >
                   <img
-                    src={track.cover_cache_path || '/placeholder.svg'}
+                    src={track.cover_cache_path ?? '/placeholder.svg'}
                     className="h-10 w-10 rounded object-cover opacity-60"
                     alt=""
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{track.title}</p>
-                    <p className="truncate text-[10px] text-zinc-500">{track.artist}</p>
+                    <p className="truncate text-[10px] text-zinc-500">{track.artist ?? ''}</p>
                   </div>
                   <span className="text-[10px] text-zinc-500">
                     {new Date(track.started_at).toLocaleTimeString([], {

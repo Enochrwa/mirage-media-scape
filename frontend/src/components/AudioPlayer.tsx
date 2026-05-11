@@ -44,6 +44,7 @@ import Recommendations from './discovery/Recommendations';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { MediaFile, Playlist } from '@/types/media';
+import { toast } from '@/hooks/use-toast';
 
 type AudioPlayerButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'ghost' | 'outline';
@@ -325,9 +326,22 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const handleSleepTimer = (minutes: number) => {
     setSleepTimer(minutes);
     setShowTimerMenu(false);
-      playbackEngine.startSleepTimer(minutes * 60);
-    console.log('Toast:', message);
+    playbackEngine.setSleepTimer(minutes);
   };
+
+  const toggleTrimming = useCallback(() => {
+    setIsTrimming((prev) => {
+      if (prev) {
+        setTrimRegion(null);
+        const regions = regionsRef.current?.getRegions();
+        if (regions) {
+          Object.values(regions).forEach((r) => r.remove());
+        }
+        return false;
+      }
+      return true;
+    });
+  }, []);
 
   const handleConfirmTrim = async () => {
     if (!trimRegion || !currentFile) return;
@@ -340,9 +354,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `trimmed_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Trim successful!');
+      toast({ title: 'Trim successful!' });
     } catch (e) {
-      showToast('Trim failed');
+      toast({ title: 'Trim failed', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
@@ -359,9 +373,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `normalized_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Normalization complete!');
+      toast({ title: 'Normalization complete!' });
     } catch (e) {
-      showToast('Normalization failed');
+      toast({ title: 'Normalization failed', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
@@ -378,9 +392,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `boosted_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Volume boost applied!');
+      toast({ title: 'Volume boost applied!' });
     } catch (e) {
-      showToast('Boost failed');
+      toast({ title: 'Boost failed', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
@@ -397,9 +411,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       a.download = `faded_${currentFile.title}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Fades applied!');
+      toast({ title: 'Fades applied!' });
     } catch (e) {
-      showToast('Fades failed');
+      toast({ title: 'Fades failed', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }

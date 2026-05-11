@@ -8,6 +8,8 @@ export interface MediaFile {
   cover?: string;
   file: string;
   type: MediaType;
+  /** Byte size when known (e.g. dashboard storage totals). */
+  size?: number;
   duration?: number;
   loudness?: number;
   bpm?: number;

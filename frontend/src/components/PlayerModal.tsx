@@ -24,8 +24,8 @@ const PlayerModal = () => {
           <DialogTitle>{currentFile.title}</DialogTitle>
         </DialogHeader>
         <div className="mt-4">
-          {currentFile.type === 'audio' && <AudioPlayer file={currentFile} />}
-          {currentFile.type === 'video' && <VideoPlayer file={currentFile} />}
+          {currentFile.type === 'audio' && <AudioPlayer />}
+          {currentFile.type === 'video' && <VideoPlayer />}
         </div>
       </DialogContent>
     </Dialog>

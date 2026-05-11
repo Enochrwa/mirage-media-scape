@@ -73,15 +73,15 @@ export function TrackTable() {
                 file: 'https://storage.googleapis.com/media-session/elephants-dream/the-wires.mp3',
                 type: 'audio',
                 duration: 193, // 3:13
-                loudness: null,
+                loudness: undefined,
                 bpm: 124,
                 camelot_key: '8A',
                 file_path: 'mock-path',
-                key: null,
-                genre: null,
-                year: null,
-                bitrate: null,
-                sampleRate: null,
+                key: undefined,
+                genre: undefined,
+                year: undefined,
+                bitrate: undefined,
+                sampleRate: undefined,
               };
               playFile(mediaFile);
             }}
