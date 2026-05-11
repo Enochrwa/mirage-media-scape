@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { FixedSizeGrid as Grid, type GridChildComponentProps } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { MediaFile } from '@/types/media';
 import { Card } from '@/components/ui/card';
@@ -167,9 +167,11 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
   }
 
   return (
-    <div className="h-[min(75vh,820px)] min-h-[320px] w-full">
-      <AutoSizer>
-        {({ width, height }) => {
+      <AutoSizer
+        ChildComponent={({ width, height }) => {
+          if (width === undefined || height === undefined) {
+            return null;
+          }
           const columnCount = Math.min(MAX_COLS, Math.max(2, Math.floor(width / MIN_COL_WIDTH)));
           const columnWidth = width / columnCount;
           const rowCount = Math.ceil(files.length / columnCount);
@@ -190,8 +192,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
             </Grid>
           );
         }}
-      </AutoSizer>
-    </div>
+      />
   );
 };
 
