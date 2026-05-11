@@ -464,7 +464,7 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-const engine = playbackEngine;
+    const engine = playbackEngine;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;

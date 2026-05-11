@@ -4,24 +4,65 @@ import { API_BASE } from '@/lib/utils';
 import { io, Socket } from 'socket.io-client';
 import { openDB, IDBPDatabase } from 'idb';
 
-interface IncomingTrack {
+export interface IncomingTrack {
   id: string;
   file_path: string;
   title: string;
-  artist: string | null;
-  album: string | null;
-  cover_cache_path: string | null;
-  genre: string | null;
-  year: number | null;
+  artist?: string | null;
+  album?: string | null;
+  cover_cache_path?: string | null;
+  thumbnail_path?: string | null;
+  genre?: string | null;
+  year?: number | null;
   duration: number;
-  bitrate: number | null;
-  sample_rate: number | null;
-  channels: number | null;
-  loudness: number | null;
-  bpm: number | null;
-  key: string | null;
-  camelot_key: string | null;
-  bpm_confidence: number | null;
+  bitrate?: number | null;
+  sample_rate?: number | null;
+  channels?: number | null;
+  loudness?: number | null;
+  bpm?: number | null;
+  key?: string | null;
+  camelot_key?: string | null;
+  bpm_confidence?: number | null;
+  file_type?: string | null;
+  rating?: number | null;
+  play_count?: number | null;
+}
+
+function resolveMediaType(
+  track: Pick<IncomingTrack, 'file_path' | 'file_type'>,
+): MediaFile['type'] {
+  if (track.file_type === 'video') return 'video';
+  if (track.file_type === 'audio') return 'audio';
+  const p = (track.file_path || '').toLowerCase();
+  if (/\.(mp4|mkv|avi|mov|webm|m4v|wmv)$/.test(p)) return 'video';
+  return 'audio';
+}
+
+export function mapIncomingTrackToMediaFile(track: IncomingTrack): MediaFile {
+  const type = resolveMediaType(track);
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist ?? undefined,
+    album: track.album ?? undefined,
+    cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
+    thumbnail: track.thumbnail_path ? `${API_BASE}/api/tracks/thumbnail/${track.id}` : undefined,
+    file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
+    file_path: track.file_path,
+    type,
+    duration: track.duration,
+    loudness: track.loudness ?? undefined,
+    bpm: track.bpm ?? undefined,
+    camelot_key: track.camelot_key ?? undefined,
+    key: track.key ?? undefined,
+    genre: track.genre ?? undefined,
+    year: track.year ?? undefined,
+    bitrate: track.bitrate != null ? String(track.bitrate) : undefined,
+    sampleRate: track.sample_rate != null ? String(track.sample_rate) : undefined,
+    rating: track.rating ?? undefined,
+    play_count: track.play_count ?? undefined,
+    file_type: track.file_type ?? undefined,
+  };
 }
 
 interface ScanStartData {
@@ -45,8 +86,8 @@ interface LibraryState {
   db: IDBPDatabase | null;
   socket: Socket | null;
 
-  // Actions
   init: () => Promise<void>;
+  fetchInstantTracks: () => Promise<void>;
   fetchTracks: () => Promise<void>;
   fetchSmartPlaylists: () => Promise<void>;
   addFolder: (path?: string) => Promise<void>;
@@ -59,6 +100,15 @@ interface LibraryState {
 const DB_NAME = 'zovyra-web-db';
 const STORE_NAME = 'tracks';
 
+async function persistTracksToIdb(db: IDBPDatabase, tracks: MediaFile[]) {
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  await tx.store.clear();
+  for (const track of tracks) {
+    await tx.store.put(track);
+  }
+  await tx.done;
+}
+
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   files: [],
   playlists: [],
@@ -68,122 +118,89 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   socket: null,
 
   init: async () => {
-    // DB Init
-    const db = await openDB(DB_NAME, 1, {
+    const idb = await openDB(DB_NAME, 1, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         }
       },
     });
-    set({ db });
+    set({ db: idb });
 
-    const cachedTracks = (await db.getAll(STORE_NAME)) as MediaFile[];
+    const cachedTracks = (await idb.getAll(STORE_NAME)) as MediaFile[];
     if (cachedTracks.length > 0) {
       set({ files: cachedTracks });
     }
 
-    // Socket Init
-    const socket = io(API_BASE.replace('/api', ''));
-    set({ socket });
+    let socket = get().socket;
+    if (!socket) {
+      socket = io(API_BASE.replace('/api', ''));
+      set({ socket });
 
-    socket.on('SCAN_START', (data: ScanStartData) => {
-      set({ scanProgress: { scanned: 0, total: data.total, percentage: 0 } });
-    });
-
-    socket.on('SCAN_PROGRESS', (data: ScanProgressData) => {
-      set({
-        scanProgress: {
-          scanned: data.scanned,
-          total: data.total,
-          percentage: Math.round((data.scanned / data.total) * 100),
-        },
+      socket.on('SCAN_START', (data: ScanStartData) => {
+        set({ scanProgress: { scanned: 0, total: data.total, percentage: 0 } });
       });
-    });
 
-    socket.on('NEW_TRACKS', (data: NewTracksData) => {
-      set((state) => {
-        const newFiles = [...state.files];
-        const tracks = data.tracks || [];
-        tracks.forEach((track) => {
-          if (!newFiles.find((f) => f.id === track.id)) {
-            const mediaFile: MediaFile = {
-              id: track.id,
-              title: track.title,
-              artist: track.artist ?? undefined,
-              album: track.album ?? undefined,
-              cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
-              file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
-              file_path: track.file_path,
-              type:
-                track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv')
-                  ? 'video'
-                  : 'audio',
-              duration: track.duration,
-              loudness: track.loudness ?? undefined,
-              bpm: track.bpm ?? undefined,
-              camelot_key: track.camelot_key ?? undefined,
-              key: track.key ?? undefined,
-              genre: track.genre ?? undefined,
-              year: track.year ?? undefined,
-              bitrate: track.bitrate != null ? String(track.bitrate) : undefined,
-              sampleRate: track.sample_rate != null ? String(track.sample_rate) : undefined,
-            };
-            newFiles.push(mediaFile);
-          }
+      socket.on('SCAN_PROGRESS', (data: ScanProgressData) => {
+        set({
+          scanProgress: {
+            scanned: data.scanned,
+            total: data.total,
+            percentage: data.total ? Math.round((data.scanned / data.total) * 100) : 0,
+          },
         });
-        return { files: newFiles };
       });
-    });
 
-    socket.on('SCAN_COMPLETE', () => {
-      set({ scanProgress: null });
-    });
+      socket.on('NEW_TRACKS', (data: NewTracksData) => {
+        set((state) => {
+          const byId = new Map(state.files.map((f) => [f.id, f]));
+          for (const track of data.tracks || []) {
+            byId.set(track.id, mapIncomingTrackToMediaFile(track));
+          }
+          return { files: Array.from(byId.values()) };
+        });
+      });
 
-    // Initial fetch
-    await get().fetchTracks();
+      socket.on('SCAN_COMPLETE', () => {
+        set({ scanProgress: null });
+        void get().fetchTracks();
+      });
+
+      socket.on('LIBRARY_CHANGE', () => {
+        void get().fetchInstantTracks();
+      });
+    }
+
+    await get().fetchInstantTracks();
+    void get().fetchTracks();
     await get().fetchSmartPlaylists();
+  },
+
+  fetchInstantTracks: async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/tracks/instant`);
+      if (!response.ok) return;
+      const data = (await response.json()) as IncomingTrack[];
+      const mapped = data.map(mapIncomingTrackToMediaFile);
+      if (mapped.length > 0) {
+        set({ files: mapped });
+      }
+    } catch (e) {
+      console.error('Instant library fetch failed', e);
+    }
   },
 
   fetchTracks: async () => {
     try {
       const response = await fetch(`${API_BASE}/api/tracks`);
-      if (response.ok) {
-        const data = (await response.json()) as IncomingTrack[];
-        const mappedTracks: MediaFile[] = data.map((track) => ({
-          id: track.id,
-          title: track.title,
-          artist: track.artist ?? undefined,
-          album: track.album ?? undefined,
-          cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
-          file: `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`,
-          file_path: track.file_path,
-          type:
-            track.file_path.endsWith('.mp4') || track.file_path.endsWith('.mkv')
-              ? 'video'
-              : 'audio',
-          duration: track.duration,
-          loudness: track.loudness ?? undefined,
-          bpm: track.bpm ?? undefined,
-          camelot_key: track.camelot_key ?? undefined,
-          key: track.key ?? undefined,
-          genre: track.genre ?? undefined,
-          year: track.year ?? undefined,
-          bitrate: track.bitrate != null ? String(track.bitrate) : undefined,
-          sampleRate: track.sample_rate != null ? String(track.sample_rate) : undefined,
-        }));
-        set({ files: mappedTracks });
+      if (!response.ok) return;
+      const data = (await response.json()) as IncomingTrack[];
+      const mappedTracks: MediaFile[] = data.map(mapIncomingTrackToMediaFile);
+      set({ files: mappedTracks });
 
-        // Cache to IDB
-        const db = get().db;
-        if (db) {
-          const tx = db.transaction(STORE_NAME, 'readwrite');
-          await tx.store.clear();
-          for (const track of mappedTracks) {
-            await tx.store.put(track);
-          }
-          await tx.done;
-        }
+      const idb = get().db;
+      if (idb) {
+        await persistTracksToIdb(idb, mappedTracks);
       }
     } catch (e) {
       console.error('Failed to fetch tracks', e);

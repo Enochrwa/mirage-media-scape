@@ -41,10 +41,10 @@ async function scan() {
       const fileSize = stats.size;
 
       const existing = db
-        .prepare('SELECT mtime, id FROM tracks WHERE file_path = ?')
-        .get(filePath) as { mtime: number; id: string } | undefined;
+        .prepare('SELECT mtime, id, file_size FROM tracks WHERE file_path = ?')
+        .get(filePath) as { mtime: number; id: string; file_size: number } | undefined;
 
-      if (existing && existing.mtime === mtime) {
+      if (existing && existing.mtime === mtime && existing.file_size === fileSize) {
         scanned++;
         if (scanned % 10 === 0) {
           parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned, total });
@@ -65,6 +65,11 @@ async function scan() {
       }
 
       const id = existing?.id || crypto.createHash('md5').update(filePath).digest('hex');
+
+      const fileType: 'audio' | 'video' =
+        metadata.width != null && metadata.width > 0 && metadata.height != null && metadata.height > 0
+          ? 'video'
+          : 'audio';
 
       let coverCachePath: string | undefined = undefined;
       if (metadata.coverArt) {
@@ -96,6 +101,10 @@ async function scan() {
         thumbnail_path: undefined,
         missing: 0,
         metadata_json: JSON.stringify({ ...metadata, analysis }),
+        rating: 0,
+        play_count: 0,
+        file_type: fileType,
+        waveform_data: undefined as string | undefined,
       };
 
       db.prepare(
@@ -104,8 +113,9 @@ async function scan() {
                     id, title, artist, album, genre, year, duration,
                     bitrate, sample_rate, channels, file_path, file_size,
                     mtime, added_at, loudness, bpm, key, camelot_key,
-                    bpm_confidence, cover_cache_path, thumbnail_path, missing, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    bpm_confidence, cover_cache_path, thumbnail_path, missing, metadata_json,
+                    rating, play_count, file_type, waveform_data
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
       ).run(
         trackData.id,
@@ -131,6 +141,10 @@ async function scan() {
         trackData.thumbnail_path,
         trackData.missing,
         trackData.metadata_json,
+        trackData.rating,
+        trackData.play_count,
+        trackData.file_type,
+        trackData.waveform_data ?? null,
       );
 
       newTracks.push(trackData);

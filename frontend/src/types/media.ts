@@ -6,6 +6,8 @@ export interface MediaFile {
   artist?: string;
   album?: string;
   cover?: string;
+  /** Video poster / filmstrip frame when available */
+  thumbnail?: string;
   file: string;
   type: MediaType;
   /** Byte size when known (e.g. dashboard storage totals). */
@@ -20,6 +22,12 @@ export interface MediaFile {
   year?: number;
   bitrate?: string;
   sampleRate?: string;
+  rating?: number;
+  play_count?: number;
+  /** Server-reported when scanned (audio | video). */
+  file_type?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface SmartPlaylistCondition {

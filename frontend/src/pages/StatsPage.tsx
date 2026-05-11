@@ -100,7 +100,9 @@ const StatsPage = () => {
                   <p className="text-sm font-bold uppercase tracking-wider text-zinc-400">
                     Top Artist
                   </p>
-                  <p className="max-w-[150px] truncate text-2xl font-bold">{summary.topArtist ?? ''}</p>
+                  <p className="max-w-[150px] truncate text-2xl font-bold">
+                    {summary.topArtist ?? ''}
+                  </p>
                 </div>
               </div>
             </Card>

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { MediaFile, MediaType } from '@/types/media';
-import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { API_BASE, cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import LibraryGrid from './LibraryGrid';
+import LibraryOnboarding from './LibraryOnboarding';
 
 interface MediaLibraryProps {
   className?: string;
@@ -15,10 +15,34 @@ interface MediaLibraryProps {
 }
 
 const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initialMediaType }) => {
-  const { files } = useLibraryStore();
+  const { files, fetchInstantTracks, fetchTracks, fetchSmartPlaylists } = useLibraryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [mediaType, setMediaType] = useState<MediaType | 'all'>(initialMediaType || 'all');
+  const [bootChecked, setBootChecked] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/scanner/bootstrap`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { folderCount: number; onboardingComplete: boolean };
+        if (cancelled) return;
+        if (data.folderCount === 0 && !data.onboardingComplete) {
+          setShowOnboarding(true);
+        }
+      } catch {
+        /* offline or server down — skip onboarding gate */
+      } finally {
+        if (!cancelled) setBootChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (initialMediaType) {
@@ -60,6 +84,33 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
         {searchTerm ? 'No matching files found.' : 'No media files found.'}
       </p>
     );
+
+  if (!bootChecked) {
+    return (
+      <div className={cn('space-y-6', className)}>
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-10 w-full max-w-md" />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-square rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (showOnboarding) {
+    return (
+      <LibraryOnboarding
+        onComplete={() => {
+          setShowOnboarding(false);
+          void fetchInstantTracks();
+          void fetchTracks();
+          void fetchSmartPlaylists();
+        }}
+      />
+    );
+  }
 
   return (
     <div className={cn('space-y-6', className)}>

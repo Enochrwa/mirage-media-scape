@@ -107,7 +107,11 @@ const Card = ({ children, className = '' }: ComponentWithClassName) => (
   </div>
 );
 
-const Badge = ({ children, variant = 'default', className = '' }: ComponentWithClassName & { variant?: 'default' | 'secondary' | 'outline' }) => (
+const Badge = ({
+  children,
+  variant = 'default',
+  className = '',
+}: ComponentWithClassName & { variant?: 'default' | 'secondary' | 'outline' }) => (
   <div
     className={cn(
       'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
@@ -291,7 +295,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return () => {
       ws.destroy();
     };
-}, [currentFile, setCurrentTime, setDuration]);
+  }, [currentFile, setCurrentTime, setDuration]);
 
   useEffect(() => {
     if (wavesurferRef.current && duration > 0) {

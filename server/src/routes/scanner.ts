@@ -9,6 +9,10 @@ export const setIo = (io: Server) => {
   scannerService.setIo(io);
 };
 
+router.get('/bootstrap', scannerController.getBootstrap);
+router.post('/onboarding/home', scannerController.postOnboardingHome);
+router.post('/onboarding/choose-folder', scannerController.postOnboardingChooseFolder);
+router.post('/onboarding/dismiss', scannerController.postOnboardingDismiss);
 router.post('/scan', scannerController.scanFolder);
 
 export default router;

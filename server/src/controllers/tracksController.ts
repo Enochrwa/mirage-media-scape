@@ -7,6 +7,21 @@ import { RecommendationService } from '../services/RecommendationService';
 import { FingerprintService } from '../services/FingerprintService';
 import { DuplicateFinderService } from '../services/DuplicateFinderService';
 
+export const getInstantTracks = (_req: Request, res: Response) => {
+    const rows = db
+        .prepare(
+            `SELECT id, title, artist, album, duration, cover_cache_path,
+                    thumbnail_path, file_path, file_type, bpm, camelot_key,
+                    rating, play_count, missing
+             FROM tracks
+             WHERE missing = 0
+             ORDER BY added_at DESC
+             LIMIT 500`,
+        )
+        .all();
+    res.json(rows);
+};
+
 export const getAllTracks = (req: Request, res: Response) => {
     const tracks = db.prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC').all();
     res.json(tracks);
@@ -104,6 +119,34 @@ export const getDuplicateCandidates = (req: Request, res: Response) => {
     } catch (e) {
         res.status(500).json({ error: (e as Error).message });
     }
+};
+
+export const getTrackCover = (req: Request, res: Response) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const row = db
+        .prepare('SELECT cover_cache_path FROM tracks WHERE id = ?')
+        .get(id) as { cover_cache_path?: string } | undefined;
+    if (!row?.cover_cache_path) {
+        return res.status(404).end();
+    }
+    if (!fs.existsSync(row.cover_cache_path)) {
+        return res.status(404).end();
+    }
+    res.sendFile(path.resolve(row.cover_cache_path));
+};
+
+export const getTrackThumbnail = (req: Request, res: Response) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const row = db
+        .prepare('SELECT thumbnail_path FROM tracks WHERE id = ?')
+        .get(id) as { thumbnail_path?: string } | undefined;
+    if (!row?.thumbnail_path) {
+        return res.status(404).end();
+    }
+    if (!fs.existsSync(row.thumbnail_path)) {
+        return res.status(404).end();
+    }
+    res.sendFile(path.resolve(row.thumbnail_path));
 };
 
 export const getTrackById = (req: Request, res: Response) => {
