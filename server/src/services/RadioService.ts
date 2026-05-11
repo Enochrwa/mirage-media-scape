@@ -4,7 +4,7 @@ export class RadioService {
     static async search(query: string): Promise<any[]> {
         try {
             const res = await fetch(`${this.API_URL}/stations/byname/${encodeURIComponent(query)}?limit=20`);
-            if (res.ok) return await res.json();
+            if (res.ok) return await res.json() as any[];
         } catch (e) {
             console.error('Radio search failed', e);
         }
@@ -14,7 +14,7 @@ export class RadioService {
     static async getTopStations(): Promise<any[]> {
         try {
             const res = await fetch(`${this.API_URL}/stations/topclick/20`);
-            if (res.ok) return await res.json();
+            if (res.ok) return await res.json() as any[];
         } catch (e) {
             console.error('Failed to fetch top stations', e);
         }

@@ -64,7 +64,7 @@ async function scan() {
 
       const id = existing?.id || crypto.createHash('md5').update(filePath).digest('hex');
 
-      let coverCachePath = null;
+      let coverCachePath: string | undefined = undefined;
       if (metadata.coverArt) {
         coverCachePath = path.join(coversDir, `${id}.jpg`);
         fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArt));
@@ -76,22 +76,22 @@ async function scan() {
         artist: metadata.artist || 'Unknown Artist',
         album: metadata.album || 'Unknown Album',
         genre: metadata.genre || 'Unknown Genre',
-        year: metadata.year || null,
+        year: metadata.year || undefined,
         duration: metadata.duration,
         bitrate: metadata.bitrate,
-        sample_rate: metadata.sampleRate || null,
-        channels: metadata.channels || null,
+        sample_rate: metadata.sampleRate || undefined,
+        channels: metadata.channels || undefined,
         file_path: filePath,
         file_size: fileSize,
         mtime: mtime,
         added_at: Date.now(),
-        loudness: analysis?.loudness || null,
-        bpm: analysis?.bpm || null,
-        key: analysis?.key || null,
-        camelot_key: analysis?.camelotKey || null,
-        bpm_confidence: analysis?.bpmConfidence || null,
+        loudness: analysis?.loudness || undefined,
+        bpm: analysis?.bpm || undefined,
+        key: analysis?.key || undefined,
+        camelot_key: analysis?.camelotKey || undefined,
+        bpm_confidence: analysis?.bpmConfidence || undefined,
         cover_cache_path: coverCachePath,
-        thumbnail_path: null,
+        thumbnail_path: undefined,
         missing: 0,
         metadata_json: JSON.stringify({ ...metadata, analysis }),
       };

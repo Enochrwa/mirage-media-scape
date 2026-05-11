@@ -97,9 +97,13 @@ export const SmartPlaylistModal: React.FC<SmartPlaylistModalProps> = ({
         const { count } = await res.json();
         setPreviewCount(count);
       }
-      } catch (error) {
-        console.error('Failed to fetch preview', error);
-      }
+    } catch (error) {
+      console.error('Failed to fetch preview', error);
+    }
+  };
+
+  const handleSave = async () => {
+    const playlist = {
       name,
       definition: {
         matchMode,

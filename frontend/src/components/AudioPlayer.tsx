@@ -282,11 +282,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     });
 
     ws.on('interaction', (newProgress) => {
-        const engine = playbackEngine;
-        // Seek on interaction
-        const seekTime = newProgress * ws.getDuration();
-        setCurrentTime(seekTime);
-      }
+      // Seek on interaction
+      const seekTime = newProgress * ws.getDuration();
+      setCurrentTime(seekTime);
     });
 
     return () => {

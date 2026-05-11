@@ -42,6 +42,18 @@ export class ScannerService {
     });
   }
 
+  async scanAll() {
+    const folders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+    if (folders.length > 0) {
+      await this.scan(folders.map(f => f.path));
+    }
+  }
+
+  async addFolder(directory: string) {
+    db.prepare('INSERT OR IGNORE INTO watched_folders (path, added_at) VALUES (?, ?)').run(directory, Date.now());
+    await this.scan([directory]);
+  }
+
   static async getLibraryStats() {
     const totalTracks = db.prepare('SELECT COUNT(*) as count FROM tracks').get() as {
       count: number;

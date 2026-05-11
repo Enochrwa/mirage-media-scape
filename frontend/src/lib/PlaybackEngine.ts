@@ -33,9 +33,9 @@ export class ParametricEQ {
   }
 
   getFrequencyResponse(frequencies: Float32Array): Float32Array {
-    const totalMag = new Float32Array(frequencies.length) as any.fill(1);
-    const magResponse = new Float32Array(frequencies.length) as any;
-    const phaseResponse = new Float32Array(frequencies.length) as any;
+    const totalMag = new Float32Array(frequencies.length).fill(1);
+    const magResponse = new Float32Array(frequencies.length);
+    const phaseResponse = new Float32Array(frequencies.length);
 
     for (const band of this.bands) {
       band.getFrequencyResponse(frequencies, magResponse, phaseResponse);
@@ -313,20 +313,24 @@ export class PlaybackEngine {
     }
   }
 
-  async scheduleNext(buffer: AudioBuffer, startTime: number) {
+  queueNext(buffer: AudioBuffer, loudness?: number) {
     if (this.nextSource) {
-      this.nextSource.stop();
+      try {
+        this.nextSource.stop();
+      } catch (e) { /* ignored */ }
     }
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.nextGainNode);
 
-    this.nextGainNode.gain.setValueAtTime(0, this.nextStartTime - this.fadeDuration);
-    this.nextGainNode.gain.linearRampToValueAtTime(1, this.nextStartTime);
-
-    this.currentGainNode.gain.setValueAtTime(1, this.nextStartTime - this.fadeDuration);
+    // Schedule crossfade
+    const fadeStart = this.nextStartTime - this.fadeDuration;
+    this.currentGainNode.gain.setValueAtTime(1, fadeStart);
     this.currentGainNode.gain.linearRampToValueAtTime(0, this.nextStartTime);
+
+    this.nextGainNode.gain.setValueAtTime(0, fadeStart);
+    this.nextGainNode.gain.linearRampToValueAtTime(1, this.nextStartTime);
 
     source.start(this.nextStartTime);
     this.nextSource = source;
@@ -337,7 +341,7 @@ export class PlaybackEngine {
         if (this.currentSource) {
           try {
             this.currentSource.stop();
-          } catch (e) {}
+          } catch (e) { /* ignored */ }
         }
         this.currentSource = this.nextSource;
         this.nextSource = null;
@@ -376,7 +380,7 @@ export class PlaybackEngine {
       if (this.currentSource) {
         try {
           this.currentSource.stop();
-        } catch (e) {}
+        } catch (e) { /* ignored */ }
       }
       this.currentSource = nextSource;
 
@@ -402,13 +406,13 @@ export class PlaybackEngine {
     if (this.currentSource) {
       try {
         this.currentSource.stop();
-      } catch (e) {}
+      } catch (e) { /* ignored */ }
       this.currentSource = null;
     }
     if (this.nextSource) {
       try {
         this.nextSource.stop();
-      } catch (e) {}
+      } catch (e) { /* ignored */ }
       this.nextSource = null;
     }
 
@@ -448,63 +452,29 @@ export class PlaybackEngine {
     const gainMultiplier = Math.pow(10, adjustment / 20);
 
     // Cap the gain to avoid extreme boosting
-    const cappedGain = Math.min(gainMultiplier, 4.0);
+    const cappedGain = Math.min(gainMultiplier, 2.0);
     this.normalizationGain.gain.setTargetAtTime(cappedGain, this.ctx.currentTime, 0.1);
   }
 
-  getEQFrequencyResponse(frequencies: Float32Array) {
-    return this.eq.getFrequencyResponse(frequencies);
-  }
-
-  setEQBand(index: number, gain: number) {
-    this.eq.setBand(index, gain);
-  }
-
-  startSleepTimer(durationSeconds: number) {
-    if (this.sleepTimerTimeout) {
-      clearTimeout(this.sleepTimerTimeout);
-    }
-
-    const fadeOutDuration = 30; // 30 seconds fade out
-    const sleepTime = Math.max(0, durationSeconds - fadeOutDuration);
-
-    this.sleepTimerTimeout = setTimeout(() => {
-      const now = this.ctx.currentTime;
-      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
-      this.masterGain.gain.linearRampToValueAtTime(0, now + fadeOutDuration);
-
-      setTimeout(() => {
-        this.stop();
-        this.masterGain.gain.setValueAtTime(1, this.ctx.currentTime);
-      }, fadeOutDuration * 1000);
-    }, sleepTime * 1000);
+  get currentTime() {
+    return this.ctx.currentTime;
   }
 
   getAnalyser() {
     return this.analyser;
   }
 
-  get currentTime() {
-    return this.ctx.currentTime;
+  setSleepTimer(minutes: number) {
+    if (this.sleepTimerTimeout) {
+      clearTimeout(this.sleepTimerTimeout);
+    }
+
+    if (minutes > 0) {
+      this.sleepTimerTimeout = setTimeout(() => {
+        this.pause();
+      }, minutes * 60 * 1000);
+    }
   }
 }
-
-// AUDIO GRAPH CHAIN (canonical order — insert all new nodes here):
-// Source → EQ Chain (5 BiquadFilterNodes) → ReplayGain (GainNode)
-// → Crossfade (GainNode) → Analyser (AnalyserNode, tap-only)
-// → Spatial Panner (PannerNode, bypassable) → Night Compressor (DynamicsCompressorNode, bypassable)
-// → Destination
 
 export const playbackEngine = new PlaybackEngine();
-window.playbackEngine = playbackEngine;
-
-declare global {
-  interface Window {
-    playbackEngine: PlaybackEngine;
-    API_BASE?: string;
-    webkitAudioContext?: {
-      new (contextOptions?: AudioContextOptions): AudioContext;
-      prototype: AudioContext;
-    };
-  }
-}

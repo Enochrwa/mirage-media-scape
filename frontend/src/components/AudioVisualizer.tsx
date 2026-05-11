@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 
@@ -47,17 +47,18 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
 
-  const colorSchemes = {
-    default: ['#8B5CF6', '#06B6D4', '#10B981'],
-    neon: ['#FF0080', '#00FF80', '#8000FF', '#FF8000'],
-    fire: ['#FF4500', '#FF6347', '#FFD700', '#FF8C00'],
-    ocean: ['#0080FF', '#00BFFF', '#1E90FF', '#4169E1'],
-    galaxy: ['#9932CC', '#8A2BE2', '#4B0082', '#6A5ACD'],
-    matrix: ['#00FF00', '#32CD32', '#7FFF00', '#ADFF2F'],
-    rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'],
-  };
-
-  const getColors = () => colorSchemes[colorScheme] ?? colorSchemes.default;
+  const getColors = useCallback(() => {
+    const schemes: Record<string, string[]> = {
+      default: ['#8B5CF6', '#06B6D4', '#10B981'],
+      neon: ['#FF0080', '#00FF80', '#8000FF', '#FF8000'],
+      fire: ['#FF4500', '#FF6347', '#FFD700', '#FF8C00'],
+      ocean: ['#0080FF', '#00BFFF', '#1E90FF', '#4169E1'],
+      galaxy: ['#9932CC', '#8A2BE2', '#4B0082', '#6A5ACD'],
+      matrix: ['#00FF00', '#32CD32', '#7FFF00', '#ADFF2F'],
+      rainbow: ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'],
+    };
+    return schemes[colorScheme] ?? schemes.default;
+  }, [colorScheme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -68,7 +69,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
     const analyser = (analyserRef.current = playbackEngine.getAnalyser());
     const bufferLength = analyser.frequencyBinCount;
-    dataArrayRef.current = new Uint8Array(bufferLength) as any;
+    dataArrayRef.current = new Uint8Array(bufferLength);
 
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
@@ -147,7 +148,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, currentType, colorScheme, intensity]);
+  }, [isPlaying, currentType, colorScheme, intensity, getColors]);
 
   return (
     <div className={cn('relative h-full w-full select-none overflow-hidden', className)}>
@@ -157,7 +158,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         height={responsive ? 400 : 200}
         className="h-full w-full cursor-pointer"
         onClick={() => {
-          const idx = allVisualizerTypes.indexOf(currentType as any);
+          const idx = allVisualizerTypes.indexOf(currentType as typeof allVisualizerTypes[number]);
           setCurrentType(allVisualizerTypes[(idx + 1) % allVisualizerTypes.length]);
         }}
       />

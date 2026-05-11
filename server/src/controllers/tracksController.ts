@@ -74,7 +74,8 @@ export const searchTracks = (req: Request, res: Response) => {
 
 export const getRecommendations = (req: Request, res: Response) => {
     try {
-        const recommendations = RecommendationService.findSimilar(req.params.id);
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        const recommendations = RecommendationService.findSimilar(id);
         res.json(recommendations);
     } catch (error) {
         console.error('Recommendations error:', error);
