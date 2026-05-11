@@ -18,7 +18,7 @@
     "better-sqlite3": "^12.9.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "multicast-dns": "^7.2.5",
     "socket.io": "^4.8.1",
