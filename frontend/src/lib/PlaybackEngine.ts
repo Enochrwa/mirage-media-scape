@@ -218,7 +218,14 @@ export class PlaybackEngine {
     } else {
       // Fallback for older browsers
       const fallbackListener = listener as AudioListener & {
-        setOrientation?: (x: number, y: number, z: number, x2: number, y2: number, z2: number) => void;
+        setOrientation?: (
+          x: number,
+          y: number,
+          z: number,
+          x2: number,
+          y2: number,
+          z2: number,
+        ) => void;
       };
       fallbackListener.setOrientation?.(forward.x, forward.y, forward.z, up.x, up.y, up.z);
     }
@@ -226,17 +233,17 @@ export class PlaybackEngine {
 
   private async reportEvent(type: 'start' | 'end', data: Record<string, unknown>) {
     try {
-      const apiBase = (window as Window & { API_BASE?: string }).API_BASE ?? 'http://localhost:3001';
+      const apiBase =
+        (window as Window & { API_BASE?: string }).API_BASE ?? 'http://localhost:3001';
       const response = await fetch(`${apiBase}/api/stats/event`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...data,
-            type,
-            timestamp: Date.now(),
-          }),
-        },
-      );
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          type,
+          timestamp: Date.now(),
+        }),
+      });
       if (response.ok) {
         const result = await response.json();
         if (type === 'start') this.currentEventId = result.id;

@@ -5,21 +5,25 @@ Quick reference guide to all configuration files in the Mirage Media Scape proje
 ## 📋 Root Configuration Files
 
 ### Code Quality & Formatting
+
 - **`.editorconfig`** - Cross-IDE editor configuration
 - **`.prettierrc`** - Code formatter settings
 - **`.prettierignore`** - Prettier exclusion patterns
 
 ### Package Management
+
 - **`.npmrc`** - NPM configuration (exact versions, audit level, registry)
 - **`.nvmrc`** - Node.js version (20.14.0)
 - **`renovate.json`** - Automated dependency updates
 - **`.github/dependabot.yml`** - Dependabot configuration
 
 ### Version Control
+
 - **`.gitignore`** - Files to ignore in git (enhanced)
 - **`.gitattributes`** - Line ending and export management
 
 ### Git Hooks & Commits
+
 - **`commitlint.config.ts`** - Conventional commit validation
 - **`.pre-commit-config.yaml`** - Pre-commit framework hooks
 - **`.husky/pre-commit`** - Lint before commit
@@ -28,14 +32,17 @@ Quick reference guide to all configuration files in the Mirage Media Scape proje
 - **`.husky/prepare-commit-msg`** - Message preparation
 
 ### Security & DevOps
+
 - **`security.yaml`** - Security headers and CORS settings
 - **`sonar-project.properties`** - SonarQube analysis configuration
 - **`.dockerlintrc.json`** - Docker linting rules
 
 ### Environment
+
 - **`.env.example`** - Root environment variables template
 
 ### Testing
+
 - **`.jestrc.json`** - Jest configuration
 
 ## 🎨 Frontend Configuration
@@ -63,6 +70,7 @@ Located in `/server/`:
 Located in `.github/`:
 
 ### Workflows Directory (`.github/workflows/`)
+
 - **`main.yml`** - Main CI/CD pipeline (enhanced)
   - Quality checks
   - Build jobs
@@ -70,10 +78,10 @@ Located in `.github/`:
   - Security scanning
   - Docker building
   - Dependency checking
-  
 - **`codeql.yml`** - CodeQL security analysis
 
 ### GitHub Config (`.github/`)
+
 - **`dependabot.yml`** - Automated dependency updates
 
 ## 🔍 VS Code Configuration
@@ -93,6 +101,7 @@ Located in `/docs/`:
 - **`CODE_OF_CONDUCT.md`** - Community code of conduct
 
 ### Root Level
+
 - **`CONFIG_ENHANCEMENTS_SUMMARY.md`** - This enhancement summary
 - **`CONFIGURATION_INDEX.md`** - This file
 
@@ -187,13 +196,13 @@ git push origin feature-branch
 
 ## 📖 Documentation Guide
 
-| Document | Purpose |
-|----------|---------|
+| Document                         | Purpose                      |
+| -------------------------------- | ---------------------------- |
 | `CONFIG_ENHANCEMENTS_SUMMARY.md` | Overview of all enhancements |
-| `CONFIGURATION_INDEX.md` | This file - quick reference |
-| `docs/DEVOPS_CONFIG.md` | Detailed DevOps setup guide |
-| `docs/CONTRIBUTING.md` | How to contribute |
-| `docs/CODE_OF_CONDUCT.md` | Community standards |
+| `CONFIGURATION_INDEX.md`         | This file - quick reference  |
+| `docs/DEVOPS_CONFIG.md`          | Detailed DevOps setup guide  |
+| `docs/CONTRIBUTING.md`           | How to contribute            |
+| `docs/CODE_OF_CONDUCT.md`        | Community standards          |
 
 ## 🔗 Key Links
 

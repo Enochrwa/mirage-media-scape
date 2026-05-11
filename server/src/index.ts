@@ -1,60 +1,50 @@
 import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import db from './db';
-import { scannerService } from './services/scanner';
-import scannerRouter from './routes/scanner';
+
 import tracksRouter from './routes/tracks';
+import scannerRouter, { setIo } from './routes/scanner';
 import playlistsRouter from './routes/playlists';
 import statsRouter from './routes/stats';
-import subtitlesRouter from './routes/subtitles';
 import radioRouter from './routes/radio';
+import subtitlesRouter from './routes/subtitles';
+
 import { LocalSyncServer } from './services/LocalSyncServer';
 import { RemoteControlServer } from './services/RemoteControlServer';
 
 dotenv.config();
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: '*' },
 });
 
-scannerService.setIo(io);
-scannerService.init();
-
-const syncServer = new LocalSyncServer();
-const remoteServer = new RemoteControlServer();
+setIo(io);
 
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/scanner', scannerRouter);
+// Initialize services
+new LocalSyncServer(8766);
+new RemoteControlServer(8765);
+
+// Routes
 app.use('/api/tracks', tracksRouter);
-app.use('/api/playlists/smart', playlistsRouter);
+app.use('/api/scanner', scannerRouter);
+app.use('/api/playlists', playlistsRouter);
 app.use('/api/stats', statsRouter);
-app.use('/api/subtitles', subtitlesRouter);
 app.use('/api/radio', radioRouter);
+app.use('/api/subtitles', subtitlesRouter);
+
+// Serve covers
+app.use('/api/covers', express.static(path.join(__dirname, '../cache/covers')));
 
 const PORT = process.env.PORT || 3001;
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', db: db.name });
-});
-
-io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
-
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-    });
-});
-
-server.listen(PORT, () => {
-    console.log(`Sonic Server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`Sonic Server running on port ${PORT}`);
 });

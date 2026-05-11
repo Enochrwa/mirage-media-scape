@@ -7,7 +7,7 @@ const dbPath = path.resolve(__dirname, '../../sonic.db');
 // Ensure the directory exists
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
 const db = new Database(dbPath);

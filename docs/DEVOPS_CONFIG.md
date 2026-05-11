@@ -17,55 +17,55 @@ This document provides a comprehensive guide to the DevOps setup and configurati
 
 ### Root Level
 
-| File | Purpose |
-|------|---------|
-| `.editorconfig` | Editor configuration for consistent formatting across all files |
-| `.npmrc` | NPM package manager configuration |
-| `.nvmrc` | Node.js version specification |
-| `.gitattributes` | Git attributes for line ending management |
-| `.gitignore` | Files to ignore in git commits |
-| `.prettierrc` | Code formatter configuration |
-| `.prettierignore` | Files to exclude from prettier formatting |
-| `commitlint.config.ts` | Commit message validation rules |
-| `renovate.json` | Automated dependency update configuration |
-| `security.yaml` | Security headers and CORS configuration |
-| `.pre-commit-config.yaml` | Pre-commit hooks for local git operations |
+| File                      | Purpose                                                         |
+| ------------------------- | --------------------------------------------------------------- |
+| `.editorconfig`           | Editor configuration for consistent formatting across all files |
+| `.npmrc`                  | NPM package manager configuration                               |
+| `.nvmrc`                  | Node.js version specification                                   |
+| `.gitattributes`          | Git attributes for line ending management                       |
+| `.gitignore`              | Files to ignore in git commits                                  |
+| `.prettierrc`             | Code formatter configuration                                    |
+| `.prettierignore`         | Files to exclude from prettier formatting                       |
+| `commitlint.config.ts`    | Commit message validation rules                                 |
+| `renovate.json`           | Automated dependency update configuration                       |
+| `security.yaml`           | Security headers and CORS configuration                         |
+| `.pre-commit-config.yaml` | Pre-commit hooks for local git operations                       |
 
 ### Frontend
 
-| File | Purpose |
-|------|---------|
-| `.prettierrc` | Prettier configuration (inherited from root) |
-| `.prettierignore` | Files to exclude from prettier formatting |
-| `.lintstagedrc.json` | Lint-staged configuration for staged files |
-| `.stylelintrc.json` | Stylelint configuration for CSS linting |
-| `.env.example` | Environment variables template |
-| `eslint.config.js` | ESLint configuration for TypeScript/TSX |
+| File                 | Purpose                                      |
+| -------------------- | -------------------------------------------- |
+| `.prettierrc`        | Prettier configuration (inherited from root) |
+| `.prettierignore`    | Files to exclude from prettier formatting    |
+| `.lintstagedrc.json` | Lint-staged configuration for staged files   |
+| `.stylelintrc.json`  | Stylelint configuration for CSS linting      |
+| `.env.example`       | Environment variables template               |
+| `eslint.config.js`   | ESLint configuration for TypeScript/TSX      |
 
 ### Server
 
-| File | Purpose |
-|------|---------|
-| `eslint.config.js` | ESLint configuration for Node.js backend |
-| `.prettierrc` | Prettier configuration |
-| `.lintstagedrc.json` | Lint-staged configuration |
-| `.env.example` | Environment variables template |
+| File                 | Purpose                                  |
+| -------------------- | ---------------------------------------- |
+| `eslint.config.js`   | ESLint configuration for Node.js backend |
+| `.prettierrc`        | Prettier configuration                   |
+| `.lintstagedrc.json` | Lint-staged configuration                |
+| `.env.example`       | Environment variables template           |
 
 ### CI/CD
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `main.yml` | `.github/workflows/` | Main CI/CD pipeline |
-| `codeql.yml` | `.github/workflows/` | Security scanning with CodeQL |
-| `dependabot.yml` | `.github/` | Automated dependency updates |
+| File             | Location             | Purpose                       |
+| ---------------- | -------------------- | ----------------------------- |
+| `main.yml`       | `.github/workflows/` | Main CI/CD pipeline           |
+| `codeql.yml`     | `.github/workflows/` | Security scanning with CodeQL |
+| `dependabot.yml` | `.github/`           | Automated dependency updates  |
 
 ### VS Code Configuration
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `settings.json` | `.vscode/` | VS Code workspace settings |
-| `extensions.json` | `.vscode/` | Recommended extensions |
-| `launch.json` | `.vscode/` | Debug configurations |
+| File              | Location   | Purpose                    |
+| ----------------- | ---------- | -------------------------- |
+| `settings.json`   | `.vscode/` | VS Code workspace settings |
+| `extensions.json` | `.vscode/` | Recommended extensions     |
+| `launch.json`     | `.vscode/` | Debug configurations       |
 
 ## Development Setup
 
@@ -129,6 +129,7 @@ The following hooks are configured:
 The `main.yml` workflow includes the following jobs:
 
 #### 1. Quality (Code Quality & Linting)
+
 - Runs on: Python 20, 22
 - Tasks:
   - Frontend formatting check
@@ -138,6 +139,7 @@ The `main.yml` workflow includes the following jobs:
   - Security audit
 
 #### 2. Build (Build & Test)
+
 - Runs after quality job
 - Tasks:
   - Frontend build
@@ -145,23 +147,27 @@ The `main.yml` workflow includes the following jobs:
   - Artifact upload
 
 #### 3. Test (Unit Tests)
+
 - Runs after quality job
 - Tasks:
   - Server test suite execution
   - Coverage report upload to Codecov
 
 #### 4. Security (Security Checks)
+
 - Tasks:
   - NPM audit
   - Snyk vulnerability scanning
 
 #### 5. Docker (Docker Build)
+
 - Runs only on main branch
 - Tasks:
   - Docker image build
   - Push to GitHub Container Registry
 
 #### 6. Dependency Check
+
 - Tasks:
   - Check for outdated dependencies
   - Validate package-lock.json
@@ -169,6 +175,7 @@ The `main.yml` workflow includes the following jobs:
 ### Triggering Workflows
 
 Workflows are triggered on:
+
 - `push` to main, develop, staging branches
 - `pull_request` to main, develop, staging branches
 - Manual `workflow_dispatch`
@@ -195,11 +202,13 @@ indent_size = 2
 ### ESLint Configuration
 
 **Frontend** (`frontend/eslint.config.js`):
+
 - Uses TypeScript ESLint parser
 - React hooks and refresh plugins
 - Tailwind CSS support
 
 **Server** (`server/eslint.config.js`):
+
 - Node.js environment
 - TypeScript strict mode
 - Jest test environment
@@ -207,6 +216,7 @@ indent_size = 2
 ### Prettier Configuration
 
 Consistent code formatting across all files:
+
 - 2-space indentation
 - Single quotes
 - 100-character line width
@@ -215,6 +225,7 @@ Consistent code formatting across all files:
 ### Stylelint Configuration
 
 Frontend CSS/SCSS linting:
+
 - Standard stylelint rules
 - Tailwind CSS compatibility
 - Prettier integration
@@ -254,6 +265,7 @@ Located in `.husky/` directory:
 ### Renovate
 
 Automated dependency updates via `renovate.json`:
+
 - Weekly updates for minor/patch versions
 - Monthly updates for major versions
 - Auto-merge disabled
@@ -262,6 +274,7 @@ Automated dependency updates via `renovate.json`:
 ### Pre-Commit Framework
 
 The `.pre-commit-config.yaml` includes:
+
 - Trailing whitespace removal
 - YAML, JSON formatting
 - ESLint enforcement
@@ -296,6 +309,7 @@ docker-compose down
 ### Multi-Stage Build
 
 The Dockerfile uses a multi-stage build:
+
 1. **Builder stage**: Installs dependencies and builds frontend/server
 2. **Runtime stage**: Lean production image with FFmpeg
 

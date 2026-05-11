@@ -210,6 +210,7 @@ All commits must follow the [Conventional Commits](https://www.conventionalcommi
 ### Type
 
 Must be one of:
+
 - **feat**: A new feature
 - **fix**: A bug fix
 - **docs**: Documentation only changes
@@ -225,6 +226,7 @@ Must be one of:
 ### Scope
 
 Optional. Examples:
+
 - `feat(auth): add login functionality`
 - `fix(player): resolve audio sync issue`
 - `docs(api): update endpoint documentation`
@@ -241,6 +243,7 @@ Optional. Examples:
 ### Body
 
 Optional but recommended:
+
 - Explain what and why, not how
 - Wrap at 72 characters
 - Add blank line before body
@@ -272,12 +275,14 @@ Fixes #512
 ### Before Submitting
 
 1. **Update your branch**
+
    ```bash
    git fetch upstream
    git rebase upstream/main
    ```
 
 2. **Run all checks**
+
    ```bash
    npm run lint
    npm run type-check
@@ -292,6 +297,7 @@ Fixes #512
 ### Submission
 
 1. **Push to your fork**
+
    ```bash
    git push origin feat/your-feature-name
    ```
@@ -306,18 +312,22 @@ Fixes #512
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 How was this tested?
 
 ## Checklist
+
 - [ ] Code follows project style guidelines
 - [ ] Tests added/updated
 - [ ] Documentation updated
@@ -325,6 +335,7 @@ How was this tested?
 - [ ] Changes reviewed for security issues
 
 ## Related Issues
+
 Fixes #(issue number)
 ```
 
@@ -433,6 +444,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 ### Changelog
 
 Add entry to relevant section:
+
 - **Added** - New features
 - **Changed** - Changes to existing functionality
 - **Deprecated** - Soon-to-be removed features

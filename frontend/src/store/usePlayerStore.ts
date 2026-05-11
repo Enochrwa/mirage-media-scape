@@ -77,7 +77,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         const response = await fetch(file.file);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await playbackEngine.ctx.decodeAudioData(arrayBuffer);
-        playbackEngine.play(audioBuffer, 0, file.loudness, file.id);
+        playbackEngine.play(audioBuffer, 0, file.loudness ?? undefined, file.id);
       } catch (error) {
         console.error('Playback Engine Error:', error);
         playbackEngine.setState('ERROR');
