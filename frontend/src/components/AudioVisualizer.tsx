@@ -158,7 +158,9 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         height={responsive ? 400 : 200}
         className="h-full w-full cursor-pointer"
         onClick={() => {
-          const idx = allVisualizerTypes.indexOf(currentType as typeof allVisualizerTypes[number]);
+          const idx = allVisualizerTypes.indexOf(
+            currentType as (typeof allVisualizerTypes)[number],
+          );
           setCurrentType(allVisualizerTypes[(idx + 1) % allVisualizerTypes.length]);
         }}
       />

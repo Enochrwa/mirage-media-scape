@@ -16,6 +16,16 @@ const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
+function columnNames(table: string): Set<string> {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return new Set(rows.map((r) => r.name));
+}
+
+function ensureColumn(table: string, column: string, sqlType: string) {
+  if (columnNames(table).has(column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`);
+}
+
 // Initialize schema
 db.exec(`
     CREATE TABLE IF NOT EXISTS tracks (
@@ -41,12 +51,17 @@ db.exec(`
         cover_cache_path TEXT,
         thumbnail_path TEXT,
         missing INTEGER DEFAULT 0,
-        metadata_json TEXT
+        metadata_json TEXT,
+        rating INTEGER DEFAULT 0,
+        play_count INTEGER DEFAULT 0,
+        file_type TEXT,
+        waveform_data TEXT
     );
 
     CREATE TABLE IF NOT EXISTS watched_folders (
         path TEXT PRIMARY KEY,
-        added_at INTEGER NOT NULL
+        added_at INTEGER NOT NULL,
+        auto_discovered INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS playlists (
@@ -137,5 +152,12 @@ db.exec(`
         VALUES (new.id, new.title, new.artist, new.album, new.genre);
     END;
 `);
+
+// Additive migrations for databases created before newer columns existed
+ensureColumn('tracks', 'rating', 'INTEGER DEFAULT 0');
+ensureColumn('tracks', 'play_count', 'INTEGER DEFAULT 0');
+ensureColumn('tracks', 'file_type', 'TEXT');
+ensureColumn('tracks', 'waveform_data', 'TEXT');
+ensureColumn('watched_folders', 'auto_discovered', 'INTEGER DEFAULT 0');
 
 export default db;

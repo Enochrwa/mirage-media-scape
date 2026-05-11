@@ -22,6 +22,10 @@ export interface Track {
   thumbnail_path?: string;
   missing: number;
   metadata_json?: string;
+  rating?: number;
+  play_count?: number;
+  file_type?: string;
+  waveform_data?: string;
 }
 
 export interface Setting {

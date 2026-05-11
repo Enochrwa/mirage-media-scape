@@ -49,8 +49,13 @@ export class ScannerService {
     }
   }
 
-  async addFolder(directory: string) {
-    db.prepare('INSERT OR IGNORE INTO watched_folders (path, added_at) VALUES (?, ?)').run(directory, Date.now());
+  async addFolder(directory: string, options?: { autoDiscovered?: boolean }) {
+    const auto = options?.autoDiscovered ? 1 : 0;
+    db.prepare('INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, ?)').run(
+      directory,
+      Date.now(),
+      auto,
+    );
     await this.scan([directory]);
   }
 

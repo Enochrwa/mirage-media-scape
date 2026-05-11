@@ -144,10 +144,31 @@ export class PlaybackEngine {
     this.eq = new ParametricEQ(this.ctx);
     this.abLoop = new ABLoop();
 
-    // Chain construction based on canonical order:
-    // Source → EQ Chain (5 BiquadFilterNodes) → ReplayGain (normalizationGain)
-    // → Master Volume (masterGain) → Crossfade (current/nextGainNode handled in play)
-    // → Analyser (tap-only) → Spatial Panner → Night Compressor → Destination
+    // ═══════════════════════════════════════════════════════════
+    // zovyra AUDIO GRAPH — CANONICAL CHAIN (insert all nodes here)
+    // ═══════════════════════════════════════════════════════════
+    //
+    // MediaSource / AudioBufferSource
+    //   → Pre-Gain (GainNode) ─────────────── input normalization
+    //   → EQ Band 1: Low Shelf   80 Hz  ─┐
+    //   → EQ Band 2: Peak       250 Hz   │── 5-band parametric EQ
+    //   → EQ Band 3: Peak      1000 Hz   │   (BiquadFilterNodes)
+    //   → EQ Band 4: Peak      4000 Hz   │
+    //   → EQ Band 5: High Shelf 12 kHz ──┘
+    //   → ReplayGain (GainNode) ─────────── loudness normalization
+    //   → Crossfade (GainNode) ──────────── track transition fades
+    //   → Analyser (AnalyserNode) ───────── tap only, no signal change
+    //   → Bass Enhancer (WaveShaperNode) ── bypassable harmonic exciter
+    //   → Spatial Panner (PannerNode) ───── HRTF, bypassable
+    //   → Night Compressor (DynamicsCompressorNode) ── bypassable
+    //   → Master Volume (GainNode)
+    //   → Destination
+    //
+    // ═══════════════════════════════════════════════════════════
+    //
+    // Current wiring (extend toward the diagram above; do not branch to destination):
+    // currentGainNode + nextGainNode → normalizationGain (ReplayGain placeholder)
+    // → EQ chain → masterGain → analyser → panner → compressor → destination
 
     this.currentGainNode.connect(this.normalizationGain);
     this.nextGainNode.connect(this.normalizationGain);
@@ -320,7 +341,9 @@ export class PlaybackEngine {
     if (this.nextSource) {
       try {
         this.nextSource.stop();
-      } catch (e) { /* ignored */ }
+      } catch (e) {
+        /* ignored */
+      }
     }
 
     const source = this.ctx.createBufferSource();
@@ -344,7 +367,9 @@ export class PlaybackEngine {
         if (this.currentSource) {
           try {
             this.currentSource.stop();
-          } catch (e) { /* ignored */ }
+          } catch (e) {
+            /* ignored */
+          }
         }
         this.currentSource = this.nextSource;
         this.nextSource = null;
@@ -383,7 +408,9 @@ export class PlaybackEngine {
       if (this.currentSource) {
         try {
           this.currentSource.stop();
-        } catch (e) { /* ignored */ }
+        } catch (e) {
+          /* ignored */
+        }
       }
       this.currentSource = nextSource;
 
@@ -409,13 +436,17 @@ export class PlaybackEngine {
     if (this.currentSource) {
       try {
         this.currentSource.stop();
-      } catch (e) { /* ignored */ }
+      } catch (e) {
+        /* ignored */
+      }
       this.currentSource = null;
     }
     if (this.nextSource) {
       try {
         this.nextSource.stop();
-      } catch (e) { /* ignored */ }
+      } catch (e) {
+        /* ignored */
+      }
       this.nextSource = null;
     }
 
@@ -473,9 +504,12 @@ export class PlaybackEngine {
     }
 
     if (minutes > 0) {
-      this.sleepTimerTimeout = setTimeout(() => {
-        this.pause();
-      }, minutes * 60 * 1000);
+      this.sleepTimerTimeout = setTimeout(
+        () => {
+          this.pause();
+        },
+        minutes * 60 * 1000,
+      );
     }
   }
 }

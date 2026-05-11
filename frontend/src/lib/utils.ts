@@ -14,6 +14,16 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+/** Wall-clock style for video badges (always includes hours). */
+export function formatVideoClock(seconds: number): string {
+  if (isNaN(seconds) || seconds === Infinity) return '0:00:00';
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
 export interface SubtitleCue {
   start: number;
   end: number;

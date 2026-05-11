@@ -14,6 +14,7 @@ import subtitlesRouter from './routes/subtitles';
 
 import { LocalSyncServer } from './services/LocalSyncServer';
 import { RemoteControlServer } from './services/RemoteControlServer';
+import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/LibraryWatcher';
 
 dotenv.config();
 
@@ -24,6 +25,8 @@ const io = new Server(httpServer, {
 });
 
 setIo(io);
+setLibraryWatcherIo(io);
+refreshLibraryWatcherPaths();
 
 app.use(cors());
 app.use(express.json());

@@ -60,9 +60,11 @@ const SpatialAudioControls: React.FC = () => {
 
     const DeviceOrientation = window.DeviceOrientationEvent;
     if (DeviceOrientation && 'requestPermission' in DeviceOrientation) {
-      void (DeviceOrientation as typeof DeviceOrientationEvent & {
-        requestPermission?: () => Promise<PermissionState>;
-      }).requestPermission?.();
+      void (
+        DeviceOrientation as typeof DeviceOrientationEvent & {
+          requestPermission?: () => Promise<PermissionState>;
+        }
+      ).requestPermission?.();
     }
 
     window.addEventListener('deviceorientation', handleOrientation);
