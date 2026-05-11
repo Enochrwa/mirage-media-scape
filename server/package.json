@@ -22,7 +22,7 @@
     "express": "^4.21.2",
     "multicast-dns": "^7.2.5",
     "socket.io": "^4.8.1",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
