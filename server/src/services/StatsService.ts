@@ -50,21 +50,27 @@ export class StatsService {
     }
 
     static getStats() {
-        const totalPlays = db.prepare('SELECT COUNT(*) as count FROM play_events WHERE completed = 1 OR position > 30').get() as any;
-        const totalTime = db.prepare('SELECT SUM(position) as time FROM play_events').get() as any;
-        const topArtist = db.prepare(`
+        const totalPlays = db
+            .prepare('SELECT COUNT(*) as count FROM play_events WHERE completed = 1 OR position > 30')
+            .get() as { count: number } | undefined;
+        const totalTime = db.prepare('SELECT SUM(position) as time FROM play_events').get() as { time: number | null } | undefined;
+        const topArtist = db
+            .prepare(
+                `
             SELECT artist, COUNT(*) as count
             FROM tracks t
             JOIN play_events e ON t.id = e.track_id
             GROUP BY artist
             ORDER BY count DESC
             LIMIT 1
-        `).get() as any;
+        `,
+            )
+            .get() as { artist: string | null; count: number } | undefined;
 
         return {
-            totalPlays: totalPlays.count,
-            totalTimeSeconds: totalTime.time || 0,
-            topArtist: topArtist?.artist || 'None'
+            totalPlays: totalPlays?.count ?? 0,
+            totalTimeSeconds: totalTime?.time ?? 0,
+            topArtist: topArtist?.artist ?? 'None',
         };
     }
 }

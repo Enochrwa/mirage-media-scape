@@ -1,5 +1,10 @@
+import { createRequire } from 'node:module';
 import db from '../db';
-const native = require('../../zovyra-native.node');
+
+const requireNative = createRequire(__filename);
+const native = requireNative('../../zovyra-native.node') as {
+  generateFingerprint: (path: string) => { fingerprint: string; duration: number };
+};
 
 interface AcoustIDResult {
   title: string;

@@ -1,7 +1,12 @@
+import { createRequire } from 'node:module';
 import { Router } from 'express';
-import { SubtitleTrackInfo } from '../zovyra-native';
+import { SubtitleTrackInfo } from '../../zovyra-native';
 
-const native = require('../../zovyra-native.node');
+const requireNative = createRequire(__filename);
+const native = requireNative('../../zovyra-native.node') as {
+  get_subtitle_tracks: (path: string) => SubtitleTrackInfo[];
+  extract_subtitle_stream: (path: string, index: number) => string;
+};
 
 export interface SubtitleCue {
   start: number;

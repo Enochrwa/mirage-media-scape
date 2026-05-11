@@ -3,10 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
-import { TrackMetadata, AudioMetadata } from '../zovyra-native';
+import { createRequire } from 'node:module';
+import { TrackMetadata, AudioMetadata } from '../../zovyra-native';
 import { Track } from '../types/database';
 
-const native = require('../../zovyra-native.node');
+const requireNative = createRequire(__filename);
+const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 const { dbPath, folders, coversDir } = workerData;
 const db = new Database(dbPath);

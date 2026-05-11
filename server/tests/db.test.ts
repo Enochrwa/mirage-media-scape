@@ -2,9 +2,9 @@ import db from '../src/db';
 
 describe('Database', () => {
     it('should have initialized the tracks table', () => {
-        const tableInfo = db.prepare("PRAGMA table_info(tracks)").all();
+        const tableInfo = db.prepare("PRAGMA table_info(tracks)").all() as { name: string }[];
         expect(tableInfo.length).toBeGreaterThan(0);
-        const columnNames = tableInfo.map((c: any) => c.name);
+        const columnNames = tableInfo.map((c) => c.name);
         expect(columnNames).toContain('file_path');
         expect(columnNames).toContain('mtime');
         expect(columnNames).toContain('loudness');

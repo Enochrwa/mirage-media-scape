@@ -1,14 +1,24 @@
 import { Request, Response } from 'express';
 import db from '../db';
-import { SmartPlaylistService } from '../services/SmartPlaylistService';
+import { SmartPlaylistService, type SmartPlaylistRules } from '../services/SmartPlaylistService';
 import crypto from 'crypto';
 
+interface SmartPlaylistRow {
+    id: string;
+    name: string;
+    definition: string;
+    created_at: number;
+    updated_at: number;
+}
+
 export const getAllSmartPlaylists = (req: Request, res: Response) => {
-    const playlists = db.prepare('SELECT * FROM smart_playlists ORDER BY name ASC').all();
-    res.json(playlists.map((p: any) => ({
-        ...p,
-        definition: JSON.parse(p.definition)
-    })));
+    const playlists = db.prepare('SELECT * FROM smart_playlists ORDER BY name ASC').all() as SmartPlaylistRow[];
+    res.json(
+        playlists.map((p) => ({
+            ...p,
+            definition: JSON.parse(p.definition) as SmartPlaylistRules,
+        })),
+    );
 };
 
 export const createSmartPlaylist = (req: Request, res: Response) => {

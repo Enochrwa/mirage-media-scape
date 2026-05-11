@@ -1,23 +1,17 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import prettier from 'eslint-config-prettier';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
-export default [
-  {
-    ignores: ['dist', 'node_modules'],
-  },
+export default tseslint.config(
+  { ignores: ['dist', 'node_modules', 'src/routes/waveform-worker.js'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        sourceType: 'module',
-        ecmaVersion: 2020,
-      },
       globals: {
-        node: true,
+        ...globals.node,
       },
     },
     rules: {
@@ -28,10 +22,9 @@ export default [
           caughtErrorsIgnorePattern: '^_',
         },
       ],
-      '@typescript-eslint/explicit-function-return-types': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      'no-console': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
+      'no-console': 'off',
     },
   },
-  prettier,
-];
+  eslintConfigPrettier,
+);

@@ -19,8 +19,16 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'react-refresh/only-export-components': [
+        'warn',
+        {
+          allowConstantExport: true,
+          // shadcn/ui: components share barrel exports with hooks / re-exports / cva helpers
+          allowExportNames: ['useSidebar', 'toast', 'toggleVariants'],
+        },
+      ],
       '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
 );

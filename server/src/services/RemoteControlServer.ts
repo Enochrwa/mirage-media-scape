@@ -41,7 +41,7 @@ export class RemoteControlServer {
         });
     }
 
-    private broadcast(clients: Set<WebSocket>, msg: any) {
+    private broadcast(clients: Set<WebSocket>, msg: unknown) {
         const data = JSON.stringify(msg);
         clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import db from '../db';
 import { Track } from '../types/database';
 
@@ -5,9 +6,11 @@ interface NativeModule {
   generateWaveformFingerprint: (path: string) => string;
 }
 
+const requireNative = createRequire(__filename);
+
 let native: NativeModule;
 try {
-  native = require('../../zovyra-native.node');
+  native = requireNative('../../zovyra-native.node') as NativeModule;
 } catch {
   native = {
     generateWaveformFingerprint: () => '0'.repeat(64),
