@@ -28,24 +28,70 @@ interface HistoryEntry {
   started_at: string;
 }
 
+interface HeatmapEntry {
+  day: string;
+  hour: string;
+  count: number;
+}
+
+const Heatmap: React.FC<{ data: HeatmapEntry[] }> = ({ data }) => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[600px] space-y-2">
+        <div className="flex">
+            <div className="w-10" />
+            {hours.map(h => (
+                <div key={h} className="flex-1 text-[8px] text-zinc-500 text-center">{h}</div>
+            ))}
+        </div>
+        {days.map((day, di) => (
+          <div key={day} className="flex items-center gap-1">
+            <div className="w-10 text-[10px] font-bold text-zinc-400">{day}</div>
+            {hours.map(hour => {
+              const entry = data.find(d => parseInt(d.day) === di && parseInt(d.hour) === hour);
+              const count = entry?.count || 0;
+              const intensity = count / maxCount;
+              return (
+                <div
+                  key={hour}
+                  className="h-4 flex-1 rounded-sm bg-purple-500"
+                  style={{ opacity: intensity > 0 ? 0.2 + intensity * 0.8 : 0.05 }}
+                  title={`${day} ${hour}:00 - ${count} plays`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const StatsPage = () => {
   const { playFile } = usePlayerStore();
   const [topTracks, setTopTracks] = useState<TopTrack[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [summary, setSummary] = useState<StatsSummary | null>(null);
+  const [heatmap, setHeatmap] = useState<HeatmapEntry[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [topRes, historyRes, summaryRes] = await Promise.all([
+        const [topRes, historyRes, summaryRes, heatmapRes] = await Promise.all([
           fetch(`${API_BASE}/api/stats/top-tracks`),
           fetch(`${API_BASE}/api/stats/history`),
           fetch(`${API_BASE}/api/stats/summary`),
+          fetch(`${API_BASE}/api/stats/heatmap`),
         ]);
 
         if (topRes.ok) setTopTracks((await topRes.json()) as TopTrack[]);
         if (historyRes.ok) setHistory((await historyRes.json()) as HistoryEntry[]);
         if (summaryRes.ok) setSummary((await summaryRes.json()) as StatsSummary);
+        if (heatmapRes.ok) setHeatmap((await heatmapRes.json()) as HeatmapEntry[]);
       } catch (e) {
         console.error('Failed to fetch stats', e);
       }
@@ -107,6 +153,16 @@ const StatsPage = () => {
               </div>
             </Card>
           </div>
+        )}
+
+        {heatmap.length > 0 && (
+          <Card className="border-white/10 bg-zinc-900/50 p-6">
+            <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
+              <History className="text-purple-400" />
+              Listening Activity
+            </h2>
+            <Heatmap data={heatmap} />
+          </Card>
         )}
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">

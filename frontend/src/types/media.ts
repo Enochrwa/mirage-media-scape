@@ -29,6 +29,7 @@ export interface MediaFile {
   width?: number;
   height?: number;
   waveform_data?: string;
+  metadata_json?: string;
   color?: string;
 }
 

@@ -32,11 +32,20 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   }, [artist, title]);
 
   useEffect(() => {
-    // Find active lyric index
-    const index = lyrics.findIndex((line, i) => {
-      const nextLine = lyrics[i + 1];
-      return currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
-    });
+    // Binary search for active lyric index
+    let low = 0;
+    let high = lyrics.length - 1;
+    let index = -1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (lyrics[mid].time <= currentTime) {
+        index = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
 
     if (index !== -1 && index !== activeIndex) {
       setActiveIndex(index);
@@ -71,7 +80,24 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             // Logic to seek could go here if needed, via context
           }}
         >
-          {line.text}
+          {line.words ? (
+            line.words.map((word, wi) => {
+              const isWordActive = currentTime >= word.time;
+              return (
+                <span
+                  key={wi}
+                  className={cn(
+                    'mr-2 transition-colors duration-200',
+                    isWordActive ? 'text-white' : 'text-zinc-600'
+                  )}
+                >
+                  {word.text}
+                </span>
+              );
+            })
+          ) : (
+            line.text
+          )}
         </div>
       ))}
     </div>

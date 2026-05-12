@@ -24,6 +24,13 @@ const SubtitleManager: React.FC = () => {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
 
+  const [settings, setSettings] = useState({
+    fontSize: 24,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    offset: 0,
+  });
+
   useEffect(() => {
     if (!currentFile || currentFile.type !== 'video') return;
 
@@ -68,8 +75,18 @@ const SubtitleManager: React.FC = () => {
   return (
     <>
       {activeCue && (
-        <div className="pointer-events-none absolute bottom-[8%] left-1/2 z-50 -translate-x-1/2 text-center">
-          <span className="rounded border border-white/10 bg-black/60 px-3 py-1 text-xl text-white shadow-lg">
+        <div
+          className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 text-center"
+          style={{ bottom: `${8 + settings.offset}%` }}
+        >
+          <span
+            className="rounded border border-white/10 px-3 py-1 shadow-lg whitespace-pre-wrap"
+            style={{
+              fontSize: `${settings.fontSize}px`,
+              color: settings.color,
+              backgroundColor: settings.backgroundColor,
+            }}
+          >
             {activeCue.text}
           </span>
         </div>

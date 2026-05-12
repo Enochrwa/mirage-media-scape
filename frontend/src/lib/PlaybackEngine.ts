@@ -38,10 +38,10 @@ export class ParametricEQ {
     const totalMag = new Float32Array(frequencies.length).fill(1);
     const magResponse = new Float32Array(frequencies.length);
     const phaseResponse = new Float32Array(frequencies.length);
-    const freqArg = frequencies as Float32Array<ArrayBuffer>;
 
     for (const band of this.bands) {
-      band.getFrequencyResponse(freqArg, magResponse, phaseResponse);
+      // @ts-expect-error - Float32Array type mismatch with older AudioContext definitions
+      band.getFrequencyResponse(frequencies, magResponse, phaseResponse);
       for (let i = 0; i < frequencies.length; i++) {
         totalMag[i] *= magResponse[i];
       }
@@ -94,6 +94,9 @@ interface TrackChain {
   crossfade: GainNode;
 }
 
+export type NightModeLevel = 'off' | 'standard' | 'night';
+export type CrossfadeCurve = 'linear' | 'equal-power';
+
 export class PlaybackEngine {
   public ctx: AudioContext;
   private state: PlaybackState = 'IDLE';
@@ -111,18 +114,20 @@ export class PlaybackEngine {
   private bassEnhancer: WaveShaperNode;
   private panner: PannerNode;
   private nightCompressor: DynamicsCompressorNode;
+  private nightMakeupGain: GainNode;
   private masterGain: GainNode;
 
   public abLoop: ABLoop;
   private spatialAudioEnabled: boolean = false;
   private pitchLockEnabled: boolean = false;
   private bassEnhancerEnabled: boolean = false;
-  private nightModeEnabled: boolean = false;
+  private nightModeLevel: NightModeLevel = 'off';
 
   private nextStartTime: number = 0;
   private currentTrackId: string | null = null;
   private currentEventId: number | null = null;
   private fadeDuration: number = 2; // Default 2s crossfade
+  private crossfadeCurve: CrossfadeCurve = 'equal-power';
   public sleepTimer: SleepTimer | null = null;
   private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
 
@@ -164,6 +169,7 @@ export class PlaybackEngine {
     this.bassEnhancer = this.ctx.createWaveShaper();
     this.panner = this.ctx.createPanner();
     this.nightCompressor = this.ctx.createDynamicsCompressor();
+    this.nightMakeupGain = this.ctx.createGain();
     this.masterGain = this.ctx.createGain();
 
     this.analyser.fftSize = 2048;
@@ -175,14 +181,8 @@ export class PlaybackEngine {
     this.panner.rolloffFactor = 1;
 
     // Bass Enhancer curve (Soft-clip harmonic exciter)
-    this.bassEnhancer.curve = this.makeDistortionCurve(400);
-
-    // Night Compressor settings
-    this.nightCompressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
-    this.nightCompressor.knee.setValueAtTime(10, this.ctx.currentTime);
-    this.nightCompressor.ratio.setValueAtTime(12, this.ctx.currentTime);
-    this.nightCompressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
-    this.nightCompressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+    // @ts-expect-error - Float32Array type mismatch
+    this.bassEnhancer.curve = this.createBassExciterCurve(0.5);
 
     this.abLoop = new ABLoop();
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
@@ -248,24 +248,52 @@ export class PlaybackEngine {
       currentNode = this.panner;
     }
 
-    if (this.nightModeEnabled) {
+    if (this.nightModeLevel !== 'off') {
+      this.updateNightCompressorSettings();
       currentNode.connect(this.nightCompressor);
-      currentNode = this.nightCompressor;
+      this.nightCompressor.connect(this.nightMakeupGain);
+      currentNode = this.nightMakeupGain;
     }
 
     currentNode.connect(this.masterGain);
   }
 
-  private makeDistortionCurve(amount: number) {
-    const k = typeof amount === 'number' ? amount : 50;
+  private createBassExciterCurve(intensity: number): Float32Array {
+    // intensity: 0.0 to 1.0
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
-    const deg = Math.PI / 180;
-    for (let i = 0; i < n_samples; ++i) {
-      const x = (i * 2) / n_samples - 1;
-      curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+    const drive = 1.0 + intensity * 4.0; // 1x to 5x drive
+
+    for (let i = 0; i < n_samples; i++) {
+      const x = (i - 22050) / 22050; // -1 to 1
+      // Soft clip curve with even harmonic emphasis
+      const softClip = Math.tanh(x * drive) / Math.tanh(drive);
+      // Mix: blend between clean and saturated based on intensity
+      curve[i] = x * (1 - intensity * 0.5) + softClip * (intensity * 0.5);
     }
+
     return curve;
+  }
+
+  private updateNightCompressorSettings() {
+    const now = this.ctx.currentTime;
+    if (this.nightModeLevel === 'standard') {
+      this.nightCompressor.threshold.setTargetAtTime(-18, now, 0.1);
+      this.nightCompressor.knee.setTargetAtTime(8, now, 0.1);
+      this.nightCompressor.ratio.setTargetAtTime(4, now, 0.1);
+      this.nightCompressor.attack.setTargetAtTime(0.01, now, 0.1);
+      this.nightCompressor.release.setTargetAtTime(0.25, now, 0.1);
+      this.nightMakeupGain.gain.setTargetAtTime(1.0, now, 0.1);
+    } else if (this.nightModeLevel === 'night') {
+      this.nightCompressor.threshold.setTargetAtTime(-24, now, 0.1);
+      this.nightCompressor.knee.setTargetAtTime(10, now, 0.1);
+      this.nightCompressor.ratio.setTargetAtTime(12, now, 0.1);
+      this.nightCompressor.attack.setTargetAtTime(0.003, now, 0.1);
+      this.nightCompressor.release.setTargetAtTime(0.25, now, 0.1);
+      // makeup +2.5dB
+      const makeupGain = Math.pow(10, 2.5 / 20);
+      this.nightMakeupGain.gain.setTargetAtTime(makeupGain, now, 0.1);
+    }
   }
 
   setState(newState: PlaybackState) {
@@ -300,19 +328,62 @@ export class PlaybackEngine {
     return this.spatialAudioEnabled;
   }
 
-  setBassEnhancerEnabled(enabled: boolean) {
+  setBassEnhancerEnabled(enabled: boolean, intensity: number = 0.5) {
     this.bassEnhancerEnabled = enabled;
+    if (enabled) {
+      // @ts-expect-error - Float32Array type mismatch
+      this.bassEnhancer.curve = this.createBassExciterCurve(intensity);
+    }
+    this.updateChain();
+  }
+
+  setNightModeLevel(level: NightModeLevel) {
+    this.nightModeLevel = level;
     this.updateChain();
   }
 
   setNightModeEnabled(enabled: boolean) {
-    this.nightModeEnabled = enabled;
-    this.updateChain();
+    this.setNightModeLevel(enabled ? 'standard' : 'off');
   }
 
   setPitchLockEnabled(enabled: boolean) {
     this.pitchLockEnabled = enabled;
     this.updateChain();
+  }
+
+  setCrossfadeCurve(curve: CrossfadeCurve) {
+    this.crossfadeCurve = curve;
+  }
+
+  setPreGain(gain: number) {
+    const clamped = Math.max(0, Math.min(2.0, gain));
+    const now = this.ctx.currentTime;
+    this.chainA.preGain.gain.setTargetAtTime(clamped, now, 0.1);
+    this.chainB.preGain.gain.setTargetAtTime(clamped, now, 0.1);
+  }
+
+  async seek(time: number) {
+    if (!this.currentSource || !this.currentSource.buffer) return;
+
+    const buffer = this.currentSource.buffer;
+    // For simplicity, we just restart with new offset
+    this.play(buffer, time, undefined, this.currentTrackId || undefined);
+  }
+
+  async preview(time: number) {
+    if (!this.currentSource || !this.currentSource.buffer) return;
+    const buffer = this.currentSource.buffer;
+
+    const previewSource = this.ctx.createBufferSource();
+    previewSource.buffer = buffer;
+
+    const previewGain = this.ctx.createGain();
+    previewGain.gain.setValueAtTime(0.3, this.ctx.currentTime); // Lower volume for preview
+
+    previewSource.connect(previewGain);
+    previewGain.connect(this.masterGain);
+
+    previewSource.start(0, time, 0.3); // Play 300ms
   }
 
   setPlaybackSpeed(speed: number) {
@@ -473,6 +544,20 @@ export class PlaybackEngine {
     }
   }
 
+  private getFadeCurves(fadeOut: boolean): Float32Array {
+    const n = 64;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      if (fadeOut) {
+        curve[i] = this.crossfadeCurve === 'equal-power' ? Math.cos(t * Math.PI / 2) : 1 - t;
+      } else {
+        curve[i] = this.crossfadeCurve === 'equal-power' ? Math.sin(t * Math.PI / 2) : t;
+      }
+    }
+    return curve;
+  }
+
   queueNext(buffer: AudioBuffer, loudness?: number) {
     if (this.nextSource) {
       try {
@@ -497,12 +582,17 @@ export class PlaybackEngine {
 
     const fadeStart = this.nextStartTime - this.fadeDuration;
     const now = this.ctx.currentTime;
+    const startTime = Math.max(now, fadeStart);
 
-    currentChain.crossfade.gain.setValueAtTime(1, Math.max(now, fadeStart));
-    currentChain.crossfade.gain.linearRampToValueAtTime(0, this.nextStartTime);
-
-    nextChain.crossfade.gain.setValueAtTime(0, Math.max(now, fadeStart));
-    nextChain.crossfade.gain.linearRampToValueAtTime(1, this.nextStartTime);
+    if (this.crossfadeCurve === 'equal-power') {
+      currentChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(true), startTime, this.nextStartTime - startTime);
+      nextChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(false), startTime, this.nextStartTime - startTime);
+    } else {
+      currentChain.crossfade.gain.setValueAtTime(1, startTime);
+      currentChain.crossfade.gain.linearRampToValueAtTime(0, this.nextStartTime);
+      nextChain.crossfade.gain.setValueAtTime(0, startTime);
+      nextChain.crossfade.gain.linearRampToValueAtTime(1, this.nextStartTime);
+    }
 
     source.start(this.nextStartTime);
     this.nextSource = source;
@@ -540,16 +630,24 @@ export class PlaybackEngine {
     }
 
     // Fade out current
-    currentChain.crossfade.gain.setValueAtTime(currentChain.crossfade.gain.value, now);
-    currentChain.crossfade.gain.linearRampToValueAtTime(0, fadeOutEnd);
+    if (this.crossfadeCurve === 'equal-power') {
+      currentChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(true), now, this.fadeDuration);
+    } else {
+      currentChain.crossfade.gain.setValueAtTime(currentChain.crossfade.gain.value, now);
+      currentChain.crossfade.gain.linearRampToValueAtTime(0, fadeOutEnd);
+    }
 
     // Fade in next
     const nextSource = this.ctx.createBufferSource();
     nextSource.buffer = nextBuffer;
     nextSource.connect(nextChain.preGain);
 
-    nextChain.crossfade.gain.setValueAtTime(0, now);
-    nextChain.crossfade.gain.linearRampToValueAtTime(1, fadeOutEnd);
+    if (this.crossfadeCurve === 'equal-power') {
+      nextChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(false), now, this.fadeDuration);
+    } else {
+      nextChain.crossfade.gain.setValueAtTime(0, now);
+      nextChain.crossfade.gain.linearRampToValueAtTime(1, fadeOutEnd);
+    }
 
     nextSource.start(now);
 
@@ -624,9 +722,9 @@ export class PlaybackEngine {
     this.masterGain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
   }
 
-  applyReplayGain(loudness: number, chain?: TrackChain) {
+  applyReplayGain(loudness: number, chain?: TrackChain, preAmpDB: number = 0) {
     const targetLUFS = -14; // Spec says -14 LUFS target
-    const adjustment = targetLUFS - loudness;
+    const adjustment = targetLUFS - loudness + preAmpDB;
     const gainMultiplier = Math.pow(10, adjustment / 20);
 
     // Cap the gain to avoid extreme boosting

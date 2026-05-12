@@ -21,6 +21,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MoodDetector } from '@/components/MoodDetector';
 
 interface MediaCardProps {
   file: MediaFile;
@@ -93,6 +94,11 @@ const Home = () => {
         <div>
           <h1 className="mb-1 text-4xl font-bold tracking-tight">Welcome to Mirage</h1>
           <p className="text-muted-foreground">Your beautiful all-in-one media player</p>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="mb-4 text-xl font-bold tracking-tight text-white">How are you feeling?</h2>
+          <MoodDetector />
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
