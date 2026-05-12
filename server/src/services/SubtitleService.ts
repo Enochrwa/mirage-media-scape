@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
-const isESM = typeof import.meta !== 'undefined';
-const requireNative = createRequire(isESM ? import.meta.url : __filename);
+const isESM = typeof (global as any).importMeta !== 'undefined';
+const requireNative = createRequire((global as any).importMeta?.url || __filename);
 const native = requireNative('../../zovyra-native.node');
 
 export interface SubtitleCue {

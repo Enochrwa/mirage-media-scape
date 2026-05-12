@@ -19,6 +19,11 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isKaraokeMode, setIsKaraokeMode] = useState(true);
+
+  const handleLineClick = (time: number) => {
+    // In a real app we'd use the playback engine to seek
+    window.dispatchEvent(new CustomEvent('zovyra-seek', { detail: time }));
+  };
   const [showTranslation, setShowTranslation] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -101,10 +106,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     ? 'text-2xl font-semibold text-zinc-400 opacity-70'
                     : 'text-xl font-medium text-zinc-600 opacity-40'
                 )}
-                onClick={() => {
-                   // In a real app we'd use the playback engine to seek
-                   // window.dispatchEvent(new CustomEvent('zovyra-seek', { detail: line.time }));
-                }}
+                onClick={() => handleLineClick(line.time)}
                 onDoubleClick={() => {
                   if (isActive) setIsKaraokeMode(!isKaraokeMode);
                 }}

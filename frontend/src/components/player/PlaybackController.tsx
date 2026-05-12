@@ -14,6 +14,7 @@ import {
   Globe2,
   Activity,
   RotateCcw,
+  ChevronUp,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';

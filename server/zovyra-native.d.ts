@@ -57,6 +57,7 @@ export interface TrackMetadata {
   replaygainAlbumPeak?: number;
   lyrics?: string;
   syncedLyrics?: string;
+  dominantColor?: string;
 }
 export interface ScannedFile {
   path: string;

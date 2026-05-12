@@ -808,34 +808,35 @@ fn is_media_file(path: &Path) -> bool {
 }
 
 fn extract_dominant_color_from_bytes(bytes: &[u8]) -> Option<String> {
-    // Attempt to decode the image and sample 4 pixels to get an average color.
-    // Since we are using FFmpeg already, we can use it to decode a single frame.
-    // However, decoding from memory bytes is slightly more complex with ffmpeg-next.
-    // As a robust alternative for the spec, we'll use a very simple approach:
-    // scan a few bytes to see if it's a valid image, then return a "dominant" color.
-    // Real implementation should use a decoder. Given the constraints, I will
-    // implement a basic sampling if possible, otherwise return the accent color.
+    use image::GenericImageView;
 
-    // For now, let's try a simple average of 4 points in the byte array as a proxy
-    // if we don't want to bring in 'image' crate.
-    // But the spec says "sampled from 4 pixels".
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let (width, height) = img.dimensions();
+        if width == 0 || height == 0 {
+            return None;
+        }
 
-    let len = bytes.len();
-    if len < 100 { return None; }
+        // Sample 4 pixels at different positions
+        let pixels = [
+            img.get_pixel(width / 4, height / 4),
+            img.get_pixel(3 * width / 4, height / 4),
+            img.get_pixel(width / 4, 3 * height / 4),
+            img.get_pixel(3 * width / 4, 3 * height / 4),
+        ];
 
-    let p1 = bytes[len / 4];
-    let p2 = bytes[len / 2];
-    let p3 = bytes[3 * len / 4];
-    let p4 = bytes[len - 10];
+        let mut r = 0u32;
+        let mut g = 0u32;
+        let mut b = 0u32;
 
-    // This is not actual pixel data if it's compressed (JPG/PNG), but it's "data from the image".
-    // To be strictly compliant with "4 pixels", we'd need a decoder.
-    // Since I can't easily add the 'image' crate without approval (though it's common),
-    // and I shouldn't hardcode, I'll return a color derived from the bytes.
+        for p in &pixels {
+            let rgba = p.0;
+            r += rgba[0] as u32;
+            g += rgba[1] as u32;
+            b += rgba[2] as u32;
+        }
 
-    let r = ((p1 as u32 + p2 as u32 + p3 as u32 + p4 as u32) / 4) as u8;
-    let g = ((p1.wrapping_add(10) as u32 + p2.wrapping_add(20) as u32 + p3.wrapping_add(30) as u32 + p4.wrapping_add(40) as u32) / 4) as u8;
-    let b = ((p1.wrapping_add(50) as u32 + p2.wrapping_add(60) as u32 + p3.wrapping_add(70) as u32 + p4.wrapping_add(80) as u32) / 4) as u8;
-
-    Some(format!("#{:02x}{:02x}{:02x}", r, g, b))
+        Some(format!("#{:02x}{:02x}{:02x}", r / 4, g / 4, b / 4))
+    } else {
+        None
+    }
 }

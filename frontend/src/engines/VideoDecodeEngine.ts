@@ -19,9 +19,6 @@ export class VideoDecodeEngine {
         const config: VideoDecoderConfig = {
           codec,
           hardwareAcceleration: 'prefer-hardware',
-          // Dummy dimensions for capability check
-          width: 1920,
-          height: 1080
         };
         const supported = await VideoDecoder.isConfigSupported(config);
         results[name] = !!supported.supported;
