@@ -408,17 +408,19 @@ export class PlaybackEngine {
 
       // Start A/B Loop Ticker
       const ticker = setInterval(() => {
-        if (this.state !== 'PLAYING') {
+        if (this.state !== 'PLAYING' || !this.currentSource) {
            clearInterval(ticker);
            return;
         }
-        this.abLoop.check(this.ctx.currentTime, (seekTo) => {
-           // For BufferSource, we can't just seek. We have to restart.
-           // This is a limitation of pure BufferSource for looping.
-           // However, for an "extraordinary" player, we'd use MediaElementSource for seeking
-           // but BufferSource for gapless.
-           // For now, let's implement a simplified jump if possible or skip.
-        });
+
+        // Use native AudioBufferSourceNode looping if A/B is active
+        if (this.abLoop.isActive && this.abLoop.pointA !== null && this.abLoop.pointB !== null) {
+          this.currentSource.loop = true;
+          this.currentSource.loopStart = this.abLoop.pointA;
+          this.currentSource.loopEnd = this.abLoop.pointB;
+        } else {
+          this.currentSource.loop = false;
+        }
       }, 100);
 
       if (trackId) {

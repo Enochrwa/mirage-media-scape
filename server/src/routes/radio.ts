@@ -37,11 +37,17 @@ router.get('/proxy', async (req, res) => {
   if (!streamUrl || typeof streamUrl !== 'string') return res.status(400).send('URL required');
 
   try {
-    const validatedUrl = UrlValidator.validate(streamUrl);
+    const url = new URL(streamUrl);
+
+    try {
+      UrlValidator.validate(streamUrl);
+    } catch (e) {
+      return res.status(400).send((e as Error).message);
+    }
 
     const response = await axios({
       method: 'get',
-      url: validatedUrl,
+      url: url.href,
       responseType: 'stream',
       headers: {
         'Icy-MetaData': '1',

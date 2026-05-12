@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
-import http from 'https';
+import http from 'http';
 import crypto from 'crypto';
 import { UrlValidator } from '../utils/UrlValidator';
 
@@ -16,14 +16,21 @@ export class DownloadManager {
     }
   }
 
-  public async queueDownload(url: string, trackId?: string, episodeId?: string) {
-    const validatedUrl = UrlValidator.validate(url);
+  public async queueDownload(urlStr: string, trackId?: string, episodeId?: string) {
+    const url = new URL(urlStr);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('Invalid protocol');
+    }
+
+    if (UrlValidator.isPrivate(url.hostname)) {
+      throw new Error('Private network access prohibited');
+    }
 
     const id = crypto.randomUUID();
     this.db.prepare(`
       INSERT INTO downloads (id, track_id, episode_id, url, status, created_at)
       VALUES (?, ?, ?, ?, 'pending', ?)
-    `).run(id, trackId || null, episodeId || null, validatedUrl, Date.now());
+    `).run(id, trackId || null, episodeId || null, url.toString(), Date.now());
 
     this.processQueue();
     return id;

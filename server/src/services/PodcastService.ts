@@ -16,9 +16,12 @@ export class PodcastService {
 
   public async subscribe(feedUrl: string) {
     try {
-      const validatedUrl = UrlValidator.validate(feedUrl);
+      const url = new URL(feedUrl);
 
-      const response = await fetch(validatedUrl);
+      // Centralized validation for protocol and private IPs
+      UrlValidator.validate(feedUrl);
+
+      const response = await fetch(url.href);
       const xml = await response.text();
       const data = this.parser.parse(xml);
       const channel = data.rss.channel;
