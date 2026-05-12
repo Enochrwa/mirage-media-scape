@@ -1,3 +1,5 @@
+import { SleepTimer } from '@/engines/SleepTimer';
+
 export class ParametricEQ {
   private ctx: AudioContext;
   public bands: BiquadFilterNode[];
@@ -105,6 +107,7 @@ export class PlaybackEngine {
 
   // Canonical Shared Nodes
   private analyser: AnalyserNode;
+  private pitchPreserver: AudioWorkletNode | null = null;
   private bassEnhancer: WaveShaperNode;
   private panner: PannerNode;
   private nightCompressor: DynamicsCompressorNode;
@@ -112,6 +115,7 @@ export class PlaybackEngine {
 
   public abLoop: ABLoop;
   private spatialAudioEnabled: boolean = false;
+  private pitchLockEnabled: boolean = false;
   private bassEnhancerEnabled: boolean = false;
   private nightModeEnabled: boolean = false;
 
@@ -119,7 +123,7 @@ export class PlaybackEngine {
   private currentTrackId: string | null = null;
   private currentEventId: number | null = null;
   private fadeDuration: number = 2; // Default 2s crossfade
-  private sleepTimerTimeout: NodeJS.Timeout | null = null;
+  public sleepTimer: SleepTimer | null = null;
   private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
 
   constructor() {
@@ -181,6 +185,15 @@ export class PlaybackEngine {
     this.nightCompressor.release.setValueAtTime(0.25, this.ctx.currentTime);
 
     this.abLoop = new ABLoop();
+    this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
+
+    // Load Phase Vocoder Worklet
+    this.ctx.audioWorklet?.addModule('/worklets/phase-vocoder.js').then(() => {
+      this.pitchPreserver = new AudioWorkletNode(this.ctx, 'phase-vocoder');
+      this.updateChain();
+    }).catch(err => {
+      console.error('Failed to load phase-vocoder worklet:', err);
+    });
 
     // Wiring the chains to merger (Analyser)
     this.chainA.crossfade.connect(this.analyser);
@@ -213,11 +226,17 @@ export class PlaybackEngine {
   private updateChain() {
     // Disconnect all bypassable nodes from their potential targets
     this.analyser.disconnect();
+    if (this.pitchPreserver) this.pitchPreserver.disconnect();
     this.bassEnhancer.disconnect();
     this.panner.disconnect();
     this.nightCompressor.disconnect();
 
     let currentNode: AudioNode = this.analyser;
+
+    if (this.pitchLockEnabled && this.pitchPreserver) {
+      currentNode.connect(this.pitchPreserver);
+      currentNode = this.pitchPreserver;
+    }
 
     if (this.bassEnhancerEnabled) {
       currentNode.connect(this.bassEnhancer);
@@ -289,6 +308,25 @@ export class PlaybackEngine {
   setNightModeEnabled(enabled: boolean) {
     this.nightModeEnabled = enabled;
     this.updateChain();
+  }
+
+  setPitchLockEnabled(enabled: boolean) {
+    this.pitchLockEnabled = enabled;
+    this.updateChain();
+  }
+
+  setPlaybackSpeed(speed: number) {
+    if (this.currentSource) {
+      if (this.pitchLockEnabled && this.pitchPreserver) {
+        this.currentSource.playbackRate.setValueAtTime(1.0, this.ctx.currentTime);
+        const speedParam = this.pitchPreserver.parameters.get('speed');
+        if (speedParam) {
+          speedParam.setTargetAtTime(speed, this.ctx.currentTime, 0.1);
+        }
+      } else {
+        this.currentSource.playbackRate.setTargetAtTime(speed, this.ctx.currentTime, 0.1);
+      }
+    }
   }
 
   setEQBand(index: number, gainDb: number) {
@@ -416,8 +454,8 @@ export class PlaybackEngine {
         // Use native AudioBufferSourceNode looping if A/B is active
         if (this.abLoop.isActive && this.abLoop.pointA !== null && this.abLoop.pointB !== null) {
           this.currentSource.loop = true;
-          this.currentSource.loopStart = this.abLoop.pointA;
-          this.currentSource.loopEnd = this.abLoop.pointB;
+          this.currentSource.loopStart = Math.min(this.abLoop.pointA, this.abLoop.pointB);
+          this.currentSource.loopEnd = Math.max(this.abLoop.pointA, this.abLoop.pointB);
         } else {
           this.currentSource.loop = false;
         }
@@ -606,18 +644,7 @@ export class PlaybackEngine {
   }
 
   setSleepTimer(minutes: number) {
-    if (this.sleepTimerTimeout) {
-      clearTimeout(this.sleepTimerTimeout);
-    }
-
-    if (minutes > 0) {
-      this.sleepTimerTimeout = setTimeout(
-        () => {
-          this.pause();
-        },
-        minutes * 60 * 1000,
-      );
-    }
+    this.sleepTimer?.set(minutes);
   }
 }
 

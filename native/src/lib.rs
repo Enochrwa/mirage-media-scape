@@ -3,6 +3,7 @@ use ffmpeg_next as ffmpeg;
 use std::path::Path;
 use ffmpeg::util::frame::audio::Audio;
 use stratum_dsp::{analyze_audio as stratum_analyze, compute_confidence, AnalysisConfig};
+use rayon::prelude::*;
 
 #[napi(object)]
 pub struct AudioMetadata {
@@ -35,19 +36,35 @@ pub struct SubtitleTrackInfo {
 pub struct TrackMetadata {
     pub title: Option<String>,
     pub artist: Option<String>,
+    pub album_artist: Option<String>,
     pub album: Option<String>,
-    pub genre: Option<String>,
     pub year: Option<i32>,
+    pub genre: Option<String>,
     pub track_number: Option<i32>,
     pub disc_number: Option<i32>,
+    pub composer: Option<String>,
+    pub lyricist: Option<String>,
+    pub comment: Option<String>,
+    pub copyright: Option<String>,
+    pub encoder: Option<String>,
     pub duration: f64,
-    pub bitrate: i64,
     pub sample_rate: Option<i32>,
+    pub bit_rate: Option<i64>,
     pub channels: Option<i32>,
+    pub codec_name: Option<String>,
+    pub file_type: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
-    pub format: String,
-    pub cover_art: Option<Vec<u8>>,
+    pub frame_rate: Option<f64>,
+    pub video_codec: Option<String>,
+    pub audio_codec: Option<String>,
+    pub cover_art_bytes: Option<Vec<u8>>,
+    pub replaygain_track_gain: Option<f64>,
+    pub replaygain_album_gain: Option<f64>,
+    pub replaygain_track_peak: Option<f64>,
+    pub replaygain_album_peak: Option<f64>,
+    pub lyrics: Option<String>,
+    pub synced_lyrics: Option<String>,
 }
 
 #[napi]
@@ -59,21 +76,34 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
 
     let duration = context.duration() as f64 / ffmpeg::ffi::AV_TIME_BASE as f64;
-    let bitrate = context.bit_rate();
-    let format_name = context.format().name().to_string();
+    let bit_rate = Some(context.bit_rate());
+    let _format_name = context.format().name().to_string();
 
     let mut title = None;
     let mut artist = None;
+    let mut album_artist = None;
     let mut album = None;
     let mut genre = None;
     let mut year = None;
     let mut track_number = None;
     let mut disc_number = None;
+    let mut composer = None;
+    let mut lyricist = None;
+    let mut comment = None;
+    let mut copyright = None;
+    let mut encoder = None;
+    let mut lyrics = None;
+    let mut synced_lyrics = None;
+    let mut replaygain_track_gain = None;
+    let mut replaygain_album_gain = None;
+    let mut replaygain_track_peak = None;
+    let mut replaygain_album_peak = None;
 
     for (key, value) in context.metadata().iter() {
         match key.to_lowercase().as_str() {
             "title" => title = Some(value.to_string()),
             "artist" => artist = Some(value.to_string()),
+            "album_artist" | "albumartist" => album_artist = Some(value.to_string()),
             "album" => album = Some(value.to_string()),
             "genre" => genre = Some(value.to_string()),
             "date" | "year" => {
@@ -87,6 +117,17 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
             "disc" => {
                 disc_number = value.split('/').next().and_then(|s| s.parse::<i32>().ok());
             },
+            "composer" => composer = Some(value.to_string()),
+            "lyricist" => lyricist = Some(value.to_string()),
+            "comment" | "description" => comment = Some(value.to_string()),
+            "copyright" => copyright = Some(value.to_string()),
+            "encoder" => encoder = Some(value.to_string()),
+            "lyrics" => lyrics = Some(value.to_string()),
+            "syncedlyrics" | "lyrics-xxx" => synced_lyrics = Some(value.to_string()),
+            "replaygain_track_gain" => replaygain_track_gain = value.parse::<f64>().ok(),
+            "replaygain_album_gain" => replaygain_album_gain = value.parse::<f64>().ok(),
+            "replaygain_track_peak" => replaygain_track_peak = value.parse::<f64>().ok(),
+            "replaygain_album_peak" => replaygain_album_peak = value.parse::<f64>().ok(),
             _ => {}
         }
     }
@@ -95,13 +136,24 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
     let mut channels = None;
     let mut width = None;
     let mut height = None;
-    let mut cover_art = None;
+    let mut frame_rate = None;
+    let mut video_codec = None;
+    let mut audio_codec = None;
+    let mut cover_art_bytes = None;
+    let mut file_type = "audio".to_string();
+    let mut codec_name = None;
+
+    // Track if we need to re-open to get attached picture packets
+    let mut attached_pic_stream_index = None;
 
     for stream in context.streams() {
-        match stream.parameters().medium() {
+        let params = stream.parameters();
+        match params.medium() {
             ffmpeg::media::Type::Audio => {
                 if sample_rate.is_none() {
-                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(stream.parameters()) {
+                    audio_codec = Some(params.id().name().to_string());
+                    codec_name = audio_codec.clone();
+                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(params) {
                         if let Ok(audio) = codec_ctx.decoder().audio() {
                             sample_rate = Some(audio.rate() as i32);
                             channels = Some(audio.channels() as i32);
@@ -111,18 +163,12 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
             },
             ffmpeg::media::Type::Video => {
                 if stream.disposition().contains(ffmpeg::format::stream::Disposition::ATTACHED_PIC) {
-                    // Extract cover art
-                    // For attached pictures, the data is in the first packet of the stream
-                    let mut ictx = ffmpeg::format::input(&path_buf).unwrap();
-                    let stream_index = stream.index();
-                    for (s, packet) in ictx.packets() {
-                        if s.index() == stream_index {
-                            cover_art = Some(packet.data().unwrap().to_vec());
-                            break;
-                        }
-                    }
+                    attached_pic_stream_index = Some(stream.index());
                 } else if width.is_none() {
-                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(stream.parameters()) {
+                    file_type = "video".to_string();
+                    frame_rate = Some(f64::from(stream.avg_frame_rate()));
+                    video_codec = Some(params.id().name().to_string());
+                    if let Ok(codec_ctx) = ffmpeg::codec::context::Context::from_parameters(params) {
                         if let Ok(video) = codec_ctx.decoder().video() {
                             width = Some(video.width() as i32);
                             height = Some(video.height() as i32);
@@ -134,22 +180,53 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         }
     }
 
+    if let Some(index) = attached_pic_stream_index {
+        // We do need to iterate packets to get the attached picture data
+        // but we can use the existing context if it hasn't been exhausted.
+        // However, extract_metadata doesn't normally read packets.
+        // To be safe and efficient, we only re-open if necessary.
+        if let Ok(mut ictx) = ffmpeg::format::input(&path_buf) {
+            for (s, packet) in ictx.packets() {
+                if s.index() == index {
+                    cover_art_bytes = packet.data().map(|d| d.to_vec());
+                    break;
+                }
+            }
+        }
+    }
+
     Ok(TrackMetadata {
         title,
         artist,
+        album_artist,
         album,
-        genre,
         year,
+        genre,
         track_number,
         disc_number,
+        composer,
+        lyricist,
+        comment,
+        copyright,
+        encoder,
         duration,
-        bitrate,
         sample_rate,
+        bit_rate,
         channels,
+        codec_name,
+        file_type,
         width,
         height,
-        format: format_name,
-        cover_art,
+        frame_rate,
+        video_codec,
+        audio_codec,
+        cover_art_bytes,
+        replaygain_track_gain,
+        replaygain_album_gain,
+        replaygain_track_peak,
+        replaygain_album_peak,
+        lyrics,
+        synced_lyrics,
     })
 }
 
@@ -203,7 +280,7 @@ pub fn generate_thumbnail(path: String, time_seconds: f64, output_path: String) 
                     let codec = ffmpeg::encoder::find(ffmpeg::codec::Id::MJPEG)
                         .ok_or_else(|| napi::Error::from_reason("MJPEG encoder not found"))?;
 
-                    let mut encoder_ctx = ffmpeg::codec::context::Context::new();
+                    let encoder_ctx = ffmpeg::codec::context::Context::new();
                     let mut encoder = encoder_ctx.encoder().video()
                         .map_err(|_| napi::Error::from_reason("Failed to get video encoder"))?;
 
@@ -586,14 +663,120 @@ pub struct FingerprintResult {
 }
 
 #[napi]
-pub fn generate_fingerprint(_path: String) -> Result<FingerprintResult, napi::Error> {
-    // In a real implementation, this would use libchromaprint to generate an AcoustID-compatible fingerprint.
-    // For this implementation, we will simulate it or use a simplified version since we cannot
-    // easily add system dependencies like libchromaprint-dev in this sandbox environment.
-    // However, to keep the TypeScript side working, we return a dummy fingerprint.
+pub fn generate_fingerprint(path: String) -> Result<FingerprintResult, napi::Error> {
+    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let path_buf = Path::new(&path);
+    let mut ictx = ffmpeg::format::input(&path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file {}: {}", path, e)))?;
+
+    let stream = ictx
+        .streams()
+        .best(ffmpeg::media::Type::Audio)
+        .ok_or_else(|| napi::Error::from_reason("Could not find best audio stream"))?;
+
+    let stream_index = stream.index();
+    let mut decoder = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get codec context: {}", e)))?
+        .decoder()
+        .audio()
+        .map_err(|e| napi::Error::from_reason(format!("Failed to get audio decoder: {}", e)))?;
+
+    let mut resampler = ffmpeg::software::resampling::context::Context::get(
+        decoder.format(),
+        decoder.channel_layout(),
+        decoder.rate(),
+        ffmpeg::util::format::sample::Sample::I16(ffmpeg::util::format::sample::Type::Packed),
+        ffmpeg::util::channel_layout::ChannelLayout::MONO,
+        11025,
+    ).map_err(|e| napi::Error::from_reason(format!("Resampler error: {}", e)))?;
+
+    let mut chromaprint = chromaprint::Chromaprint::new();
+    chromaprint.start(11025, 1);
+
+    let mut total_duration = 0.0;
+    let time_base = stream.time_base();
+
+    for (stream, packet) in ictx.packets() {
+        if stream.index() == stream_index {
+            if decoder.send_packet(&packet).is_ok() {
+                let mut decoded = Audio::empty();
+                while decoder.receive_frame(&mut decoded).is_ok() {
+                    let mut resampled = Audio::empty();
+                    if resampler.run(&decoded, &mut resampled).is_ok() {
+                        let data = resampled.data(0);
+                        let samples_u8: &[u8] = data;
+                        chromaprint.feed(samples_u8);
+                    }
+                    if let Some(pts) = decoded.pts() {
+                        total_duration = pts as f64 * f64::from(time_base);
+                    }
+                    if total_duration >= 120.0 { break; }
+                }
+            }
+        }
+        if total_duration >= 120.0 { break; }
+    }
+
+    chromaprint.finish();
+    let fingerprint = chromaprint.fingerprint().unwrap_or_else(|| "error".to_string());
 
     Ok(FingerprintResult {
-        fingerprint: "dummy_acoustid_fingerprint".to_string(),
-        duration: 0.0,
+        fingerprint,
+        duration: total_duration,
     })
+}
+
+#[napi(object)]
+pub struct ScannedFile {
+    pub path: String,
+    pub mtime: f64,
+    pub size: i64,
+}
+
+#[napi]
+pub fn scan_folders(folders: Vec<String>) -> Vec<ScannedFile> {
+    folders.into_par_iter()
+        .flat_map(|folder| {
+            let mut files = Vec::new();
+            let path = Path::new(&folder);
+            if path.is_dir() {
+                walk_dir(path, &mut files);
+            }
+            files
+        })
+        .collect()
+}
+
+fn walk_dir(dir: &Path, files: &mut Vec<ScannedFile>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk_dir(&path, files);
+            } else if is_media_file(&path) {
+                if let Ok(metadata) = entry.metadata() {
+                    let mtime = metadata
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs_f64() * 1000.0)
+                        .unwrap_or(0.0);
+                    files.push(ScannedFile {
+                        path: path.to_string_lossy().to_string(),
+                        mtime,
+                        size: metadata.len() as i64,
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn is_media_file(path: &Path) -> bool {
+    let extensions = ["mp3", "flac", "wav", "m4a", "ogg", "mp4", "mkv", "avi"];
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| extensions.contains(&s.to_lowercase().as_str()))
+        .unwrap_or(false)
 }

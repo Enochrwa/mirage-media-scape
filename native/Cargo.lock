@@ -87,6 +87,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "chromaprint"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be70a027a586e6aa919f7222ec2da0bc31c72def91afd5d71733b654f9cd2dd2"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -835,12 +844,14 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 name = "zovyra-native"
 version = "0.1.0"
 dependencies = [
+ "chromaprint",
  "ffmpeg-next",
  "hound",
  "itertools",
  "napi",
  "napi-build",
  "napi-derive",
+ "rayon",
  "realfft",
  "stratum-dsp",
 ]

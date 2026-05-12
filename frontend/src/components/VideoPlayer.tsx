@@ -44,6 +44,7 @@ import {
 import { SubtitleCue, parseSRT } from '@/lib/utils';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
+import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -170,6 +171,7 @@ const VideoPlayer: React.FC = () => {
   const [qualityMode, setQualityMode] = useState('auto');
   const [devicePreview, setDevicePreview] = useState('desktop');
   const [isMobile, setIsMobile] = useState(false);
+  const [hwDecodeSupported, setHwDecodeSupported] = useState<Record<string, boolean>>({});
 
   // Detect mobile device
   useEffect(() => {
@@ -179,6 +181,10 @@ const VideoPlayer: React.FC = () => {
 
     checkMobile();
     window.addEventListener('resize', checkMobile);
+
+    // Probe hardware decode
+    VideoDecodeEngine.probeHardwareDecode().then(setHwDecodeSupported);
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -1063,6 +1069,13 @@ const VideoPlayer: React.FC = () => {
               <div className="flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-1 text-xs text-purple-400 backdrop-blur-sm sm:px-3">
                 <Waves size={10} />
                 <span className="hidden sm:inline">Visualizer</span>
+              </div>
+            )}
+
+            {Object.values(hwDecodeSupported).some(v => v) && (
+              <div className="flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-1 text-xs text-green-400 backdrop-blur-sm sm:px-3">
+                <Zap size={10} />
+                <span className="hidden sm:inline">HW Decode</span>
               </div>
             )}
           </div>

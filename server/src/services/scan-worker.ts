@@ -26,19 +26,17 @@ async function scan() {
   let scanned = 0;
   let newTracks: Track[] = [];
 
-  const allFiles: string[] = [];
-  for (const folder of folders) {
-    walk(folder, allFiles);
-  }
+  // Use Rust for high-performance filesystem scanning
+  const allFiles = native.scanFolders(folders);
 
   const total = allFiles.length;
   parentPort?.postMessage({ type: 'SCAN_START', total });
 
-  for (const filePath of allFiles) {
+  for (const file of allFiles) {
+    const filePath = file.path;
     try {
-      const stats = fs.statSync(filePath);
-      const mtime = stats.mtimeMs;
-      const fileSize = stats.size;
+      const mtime = file.mtime;
+      const fileSize = file.size;
 
       const existing = db
         .prepare('SELECT mtime, id, file_size FROM tracks WHERE file_path = ?')
@@ -66,15 +64,12 @@ async function scan() {
 
       const id = existing?.id || crypto.createHash('md5').update(filePath).digest('hex');
 
-      const fileType: 'audio' | 'video' =
-        metadata.width != null && metadata.width > 0 && metadata.height != null && metadata.height > 0
-          ? 'video'
-          : 'audio';
+      const fileType: 'audio' | 'video' = metadata.fileType as 'audio' | 'video';
 
       let coverCachePath: string | undefined = undefined;
-      if (metadata.coverArt) {
+      if (metadata.coverArtBytes) {
         coverCachePath = path.join(coversDir, `${id}.jpg`);
-        fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArt));
+        fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArtBytes));
       }
 
       let thumbnailPath: string | undefined = undefined;
@@ -106,7 +101,7 @@ async function scan() {
         genre: metadata.genre || 'Unknown Genre',
         year: metadata.year || undefined,
         duration: metadata.duration,
-        bitrate: metadata.bitrate,
+        bitrate: (metadata.bitRate as number) || 0,
         sample_rate: metadata.sampleRate || undefined,
         channels: metadata.channels || undefined,
         file_path: filePath,
@@ -191,20 +186,5 @@ async function scan() {
   parentPort?.postMessage({ type: 'SCAN_COMPLETE', scanned, total });
 }
 
-function walk(dir: string, files: string[]) {
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath, files);
-      } else if (isMediaFile(entry.name)) {
-        files.push(fullPath);
-      }
-    }
-  } catch (e) {
-    console.error(`Failed to walk ${dir}:`, e);
-  }
-}
 
 scan();
