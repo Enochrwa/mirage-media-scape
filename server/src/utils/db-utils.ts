@@ -1,5 +1,4 @@
 import path from 'path';
-import fs from 'fs';
 
 export function getDatabasePath(): string {
   if (process.env.DATABASE_PATH) {

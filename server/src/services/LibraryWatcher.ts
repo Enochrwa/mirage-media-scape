@@ -25,12 +25,12 @@ function markTrackMissing(filePath: string) {
 function markTracksMissingUnderDir(dirPath: string) {
   const normalized = dirPath.replace(/[/\\]+$/, '');
   const sep = path.sep;
-  const escapeLike = (s: string) => s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const escapeLike = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
   const childPattern = `${escapeLike(normalized)}${escapeLike(sep)}%`;
-  db.prepare(`UPDATE tracks SET missing = 1 WHERE file_path = ? OR file_path LIKE ? ESCAPE '\\'`).run(
-    normalized,
-    childPattern,
-  );
+  db.prepare(
+    `UPDATE tracks SET missing = 1 WHERE file_path = ? OR file_path LIKE ? ESCAPE '\\'`,
+  ).run(normalized, childPattern);
 }
 
 export function setLibraryWatcherIo(io: Server | null) {

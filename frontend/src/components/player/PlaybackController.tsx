@@ -221,6 +221,15 @@ export function PlaybackController() {
             className="h-1"
           />
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-gray-400 hover:text-white"
+          onClick={() => usePlayerStore.getState().setPlayerFullscreen(true)}
+          title="Open full player"
+        >
+          <ChevronUp className="h-5 w-5" />
+        </Button>
       </div>
     </div>
   );

@@ -26,7 +26,11 @@ export const setIo = (io: Server) => {
 
 router.get('/bootstrap', scannerRateLimiter, scannerController.getBootstrap);
 router.post('/onboarding/home', scannerWriteLimiter, scannerController.postOnboardingHome);
-router.post('/onboarding/choose-folder', scannerWriteLimiter, scannerController.postOnboardingChooseFolder);
+router.post(
+  '/onboarding/choose-folder',
+  scannerWriteLimiter,
+  scannerController.postOnboardingChooseFolder,
+);
 router.post('/onboarding/dismiss', scannerWriteLimiter, scannerController.postOnboardingDismiss);
 router.post('/scan', scannerWriteLimiter, scannerController.scanFolder);
 

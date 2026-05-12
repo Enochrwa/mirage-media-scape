@@ -18,7 +18,9 @@ export class RecommendationService {
     const sourceVector = this.getFeatureVector(source);
 
     // Fetch potential candidates (same genre, similar BPM, or co-played)
-    const candidates = this.db.prepare(`
+    const candidates = this.db
+      .prepare(
+        `
       SELECT * FROM tracks
       WHERE id != ?
       AND missing = 0
@@ -27,17 +29,27 @@ export class RecommendationService {
         OR (bpm BETWEEN ? AND ?)
         OR id IN (SELECT track_b FROM track_coplay WHERE track_a = ?)
       )
-    `).all(trackId, source.genre, (source.bpm || 120) - 20, (source.bpm || 120) + 20, trackId) as Track[];
+    `,
+      )
+      .all(
+        trackId,
+        source.genre,
+        (source.bpm || 120) - 20,
+        (source.bpm || 120) + 20,
+        trackId,
+      ) as Track[];
 
-    const scored: ScoredTrack[] = candidates.map(track => {
+    const scored: ScoredTrack[] = candidates.map((track) => {
       const targetVector = this.getFeatureVector(track);
       const similarity = this.cosineSimilarity(sourceVector, targetVector);
 
-      const coplay = this.db.prepare('SELECT score FROM track_coplay WHERE track_a = ? AND track_b = ?').get(trackId, track.id) as any;
+      const coplay = this.db
+        .prepare('SELECT score FROM track_coplay WHERE track_a = ? AND track_b = ?')
+        .get(trackId, track.id) as { score: number } | undefined;
       const coplayScore = coplay ? coplay.score : 0;
 
       // Weighted scoring: 40% similarity, 60% coplay signal
-      const totalScore = (similarity * 0.4) + (Math.min(coplayScore / 10, 1) * 0.6);
+      const totalScore = similarity * 0.4 + Math.min(coplayScore / 10, 1) * 0.6;
 
       return { track, similarity, coplayScore, totalScore };
     });
@@ -45,7 +57,7 @@ export class RecommendationService {
     return scored
       .sort((a, b) => b.totalScore - a.totalScore)
       .slice(0, limit)
-      .map(s => s.track);
+      .map((s) => s.track);
   }
 
   private getFeatureVector(track: Track): number[] {

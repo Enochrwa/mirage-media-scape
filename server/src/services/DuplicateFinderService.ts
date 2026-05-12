@@ -9,7 +9,9 @@ export class DuplicateFinderService {
   constructor(private db: Database.Database) {}
 
   public async findDuplicates() {
-    const candidates = this.db.prepare(`
+    const candidates = this.db
+      .prepare(
+        `
       SELECT id, title, artist, duration, file_path, bitrate, file_size
       FROM tracks
       WHERE missing = 0
@@ -18,7 +20,9 @@ export class DuplicateFinderService {
         GROUP BY ROUND(duration), LOWER(TRIM(artist))
         HAVING COUNT(*) > 1
       )
-    `).all() as Track[];
+    `,
+      )
+      .all() as Track[];
 
     const groups: Record<string, Track[]> = {};
     for (const track of candidates) {

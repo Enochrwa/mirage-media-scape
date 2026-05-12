@@ -8,7 +8,7 @@ import { TrackMetadata, AudioMetadata } from '../../zovyra-native';
 import { Track } from '../types/database';
 
 const isESM = typeof import.meta !== 'undefined';
-const requireNative = createRequire(isESM ? (import.meta as any).url : __filename);
+const requireNative = createRequire(isESM ? import.meta.url : __filename);
 const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 const { dbPath, folders, coversDir } = workerData;
@@ -18,10 +18,6 @@ if (!fs.existsSync(coversDir)) {
   fs.mkdirSync(coversDir, { recursive: true });
 }
 
-function isMediaFile(filename: string): boolean {
-  const extensions = ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.mp4', '.mkv', '.avi'];
-  return extensions.includes(path.extname(filename).toLowerCase());
-}
 
 async function scan() {
   let scanned = 0;
@@ -188,6 +184,5 @@ async function scan() {
 
   parentPort?.postMessage({ type: 'SCAN_COMPLETE', scanned, total });
 }
-
 
 scan();

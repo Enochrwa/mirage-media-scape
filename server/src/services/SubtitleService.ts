@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
 const isESM = typeof import.meta !== 'undefined';
-const requireNative = createRequire(isESM ? (import.meta as any).url : __filename);
+const requireNative = createRequire(isESM ? import.meta.url : __filename);
 const native = requireNative('../../zovyra-native.node');
 
 export interface SubtitleCue {
@@ -32,15 +32,20 @@ export class SubtitleService {
     const blocks = data.split(/\n\s*\n/);
 
     for (const block of blocks) {
-      const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+      const lines = block
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l);
       if (lines.length < 3) continue;
 
-      const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+      const timeMatch = lines[1].match(
+        /(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/,
+      );
       if (timeMatch) {
         cues.push({
           start: this.parseTime(timeMatch[1]),
           end: this.parseTime(timeMatch[2]),
-          text: lines.slice(2).join('\n')
+          text: lines.slice(2).join('\n'),
         });
       }
     }
@@ -53,15 +58,20 @@ export class SubtitleService {
 
     for (const block of blocks) {
       if (block.includes('WEBVTT')) continue;
-      const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+      const lines = block
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l);
       if (lines.length < 2) continue;
 
-      const timeMatch = lines[0].match(/(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})/);
+      const timeMatch = lines[0].match(
+        /(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})/,
+      );
       if (timeMatch) {
         cues.push({
           start: this.parseTime(timeMatch[1]),
           end: this.parseTime(timeMatch[2]),
-          text: lines.slice(1).join('\n')
+          text: lines.slice(1).join('\n'),
         });
       }
     }
@@ -82,12 +92,16 @@ export class SubtitleService {
         const parts = line.split(',');
         const start = parts[1];
         const end = parts[2];
-        const text = parts.slice(9).join(',').replace(/\{[^}]+\}/g, '').replace(/\\N/g, '\n');
+        const text = parts
+          .slice(9)
+          .join(',')
+          .replace(/\{[^}]+\}/g, '')
+          .replace(/\\N/g, '\n');
 
         cues.push({
           start: this.parseTime(start),
           end: this.parseTime(end),
-          text: text.trim()
+          text: text.trim(),
         });
       }
     }
@@ -106,7 +120,7 @@ export class SubtitleService {
 
     let fraction = 0;
     if (frac) {
-        fraction = Number(frac.padEnd(3, '0').slice(0, 3)) / 1000;
+      fraction = Number(frac.padEnd(3, '0').slice(0, 3)) / 1000;
     }
 
     return h * 3600 + m * 60 + s + fraction;
