@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { UrlValidator } from '../utils/UrlValidator';
 
 const router = Router();
 
@@ -36,14 +37,11 @@ router.get('/proxy', async (req, res) => {
   if (!streamUrl || typeof streamUrl !== 'string') return res.status(400).send('URL required');
 
   try {
-    const validatedUrl = new URL(streamUrl);
-    if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
-      return res.status(400).send('Invalid protocol');
-    }
+    const validatedUrl = UrlValidator.validate(streamUrl);
 
     const response = await axios({
       method: 'get',
-      url: validatedUrl.toString(),
+      url: validatedUrl,
       responseType: 'stream',
       headers: {
         'Icy-MetaData': '1',

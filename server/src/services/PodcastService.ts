@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fetch from 'node-fetch';
 import { XMLParser } from 'fast-xml-parser';
 import crypto from 'crypto';
+import { UrlValidator } from '../utils/UrlValidator';
 
 export class PodcastService {
   private parser: XMLParser;
@@ -15,12 +16,9 @@ export class PodcastService {
 
   public async subscribe(feedUrl: string) {
     try {
-      const validatedUrl = new URL(feedUrl);
-      if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
-        throw new Error('Invalid protocol for podcast feed');
-      }
+      const validatedUrl = UrlValidator.validate(feedUrl);
 
-      const response = await fetch(validatedUrl.toString());
+      const response = await fetch(validatedUrl);
       const xml = await response.text();
       const data = this.parser.parse(xml);
       const channel = data.rss.channel;
