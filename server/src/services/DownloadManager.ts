@@ -10,13 +10,20 @@ export class DownloadManager {
   private activeDownloads = 0;
   private maxConcurrent = 3;
 
+  private isWifi = true; // Default to true, in a real app this would be updated by system events
+
   constructor(private db: Database.Database, private downloadDir: string) {
     if (!fs.existsSync(downloadDir)) {
       fs.mkdirSync(downloadDir, { recursive: true });
     }
   }
 
-  public async queueDownload(urlStr: string, trackId?: string, episodeId?: string) {
+  public setWifiStatus(isWifi: boolean) {
+    this.isWifi = isWifi;
+    if (isWifi) this.processQueue();
+  }
+
+  public async queueDownload(urlStr: string, trackId?: string, episodeId?: string, wifiOnly: boolean = true) {
     const url = new URL(urlStr);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       throw new Error('Invalid protocol');
@@ -28,9 +35,9 @@ export class DownloadManager {
 
     const id = crypto.randomUUID();
     this.db.prepare(`
-      INSERT INTO downloads (id, track_id, episode_id, url, status, created_at)
-      VALUES (?, ?, ?, ?, 'pending', ?)
-    `).run(id, trackId || null, episodeId || null, url.toString(), Date.now());
+      INSERT INTO downloads (id, track_id, episode_id, url, status, created_at, wifi_only)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?)
+    `).run(id, trackId || null, episodeId || null, url.toString(), Date.now(), wifiOnly ? 1 : 0);
 
     this.processQueue();
     return id;
@@ -39,9 +46,13 @@ export class DownloadManager {
   private async processQueue() {
     if (this.activeDownloads >= this.maxConcurrent) return;
 
-    const pending = this.db.prepare(`
-      SELECT * FROM downloads WHERE status = 'pending' ORDER BY priority DESC, created_at ASC LIMIT 1
-    `).get() as any;
+    let query = `SELECT * FROM downloads WHERE status = 'pending'`;
+    if (!this.isWifi) {
+      query += ` AND wifi_only = 0`;
+    }
+    query += ` ORDER BY priority DESC, created_at ASC LIMIT 1`;
+
+    const pending = this.db.prepare(query).get() as any;
 
     if (!pending) return;
 

@@ -15,8 +15,10 @@ interface PlayerState {
   repeat: boolean;
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
+  aiDjEnabled: boolean;
 
   // Actions
+  setAiDjEnabled: (enabled: boolean) => void;
   setCurrentFile: (file: MediaFile | null) => void;
   setIsPlaying: (isPlaying: boolean) => void;
   setVolume: (volume: number) => void;
@@ -52,6 +54,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   repeat: false,
   isPlayerFullscreen: false,
   showMobilePlayer: false,
+  aiDjEnabled: false,
 
   setCurrentFile: (file) => set({ currentFile: file }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -65,12 +68,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setRepeat: (repeat) => set({ repeat }),
   setPlayerFullscreen: (isPlayerFullscreen) => set({ isPlayerFullscreen }),
   setShowMobilePlayer: (showMobilePlayer) => set({ showMobilePlayer }),
+  setAiDjEnabled: (enabled: boolean) => set({ aiDjEnabled: enabled }),
   closePlayer: () => {
     get().pausePlayback();
     set({ currentFile: null });
   },
 
   playFile: async (file) => {
+    const prevFile = get().currentFile;
     set({ currentFile: file, isPlaying: true, currentTime: 0 });
 
     if (file.type === 'audio') {
@@ -79,6 +84,26 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         const response = await fetch(file.file);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await playbackEngine.ctx.decodeAudioData(arrayBuffer);
+        if (get().aiDjEnabled && prevFile) {
+           try {
+              const res = await fetch(`${API_BASE}/api/ai-dj/intro?prevId=${prevFile.id}&nextId=${file.id}`);
+              if (res.ok) {
+                 const { intro } = await res.json();
+                 const utterance = new SpeechSynthesisUtterance(intro);
+                 utterance.rate = 0.9;
+                 utterance.pitch = 1.0;
+                 window.speechSynthesis.speak(utterance);
+
+                 // Duck volume during intro
+                 const originalVolume = get().volume;
+                 playbackEngine.setVolume(originalVolume * 0.3);
+                 utterance.onend = () => {
+                    playbackEngine.setVolume(originalVolume);
+                 };
+              }
+           } catch (e) { console.error('AI DJ failed', e); }
+        }
+
         playbackEngine.play(audioBuffer, 0, file.loudness, file.id);
 
         // Media Session API

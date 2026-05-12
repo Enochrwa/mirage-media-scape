@@ -27,7 +27,9 @@ export const FullNowPlaying: React.FC = () => {
     previousTrack,
     setPlayerFullscreen,
     volume,
-    setVolume
+    setVolume,
+    aiDjEnabled,
+    setAiDjEnabled
   } = usePlayerStore();
   const { files } = useLibraryStore();
 
@@ -121,7 +123,15 @@ export const FullNowPlaying: React.FC = () => {
 
           <div className="flex items-center justify-between text-muted-foreground">
              <div className="flex gap-4">
-                <Button variant="ghost" size="icon"><Mic size={20} /></Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(aiDjEnabled && "text-purple-400")}
+                  onClick={() => setAiDjEnabled(!aiDjEnabled)}
+                  title="AI DJ"
+                >
+                  <Mic size={20} />
+                </Button>
                 <Button variant="ghost" size="icon"><ListMusic size={20} /></Button>
              </div>
 

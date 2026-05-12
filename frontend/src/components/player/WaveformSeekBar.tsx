@@ -16,6 +16,8 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     isActive: false,
   });
 
+  const [chapters, setChapters] = useState<{ time: number; title: string }[]>([]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +42,54 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     }, 100);
     return () => clearInterval(checkLoop);
   }, [playbackEngine]);
+
+  useEffect(() => {
+    if (currentFile?.metadata_json) {
+      try {
+        const metadata = JSON.parse(currentFile.metadata_json);
+        if (metadata.chapters) {
+          setChapters(metadata.chapters);
+        } else if (metadata.chapter_data) {
+          setChapters(JSON.parse(metadata.chapter_data));
+        } else {
+          setChapters([]);
+        }
+      } catch (e) {
+        setChapters([]);
+      }
+    } else {
+      setChapters([]);
+    }
+  }, [currentFile]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key) {
+        case '[':
+          playbackEngine.abLoop.setA(currentTime);
+          break;
+        case ']':
+          playbackEngine.abLoop.setB(currentTime);
+          break;
+        case '\\':
+          playbackEngine.abLoop.toggle();
+          break;
+        case 'ArrowLeft':
+          playbackEngine.resume();
+          playbackEngine.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 5)));
+          break;
+        case 'ArrowRight':
+          playbackEngine.resume();
+          playbackEngine.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 5)));
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTime, playbackEngine, duration]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -84,7 +134,14 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
       ctx.fillRect(xA, 0, xB - xA, height);
     }
-  }, [peaks, currentTime, duration, hoverTime, abLoop]);
+
+    // Chapter markers
+    chapters.forEach(chapter => {
+      const x = (chapter.time / duration) * width;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillRect(x - 1, 0, 2, height);
+    });
+  }, [peaks, currentTime, duration, hoverTime, abLoop, chapters]);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
@@ -108,12 +165,12 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       setDragMarker('B');
     } else {
       setDragMarker('progress');
-      // Actually seek in playback engine
-      // This is a bit simplified, usually you'd have a seek method
-      // playbackEngine.seek(targetTime);
+      playbackEngine.seek(targetTime);
     }
     setIsDragging(true);
   };
+
+  const lastPreviewTime = useRef(0);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -129,9 +186,11 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       } else if (dragMarker === 'B') {
         playbackEngine.abLoop.setB(targetTime);
       } else if (dragMarker === 'progress') {
-        // Preview logic: play 300ms snippet
-        // This would require specific support in PlaybackEngine for previewing
-        // For now we just hover
+        const now = Date.now();
+        if (now - lastPreviewTime.current > 400) {
+           playbackEngine.preview(targetTime);
+           lastPreviewTime.current = now;
+        }
       }
     }
   };
