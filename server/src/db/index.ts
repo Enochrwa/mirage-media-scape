@@ -116,12 +116,86 @@ db.exec(`
         value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS radio_stations (
+        stationuuid TEXT PRIMARY KEY,
+        name TEXT,
+        url TEXT,
+        url_resolved TEXT,
+        country TEXT,
+        countrycode TEXT,
+        language TEXT,
+        tags TEXT,
+        bitrate INTEGER,
+        codec TEXT,
+        favicon TEXT,
+        cached_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS podcast_subscriptions (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        feed_url TEXT NOT NULL UNIQUE,
+        description TEXT,
+        artwork_url TEXT,
+        artwork_cache_path TEXT,
+        author TEXT,
+        website TEXT,
+        language TEXT,
+        explicit INTEGER DEFAULT 0,
+        subscribed_at INTEGER,
+        last_fetched INTEGER,
+        auto_download INTEGER DEFAULT 0,
+        play_count INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS podcast_episodes (
+        id TEXT PRIMARY KEY,
+        podcast_id TEXT NOT NULL,
+        guid TEXT,
+        title TEXT,
+        description TEXT,
+        audio_url TEXT NOT NULL,
+        chapter_data TEXT,
+        published_at INTEGER,
+        duration INTEGER,
+        played INTEGER DEFAULT 0,
+        progress_seconds REAL DEFAULT 0,
+        downloaded INTEGER DEFAULT 0,
+        download_path TEXT,
+        file_size INTEGER,
+        FOREIGN KEY (podcast_id) REFERENCES podcast_subscriptions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS downloads (
+        id TEXT PRIMARY KEY,
+        track_id TEXT,
+        episode_id TEXT,
+        url TEXT NOT NULL,
+        local_path TEXT,
+        status TEXT DEFAULT 'pending',
+        progress REAL DEFAULT 0,
+        file_size INTEGER DEFAULT 0,
+        downloaded_bytes INTEGER DEFAULT 0,
+        created_at INTEGER,
+        wifi_only INTEGER DEFAULT 1,
+        priority INTEGER DEFAULT 5,
+        retries INTEGER DEFAULT 0,
+        error TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS sync_log (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
         payload TEXT NOT NULL,
         device_id TEXT NOT NULL,
         timestamp INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS track_coplay (
+        track_a TEXT NOT NULL,
+        track_b TEXT NOT NULL,
+        score INTEGER DEFAULT 1,
+        PRIMARY KEY (track_a, track_b)
     );
 
     CREATE INDEX IF NOT EXISTS idx_tracks_mtime ON tracks(mtime);

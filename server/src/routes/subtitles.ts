@@ -4,8 +4,8 @@ import { SubtitleTrackInfo } from '../../zovyra-native';
 
 const requireNative = createRequire(__filename);
 const native = requireNative('../../zovyra-native.node') as {
-  get_subtitle_tracks: (path: string) => SubtitleTrackInfo[];
-  extract_subtitle_stream: (path: string, index: number) => string;
+  getSubtitleTracks: (path: string) => SubtitleTrackInfo[];
+  extractSubtitleStream: (path: string, index: number) => string;
 };
 
 export interface SubtitleCue {
@@ -20,7 +20,7 @@ router.get('/tracks', (req, res) => {
   const { path: filePath } = req.query;
   if (!filePath || typeof filePath !== 'string') return res.status(400).send('Path required');
   try {
-    const tracks = native.get_subtitle_tracks(filePath) as SubtitleTrackInfo[];
+    const tracks = native.getSubtitleTracks(filePath);
     res.json(tracks);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
@@ -32,7 +32,7 @@ router.get('/extract', (req, res) => {
   if (!filePath || typeof filePath !== 'string' || !index)
     return res.status(400).send('Params required');
   try {
-    const content = native.extract_subtitle_stream(filePath, parseInt(index as string)) as string;
+    const content = native.extractSubtitleStream(filePath, parseInt(index as string));
     res.send(content);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });

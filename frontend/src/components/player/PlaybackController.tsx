@@ -21,7 +21,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils';
-import WaveformSeekBar from './WaveformSeekBar';
+import { WaveformSeekBar } from './WaveformSeekBar';
 import { useState, useEffect } from 'react';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { resourceMonitor, ResourceState } from '@/lib/ResourceMonitor';

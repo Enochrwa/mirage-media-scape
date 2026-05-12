@@ -85,28 +85,42 @@ export class ABLoop {
 
 export type PlaybackState = 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'ENDED' | 'ERROR';
 
+interface TrackChain {
+  preGain: GainNode;
+  eq: ParametricEQ;
+  replayGain: GainNode;
+  crossfade: GainNode;
+}
+
 export class PlaybackEngine {
   public ctx: AudioContext;
   private state: PlaybackState = 'IDLE';
   private currentSource: AudioBufferSourceNode | null = null;
   private nextSource: AudioBufferSourceNode | null = null;
-  private currentGainNode: GainNode;
-  private nextGainNode: GainNode;
-  private normalizationGain: GainNode;
-  private masterGain: GainNode;
-  private panner: PannerNode;
+
+  // Canonical Parallel Prefix
+  private chainA: TrackChain;
+  private chainB: TrackChain;
+  private activeChain: 'A' | 'B' = 'A';
+
+  // Canonical Shared Nodes
   private analyser: AnalyserNode;
-  private eq: ParametricEQ;
+  private bassEnhancer: WaveShaperNode;
+  private panner: PannerNode;
+  private nightCompressor: DynamicsCompressorNode;
+  private masterGain: GainNode;
+
   public abLoop: ABLoop;
   private spatialAudioEnabled: boolean = false;
+  private bassEnhancerEnabled: boolean = false;
+  private nightModeEnabled: boolean = false;
+
   private nextStartTime: number = 0;
   private currentTrackId: string | null = null;
   private currentEventId: number | null = null;
   private fadeDuration: number = 2; // Default 2s crossfade
   private sleepTimerTimeout: NodeJS.Timeout | null = null;
   private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
-
-  private compressor: DynamicsCompressorNode;
 
   constructor() {
     const win = window as Window & {
@@ -116,33 +130,6 @@ export class PlaybackEngine {
     const AudioContextClass = win.AudioContext ?? win.webkitAudioContext;
     if (!AudioContextClass) throw new Error('AudioContext not supported');
     this.ctx = new AudioContextClass();
-    this.currentGainNode = this.ctx.createGain();
-    this.nextGainNode = this.ctx.createGain();
-    this.normalizationGain = this.ctx.createGain();
-    this.masterGain = this.ctx.createGain();
-
-    this.panner = this.ctx.createPanner();
-    this.panner.panningModel = 'HRTF';
-    this.panner.distanceModel = 'inverse';
-    this.panner.refDistance = 1;
-    this.panner.maxDistance = 10000;
-    this.panner.rolloffFactor = 1;
-    this.panner.positionX.value = 0;
-    this.panner.positionY.value = 0;
-    this.panner.positionZ.value = 0;
-
-    this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 2048;
-
-    this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
-    this.compressor.knee.setValueAtTime(40, this.ctx.currentTime);
-    this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);
-    this.compressor.attack.setValueAtTime(0, this.ctx.currentTime);
-    this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
-
-    this.eq = new ParametricEQ(this.ctx);
-    this.abLoop = new ABLoop();
 
     // ═══════════════════════════════════════════════════════════
     // zovyra AUDIO GRAPH — CANONICAL CHAIN (insert all nodes here)
@@ -165,24 +152,101 @@ export class PlaybackEngine {
     //   → Destination
     //
     // ═══════════════════════════════════════════════════════════
-    //
-    // Current wiring (extend toward the diagram above; do not branch to destination):
-    // currentGainNode + nextGainNode → normalizationGain (ReplayGain placeholder)
-    // → EQ chain → masterGain → analyser → panner → compressor → destination
 
-    this.currentGainNode.connect(this.normalizationGain);
-    this.nextGainNode.connect(this.normalizationGain);
-    this.normalizationGain.connect(this.eq.bands[0]);
+    this.chainA = this.createTrackChain();
+    this.chainB = this.createTrackChain();
 
-    for (let i = 0; i < this.eq.bands.length - 1; i++) {
-      this.eq.bands[i].connect(this.eq.bands[i + 1]);
+    this.analyser = this.ctx.createAnalyser();
+    this.bassEnhancer = this.ctx.createWaveShaper();
+    this.panner = this.ctx.createPanner();
+    this.nightCompressor = this.ctx.createDynamicsCompressor();
+    this.masterGain = this.ctx.createGain();
+
+    this.analyser.fftSize = 2048;
+
+    this.panner.panningModel = 'HRTF';
+    this.panner.distanceModel = 'inverse';
+    this.panner.refDistance = 1;
+    this.panner.maxDistance = 10000;
+    this.panner.rolloffFactor = 1;
+
+    // Bass Enhancer curve (Soft-clip harmonic exciter)
+    this.bassEnhancer.curve = this.makeDistortionCurve(400);
+
+    // Night Compressor settings
+    this.nightCompressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
+    this.nightCompressor.knee.setValueAtTime(10, this.ctx.currentTime);
+    this.nightCompressor.ratio.setValueAtTime(12, this.ctx.currentTime);
+    this.nightCompressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+    this.nightCompressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+
+    this.abLoop = new ABLoop();
+
+    // Wiring the chains to merger (Analyser)
+    this.chainA.crossfade.connect(this.analyser);
+    this.chainB.crossfade.connect(this.analyser);
+
+    this.updateChain();
+
+    // Start with chainA active
+    this.chainA.crossfade.gain.setValueAtTime(1, this.ctx.currentTime);
+    this.chainB.crossfade.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.activeChain = 'A';
+  }
+
+  private createTrackChain(): TrackChain {
+    const preGain = this.ctx.createGain();
+    const eq = new ParametricEQ(this.ctx);
+    const replayGain = this.ctx.createGain();
+    const crossfade = this.ctx.createGain();
+
+    preGain.connect(eq.bands[0]);
+    for (let i = 0; i < eq.bands.length - 1; i++) {
+      eq.bands[i].connect(eq.bands[i + 1]);
+    }
+    eq.bands[eq.bands.length - 1].connect(replayGain);
+    replayGain.connect(crossfade);
+
+    return { preGain, eq, replayGain, crossfade };
+  }
+
+  private updateChain() {
+    // Disconnect all bypassable nodes from their potential targets
+    this.analyser.disconnect();
+    this.bassEnhancer.disconnect();
+    this.panner.disconnect();
+    this.nightCompressor.disconnect();
+
+    let currentNode: AudioNode = this.analyser;
+
+    if (this.bassEnhancerEnabled) {
+      currentNode.connect(this.bassEnhancer);
+      currentNode = this.bassEnhancer;
     }
 
-    this.eq.bands[this.eq.bands.length - 1].connect(this.masterGain);
-    this.masterGain.connect(this.analyser);
-    this.analyser.connect(this.panner);
-    this.panner.connect(this.compressor);
-    this.compressor.connect(this.ctx.destination);
+    if (this.spatialAudioEnabled) {
+      currentNode.connect(this.panner);
+      currentNode = this.panner;
+    }
+
+    if (this.nightModeEnabled) {
+      currentNode.connect(this.nightCompressor);
+      currentNode = this.nightCompressor;
+    }
+
+    currentNode.connect(this.masterGain);
+  }
+
+  private makeDistortionCurve(amount: number) {
+    const k = typeof amount === 'number' ? amount : 50;
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / n_samples - 1;
+      curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
   }
 
   setState(newState: PlaybackState) {
@@ -205,24 +269,36 @@ export class PlaybackEngine {
 
   setSpatialAudioEnabled(enabled: boolean) {
     this.spatialAudioEnabled = enabled;
-    this.panner.panningModel = enabled ? 'HRTF' : 'equalpower';
     if (!enabled) {
       this.panner.positionX.setTargetAtTime(0, this.ctx.currentTime, 0.1);
       this.panner.positionY.setTargetAtTime(0, this.ctx.currentTime, 0.1);
       this.panner.positionZ.setTargetAtTime(0, this.ctx.currentTime, 0.1);
     }
+    this.updateChain();
   }
 
   isSpatialAudioEnabled() {
     return this.spatialAudioEnabled;
   }
 
-  getFrequencyResponse(frequencies: Float32Array): Float32Array {
-    return this.eq.getFrequencyResponse(frequencies);
+  setBassEnhancerEnabled(enabled: boolean) {
+    this.bassEnhancerEnabled = enabled;
+    this.updateChain();
+  }
+
+  setNightModeEnabled(enabled: boolean) {
+    this.nightModeEnabled = enabled;
+    this.updateChain();
   }
 
   setEQBand(index: number, gainDb: number) {
-    this.eq.setBand(index, gainDb);
+    this.chainA.eq.setBand(index, gainDb);
+    this.chainB.eq.setBand(index, gainDb);
+  }
+
+  getFrequencyResponse(frequencies: Float32Array): Float32Array {
+    // Both chains should have same EQ, so we can use either
+    return this.chainA.eq.getFrequencyResponse(frequencies);
   }
 
   setSpatialPosition(x: number, y: number, z: number) {
@@ -294,10 +370,12 @@ export class PlaybackEngine {
       });
     }
 
+    const chain = this.activeChain === 'A' ? this.chainA : this.chainB;
+
     if (loudness !== undefined) {
-      this.applyReplayGain(loudness);
+      this.applyReplayGain(loudness, chain);
     } else {
-      this.normalizationGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
     }
 
     this.stop();
@@ -305,12 +383,15 @@ export class PlaybackEngine {
     try {
       const source = this.ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(this.currentGainNode);
+      source.connect(chain.preGain);
 
       const now = this.ctx.currentTime;
       const playTime = now + 0.1;
 
-      this.currentGainNode.gain.setValueAtTime(1, playTime);
+      chain.crossfade.gain.setValueAtTime(1, playTime);
+      const otherChain = this.activeChain === 'A' ? this.chainB : this.chainA;
+      otherChain.crossfade.gain.setValueAtTime(0, playTime);
+
       source.start(playTime, startTime);
 
       source.onended = () => {
@@ -324,6 +405,23 @@ export class PlaybackEngine {
       this.nextStartTime = playTime + buffer.duration - startTime;
       this.setState('PLAYING');
       this.currentTrackId = trackId || null;
+
+      // Start A/B Loop Ticker
+      const ticker = setInterval(() => {
+        if (this.state !== 'PLAYING' || !this.currentSource) {
+           clearInterval(ticker);
+           return;
+        }
+
+        // Use native AudioBufferSourceNode looping if A/B is active
+        if (this.abLoop.isActive && this.abLoop.pointA !== null && this.abLoop.pointB !== null) {
+          this.currentSource.loop = true;
+          this.currentSource.loopStart = this.abLoop.pointA;
+          this.currentSource.loopEnd = this.abLoop.pointB;
+        } else {
+          this.currentSource.loop = false;
+        }
+      }, 100);
 
       if (trackId) {
         this.reportEvent('start', {
@@ -346,22 +444,32 @@ export class PlaybackEngine {
       }
     }
 
+    const nextChain = this.activeChain === 'A' ? this.chainB : this.chainA;
+    const currentChain = this.activeChain === 'A' ? this.chainA : this.chainB;
+
+    if (loudness !== undefined) {
+      this.applyReplayGain(loudness, nextChain);
+    } else {
+      nextChain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    }
+
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.nextGainNode);
+    source.connect(nextChain.preGain);
 
-    // Schedule crossfade
     const fadeStart = this.nextStartTime - this.fadeDuration;
-    this.currentGainNode.gain.setValueAtTime(1, fadeStart);
-    this.currentGainNode.gain.linearRampToValueAtTime(0, this.nextStartTime);
+    const now = this.ctx.currentTime;
 
-    this.nextGainNode.gain.setValueAtTime(0, fadeStart);
-    this.nextGainNode.gain.linearRampToValueAtTime(1, this.nextStartTime);
+    currentChain.crossfade.gain.setValueAtTime(1, Math.max(now, fadeStart));
+    currentChain.crossfade.gain.linearRampToValueAtTime(0, this.nextStartTime);
+
+    nextChain.crossfade.gain.setValueAtTime(0, Math.max(now, fadeStart));
+    nextChain.crossfade.gain.linearRampToValueAtTime(1, this.nextStartTime);
 
     source.start(this.nextStartTime);
     this.nextSource = source;
 
-    // Swap after the transition
+    // Swap after transition
     setTimeout(
       () => {
         if (this.currentSource) {
@@ -373,37 +481,40 @@ export class PlaybackEngine {
         }
         this.currentSource = this.nextSource;
         this.nextSource = null;
-
-        // Swap gain nodes
-        const temp = this.currentGainNode;
-        this.currentGainNode = this.nextGainNode;
-        this.nextGainNode = temp;
-
+        this.activeChain = this.activeChain === 'A' ? 'B' : 'A';
         this.nextStartTime += buffer.duration;
       },
       (this.nextStartTime - this.ctx.currentTime) * 1000,
     );
   }
 
-  async crossfadeTo(nextBuffer: AudioBuffer) {
+  async crossfadeTo(nextBuffer: AudioBuffer, loudness?: number) {
     const now = this.ctx.currentTime;
     const fadeOutEnd = now + this.fadeDuration;
 
+    const currentChain = this.activeChain === 'A' ? this.chainA : this.chainB;
+    const nextChain = this.activeChain === 'A' ? this.chainB : this.chainA;
+
+    if (loudness !== undefined) {
+      this.applyReplayGain(loudness, nextChain);
+    } else {
+      nextChain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    }
+
     // Fade out current
-    this.currentGainNode.gain.setValueAtTime(this.currentGainNode.gain.value, now);
-    this.currentGainNode.gain.linearRampToValueAtTime(0, fadeOutEnd);
+    currentChain.crossfade.gain.setValueAtTime(currentChain.crossfade.gain.value, now);
+    currentChain.crossfade.gain.linearRampToValueAtTime(0, fadeOutEnd);
 
     // Fade in next
     const nextSource = this.ctx.createBufferSource();
     nextSource.buffer = nextBuffer;
-    nextSource.connect(this.nextGainNode);
+    nextSource.connect(nextChain.preGain);
 
-    this.nextGainNode.gain.setValueAtTime(0, now);
-    this.nextGainNode.gain.linearRampToValueAtTime(1, fadeOutEnd);
+    nextChain.crossfade.gain.setValueAtTime(0, now);
+    nextChain.crossfade.gain.linearRampToValueAtTime(1, fadeOutEnd);
 
     nextSource.start(now);
 
-    // Cleanup after fade
     setTimeout(() => {
       if (this.currentSource) {
         try {
@@ -413,12 +524,7 @@ export class PlaybackEngine {
         }
       }
       this.currentSource = nextSource;
-
-      // Swap gain nodes
-      const temp = this.currentGainNode;
-      this.currentGainNode = this.nextGainNode;
-      this.nextGainNode = temp;
-
+      this.activeChain = this.activeChain === 'A' ? 'B' : 'A';
       this.nextStartTime = now + nextBuffer.duration;
     }, this.fadeDuration * 1000);
   }
@@ -454,10 +560,10 @@ export class PlaybackEngine {
       this.setState('IDLE');
     }
 
-    this.currentGainNode.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.nextGainNode.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.currentGainNode.gain.setValueAtTime(1, this.ctx.currentTime);
-    this.nextGainNode.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.chainA.crossfade.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.chainB.crossfade.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.chainA.crossfade.gain.setValueAtTime(this.activeChain === 'A' ? 1 : 0, this.ctx.currentTime);
+    this.chainB.crossfade.gain.setValueAtTime(this.activeChain === 'B' ? 1 : 0, this.ctx.currentTime);
   }
 
   pause() {
@@ -480,14 +586,15 @@ export class PlaybackEngine {
     this.masterGain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
   }
 
-  applyReplayGain(loudness: number) {
-    const targetLUFS = -16;
+  applyReplayGain(loudness: number, chain?: TrackChain) {
+    const targetLUFS = -14; // Spec says -14 LUFS target
     const adjustment = targetLUFS - loudness;
     const gainMultiplier = Math.pow(10, adjustment / 20);
 
     // Cap the gain to avoid extreme boosting
     const cappedGain = Math.min(gainMultiplier, 2.0);
-    this.normalizationGain.gain.setTargetAtTime(cappedGain, this.ctx.currentTime, 0.1);
+    const targetChain = chain || (this.activeChain === 'A' ? this.chainA : this.chainB);
+    targetChain.replayGain.gain.setTargetAtTime(cappedGain, this.ctx.currentTime, 0.1);
   }
 
   get currentTime() {
