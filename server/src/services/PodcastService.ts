@@ -15,7 +15,12 @@ export class PodcastService {
 
   public async subscribe(feedUrl: string) {
     try {
-      const response = await fetch(feedUrl);
+      const validatedUrl = new URL(feedUrl);
+      if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
+        throw new Error('Invalid protocol for podcast feed');
+      }
+
+      const response = await fetch(validatedUrl.toString());
       const xml = await response.text();
       const data = this.parser.parse(xml);
       const channel = data.rss.channel;

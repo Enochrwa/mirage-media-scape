@@ -16,11 +16,17 @@ export class DownloadManager {
   }
 
   public async queueDownload(url: string, trackId?: string, episodeId?: string) {
+    // Basic SSRF validation
+    const validatedUrl = new URL(url);
+    if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
+      throw new Error('Invalid protocol for download');
+    }
+
     const id = crypto.randomUUID();
     this.db.prepare(`
       INSERT INTO downloads (id, track_id, episode_id, url, status, created_at)
       VALUES (?, ?, ?, ?, 'pending', ?)
-    `).run(id, trackId || null, episodeId || null, url, Date.now());
+    `).run(id, trackId || null, episodeId || null, validatedUrl.toString(), Date.now());
 
     this.processQueue();
     return id;

@@ -32,13 +32,18 @@ router.get('/by-tag/:tag', async (req, res) => {
 
 // Stream proxy with ICY metadata extraction
 router.get('/proxy', async (req, res) => {
-  const { url } = req.query;
-  if (!url || typeof url !== 'string') return res.status(400).send('URL required');
+  const { url: streamUrl } = req.query;
+  if (!streamUrl || typeof streamUrl !== 'string') return res.status(400).send('URL required');
 
   try {
+    const validatedUrl = new URL(streamUrl);
+    if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
+      return res.status(400).send('Invalid protocol');
+    }
+
     const response = await axios({
       method: 'get',
-      url: url,
+      url: validatedUrl.toString(),
       responseType: 'stream',
       headers: {
         'Icy-MetaData': '1',
