@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import {
   Search,
+  Mic,
   Music,
   Film,
   ListMusic,
@@ -162,6 +163,18 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 label={t('Internet Radio')}
                 active={location.pathname === '/radio'}
                 to="/radio"
+              />
+              <SidebarItem
+                icon={<Mic size={20} />}
+                label={t('Podcasts')}
+                active={location.pathname === '/podcasts'}
+                to="/podcasts"
+              />
+              <SidebarItem
+                icon={<User size={20} />}
+                label={t('Remote')}
+                active={location.pathname === '/remote'}
+                to="/remote"
               />
             </div>
 
@@ -393,6 +406,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   </TooltipTrigger>
                   <TooltipContent side="right">Internet Radio</TooltipContent>
                 </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<User size={20} />}
+                        label=""
+                        active={location.pathname === '/remote'}
+                        to="/remote"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Remote Control</TooltipContent>
+                </Tooltip>
               </>
             ) : (
               <div className="space-y-1">
@@ -413,6 +440,18 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                   label={t('Internet Radio')}
                   active={location.pathname === '/radio'}
                   to="/radio"
+                />
+                <SidebarItem
+                  icon={<Mic size={20} />}
+                  label={t('Podcasts')}
+                  active={location.pathname === '/podcasts'}
+                  to="/podcasts"
+                />
+                <SidebarItem
+                  icon={<User size={20} />}
+                  label={t('Remote')}
+                  active={location.pathname === '/remote'}
+                  to="/remote"
                 />
               </div>
             )}
@@ -639,6 +678,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       <div className="p-2">
         <TooltipProvider>
           {collapsed ? (
+            <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
@@ -652,6 +692,21 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               </TooltipTrigger>
               <TooltipContent side="right">{t('Settings')}</TooltipContent>
             </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<Mic size={20} />}
+                        label=""
+                        active={location.pathname === '/podcasts'}
+                        to="/podcasts"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Podcasts</TooltipContent>
+                </Tooltip>
+            </>
           ) : (
             <SidebarItem
               icon={<Settings size={20} />}

@@ -1,95 +1,82 @@
+import Database from 'better-sqlite3';
 import { createRequire } from 'node:module';
-import db from '../db';
 import { Track } from '../types/database';
 
-interface NativeModule {
-  generateWaveformFingerprint: (path: string) => string;
-}
-
 const requireNative = createRequire(__filename);
-
-let native: NativeModule;
-try {
-  native = requireNative('../../zovyra-native.node') as NativeModule;
-} catch {
-  native = {
-    generateWaveformFingerprint: () => '0'.repeat(64),
-  };
-}
-
-interface Candidate {
-  artist: string;
-  dur: number;
-}
+const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 export class DuplicateFinderService {
-  static findCandidates(): Candidate[] {
-    // Find tracks with same duration (rounded) and artist
-    return db
-      .prepare(
-        `
-            SELECT artist, ROUND(duration) as dur, COUNT(*) as count
-            FROM tracks
-            WHERE missing = 0 AND artist IS NOT NULL
-            GROUP BY artist, dur
-            HAVING count > 1
-        `,
+  constructor(private db: Database.Database) {}
+
+  public async findDuplicates() {
+    const candidates = this.db.prepare(`
+      SELECT id, title, artist, duration, file_path, bitrate, file_size
+      FROM tracks
+      WHERE missing = 0
+      AND id IN (
+        SELECT id FROM tracks
+        GROUP BY ROUND(duration), LOWER(TRIM(artist))
+        HAVING COUNT(*) > 1
       )
-      .all() as Candidate[];
-  }
+    `).all() as Track[];
 
-  static getDuplicateGroups(candidates: Candidate[]): Track[][] {
-    const groups: Track[][] = [];
-    for (const candidate of candidates) {
-      const tracks = db
-        .prepare(
-          `
-                SELECT * FROM tracks
-                WHERE artist = ? AND ROUND(duration) = ? AND missing = 0
-            `,
-        )
-        .all(candidate.artist, candidate.dur) as Track[];
+    const groups: Record<string, Track[]> = {};
+    for (const track of candidates) {
+      const key = `${Math.round(track.duration || 0)}_${(track.artist || '').toLowerCase().trim()}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(track);
+    }
 
-      if (tracks.length < 2) continue;
+    const duplicates: Track[][] = [];
 
-      // Accurate pass: generate waveform fingerprints and compare Hamming distance
-      try {
-        const confirmedGroup: Track[] = [tracks[0]];
-        const fp1 = native.generateWaveformFingerprint(tracks[0].file_path);
+    for (const key in groups) {
+      const group = groups[key];
+      if (group.length < 2) continue;
 
-        for (let i = 1; i < tracks.length; i++) {
-          const fp2 = native.generateWaveformFingerprint(tracks[i].file_path);
-          if (this.compareFingerprints(fp1, fp2) <= 3) {
-            confirmedGroup.push(tracks[i]);
+      const groupDuplicates: Track[] = [];
+      const fingerprints: Record<string, string> = {};
+
+      for (const track of group) {
+        try {
+          const fp = native.generate_waveform_fingerprint(track.file_path);
+          fingerprints[track.id] = fp;
+        } catch (e) {
+          console.error(`Failed to generate fingerprint for ${track.file_path}:`, e);
+        }
+      }
+
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const fp1 = fingerprints[group[i].id];
+          const fp2 = fingerprints[group[j].id];
+
+          if (fp1 && fp2 && this.hammingDistance(fp1, fp2) <= 3) {
+            if (!groupDuplicates.includes(group[i])) groupDuplicates.push(group[i]);
+            if (!groupDuplicates.includes(group[j])) groupDuplicates.push(group[j]);
           }
         }
+      }
 
-        if (confirmedGroup.length > 1) {
-          groups.push(confirmedGroup);
-        }
-      } catch (e) {
-        console.error('Accurate duplicate check failed:', e);
-        // Fallback to basic match if native module fails
-        groups.push(tracks);
+      if (groupDuplicates.length > 0) {
+        duplicates.push(groupDuplicates);
       }
     }
-    return groups;
+
+    return duplicates;
   }
 
-  private static compareFingerprints(fp1: string, fp2: string): number {
-    let distance = 0;
-    // Fingerprints are 32-char hex strings (64 chars actually, 32 bytes)
-    for (let i = 0; i < fp1.length; i += 2) {
-      const b1 = parseInt(fp1.substring(i, i + 2), 16);
-      const b2 = parseInt(fp2.substring(i, i + 2), 16);
-
-      // Hamming distance on bytes
-      let xor = b1 ^ b2;
-      while (xor > 0) {
-        if (xor & 1) distance++;
-        xor >>= 1;
+  private hammingDistance(h1: string, h2: string): number {
+    if (h1.length !== h2.length) return 999;
+    let dist = 0;
+    for (let i = 0; i < h1.length; i++) {
+      const b1 = parseInt(h1[i], 16);
+      const b2 = parseInt(h2[i], 16);
+      let x = b1 ^ b2;
+      while (x > 0) {
+        dist++;
+        x &= x - 1;
       }
     }
-    return distance;
+    return dist;
   }
 }

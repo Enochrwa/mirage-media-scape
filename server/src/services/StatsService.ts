@@ -73,4 +73,42 @@ export class StatsService {
             topArtist: topArtist?.artist ?? 'None',
         };
     }
+
+    static getHeatmap() {
+        return db.prepare(`
+            SELECT
+                strftime('%w', datetime(started_at/1000, 'unixepoch')) as day,
+                strftime('%H', datetime(started_at/1000, 'unixepoch')) as hour,
+                COUNT(*) as count
+            FROM play_events
+            GROUP BY day, hour
+        `).all();
+    }
+
+    static getYearRecap(year: number) {
+        const start = new Date(year, 0, 1).getTime();
+        const end = new Date(year + 1, 0, 1).getTime();
+
+        return {
+            totalTimeSeconds: db.prepare("SELECT SUM(position) as total FROM play_events WHERE started_at BETWEEN ? AND ?").get(start, end),
+            topTrack: db.prepare(`
+                SELECT t.*, COUNT(e.id) as plays
+                FROM tracks t
+                JOIN play_events e ON t.id = e.track_id
+                WHERE e.started_at BETWEEN ? AND ?
+                GROUP BY t.id
+                ORDER BY plays DESC
+                LIMIT 1
+            `).get(start, end),
+            topArtist: db.prepare(`
+                SELECT artist, COUNT(*) as plays
+                FROM tracks t
+                JOIN play_events e ON t.id = e.track_id
+                WHERE e.started_at BETWEEN ? AND ?
+                GROUP BY artist
+                ORDER BY plays DESC
+                LIMIT 1
+            `).get(start, end),
+        };
+    }
 }

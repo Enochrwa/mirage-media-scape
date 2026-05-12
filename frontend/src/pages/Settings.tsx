@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import {
   Select,
   SelectContent,
@@ -22,8 +23,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Globe, Moon, Sun, User, Bell, Shield, Download, Save } from 'lucide-react';
+import { Globe, Moon, Sun, User, Bell, Shield, Download, Save, Zap, Volume2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { playbackEngine } from '@/lib/PlaybackEngine';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -32,6 +34,10 @@ const Settings = () => {
   const [notifications, setNotifications] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
   const [downloadQuality, setDownloadQuality] = useState('high');
+
+  const [bassEnhancer, setBassEnhancer] = useState(false);
+  const [nightMode, setNightMode] = useState(false);
+  const [crossfade, setCrossfade] = useState(2);
 
   const handleSaveSettings = () => {
     toast({
@@ -44,18 +50,73 @@ const Settings = () => {
     <MainLayout>
       <div className="animate-fade-in space-y-6">
         <div>
-          <h1 className="mb-1 text-4xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">Manage your application preferences</p>
+          <h1 className="mb-1 text-4xl font-bold tracking-tight uppercase">Settings</h1>
+          <p className="text-muted-foreground">Customize your zovyra experience.</p>
         </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="mb-6 grid max-w-2xl grid-cols-5">
+        <Tabs defaultValue="playback" className="w-full">
+          <TabsList className="mb-6 grid max-w-3xl grid-cols-6">
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="playback">Playback</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="playback" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Audio Engine
+                </CardTitle>
+                <CardDescription>Advanced audio processing and transitions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                <div className="flex items-center justify-between">
+                   <div className="space-y-1">
+                      <Label className="text-base">Bass Enhancer</Label>
+                      <p className="text-sm text-muted-foreground">Harmonic exciter for warmer low-end</p>
+                   </div>
+                   <Switch
+                    checked={bassEnhancer}
+                    onCheckedChange={(v) => {
+                      setBassEnhancer(v);
+                      playbackEngine.setBassEnhancerEnabled(v);
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                   <div className="space-y-1">
+                      <Label className="text-base">Night Mode</Label>
+                      <p className="text-sm text-muted-foreground">Dynamic range compression for quiet listening</p>
+                   </div>
+                   <Switch
+                    checked={nightMode}
+                    onCheckedChange={(v) => {
+                      setNightMode(v);
+                      playbackEngine.setNightModeEnabled(v);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                   <div className="flex justify-between">
+                      <Label className="text-base">Crossfade Duration</Label>
+                      <span className="font-mono text-primary">{crossfade}s</span>
+                   </div>
+                   <Slider
+                    value={[crossfade]}
+                    onValueChange={(v) => setCrossfade(v[0])}
+                    max={12}
+                    step={1}
+                   />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="general" className="space-y-6">
             <Card>

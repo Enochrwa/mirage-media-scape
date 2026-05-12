@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import Index from './pages/Index';
 import Home from './pages/Home';
 import Library from './pages/Library';
@@ -13,6 +14,7 @@ import StatsPage from './pages/StatsPage';
 import RemotePage from './pages/RemotePage';
 import DuplicateManagerPage from './pages/DuplicateManagerPage';
 import RadioPage from './pages/RadioPage';
+import PodcastsPage from './pages/PodcastsPage';
 import Music from './pages/Music';
 import Videos from './pages/Videos';
 import Upload from './pages/Upload';
@@ -32,6 +34,40 @@ const App = () => {
   useEffect(() => {
     initLibrary();
   }, [initLibrary]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Global shortcuts
+      const player = usePlayerStore.getState();
+      const library = useLibraryStore.getState();
+
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch(e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault();
+          player.togglePlayback();
+          break;
+        case 'n':
+          player.nextTrack(library.files);
+          break;
+        case 'p':
+          player.previousTrack(library.files);
+          break;
+        case 'f':
+          if (player.currentFile?.type === 'video') {
+             // Handle fullscreen
+          }
+          break;
+        case 'm':
+          // Toggle mute
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -70,6 +106,7 @@ const App = () => {
               <Route path="/remote" element={<RemotePage />} />
               <Route path="/duplicates" element={<DuplicateManagerPage />} />
               <Route path="/radio" element={<RadioPage />} />
+              <Route path="/podcasts" element={<PodcastsPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

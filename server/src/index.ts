@@ -11,6 +11,8 @@ import playlistsRouter from './routes/playlists';
 import statsRouter from './routes/stats';
 import radioRouter from './routes/radio';
 import subtitlesRouter from './routes/subtitles';
+import aidjRouter from './routes/ai-dj';
+import podcastsRouter from './routes/podcasts';
 
 import { LocalSyncServer } from './services/LocalSyncServer';
 import { RemoteControlServer } from './services/RemoteControlServer';
@@ -42,6 +44,8 @@ app.use('/api/playlists', playlistsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/radio', radioRouter);
 app.use('/api/subtitles', subtitlesRouter);
+app.use('/api/ai-dj', aidjRouter);
+app.use('/api/podcasts', podcastsRouter);
 
 // Serve covers
 app.use('/api/covers', express.static(path.join(__dirname, '../cache/covers')));

@@ -1,29 +1,25 @@
 import React from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import AudioPlayer from './AudioPlayer';
+import { MiniPlayer } from './player/MiniPlayer';
+import { FullNowPlaying } from './player/FullNowPlaying';
 import VideoPlayer from './VideoPlayer';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const PlayerWrapper = () => {
-  const { currentFile, closePlayer } = usePlayerStore();
+  const { currentFile, isPlayerFullscreen } = usePlayerStore();
 
   if (!currentFile) {
     return null;
   }
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      closePlayer();
-    }
-  };
+  if (currentFile.type === 'video') {
+    return <VideoPlayer />;
+  }
 
   return (
-    <Dialog open={!!currentFile} onOpenChange={handleOpenChange}>
-      <DialogContent className="h-full max-h-none w-full max-w-none border-0 bg-transparent p-0">
-        {currentFile.type === 'audio' && <AudioPlayer />}
-        {currentFile.type === 'video' && <VideoPlayer />}
-      </DialogContent>
-    </Dialog>
+    <>
+      <MiniPlayer />
+      {isPlayerFullscreen && <FullNowPlaying />}
+    </>
   );
 };
 

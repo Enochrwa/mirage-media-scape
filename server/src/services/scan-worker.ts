@@ -77,6 +77,27 @@ async function scan() {
         fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArt));
       }
 
+      let thumbnailPath: string | undefined = undefined;
+      if (fileType === 'video') {
+        thumbnailPath = path.join(coversDir, `${id}_thumb.jpg`);
+        try {
+          native.generateThumbnail(filePath, metadata.duration * 0.25, thumbnailPath);
+        } catch (e) {
+          console.warn(`Thumbnail generation failed for ${filePath}:`, e);
+          thumbnailPath = undefined;
+        }
+      }
+
+      let waveformData: string | undefined = undefined;
+      if (fileType === 'audio') {
+        try {
+          const peaks = native.generateWaveform(filePath);
+          waveformData = JSON.stringify(peaks);
+        } catch (e) {
+          console.warn(`Waveform generation failed for ${filePath}:`, e);
+        }
+      }
+
       const trackData: Track = {
         id,
         title: metadata.title || path.basename(filePath),
@@ -98,13 +119,13 @@ async function scan() {
         camelot_key: analysis?.camelotKey || undefined,
         bpm_confidence: analysis?.bpmConfidence || undefined,
         cover_cache_path: coverCachePath,
-        thumbnail_path: undefined,
+        thumbnail_path: thumbnailPath,
         missing: 0,
         metadata_json: JSON.stringify({ ...metadata, analysis }),
         rating: 0,
         play_count: 0,
         file_type: fileType,
-        waveform_data: undefined as string | undefined,
+        waveform_data: waveformData,
       };
 
       db.prepare(

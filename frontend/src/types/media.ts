@@ -28,6 +28,8 @@ export interface MediaFile {
   file_type?: string;
   width?: number;
   height?: number;
+  waveform_data?: string;
+  color?: string;
 }
 
 export interface SmartPlaylistCondition {

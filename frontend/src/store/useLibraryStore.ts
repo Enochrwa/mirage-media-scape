@@ -174,6 +174,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     await get().fetchInstantTracks();
     void get().fetchTracks();
     await get().fetchSmartPlaylists();
+
+    useLibraryStore.subscribe((state) => {
+      (window as unknown as { libraryFiles: MediaFile[] }).libraryFiles = state.files;
+    });
   },
 
   fetchInstantTracks: async () => {
