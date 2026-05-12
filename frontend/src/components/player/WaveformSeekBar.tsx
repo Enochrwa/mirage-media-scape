@@ -86,22 +86,59 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     }
   }, [peaks, currentTime, duration, hoverTime, abLoop]);
 
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
+
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const position = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-    playbackEngine.ctx.resume().then(() => {
-       // Manual seek logic if needed, but for now we just update time
-       // In a real implementation, you'd call playbackEngine.seek(position * duration)
-    });
+    const targetTime = position * duration;
+
+    // Check if clicking near A or B markers
+    const clickThreshold = 0.02; // 2% of width
+    const progressPos = currentTime / duration;
+    const aPos = abLoop.pointA !== null ? abLoop.pointA / duration : -1;
+    const bPos = abLoop.pointB !== null ? abLoop.pointB / duration : -1;
+
+    if (Math.abs(position - aPos) < clickThreshold) {
+      setDragMarker('A');
+    } else if (Math.abs(position - bPos) < clickThreshold) {
+      setDragMarker('B');
+    } else {
+      setDragMarker('progress');
+      // Actually seek in playback engine
+      // This is a bit simplified, usually you'd have a seek method
+      // playbackEngine.seek(targetTime);
+    }
+    setIsDragging(true);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    setHoverTime(Math.max(0, Math.min(1, x / rect.width)) * duration);
+    const position = Math.max(0, Math.min(1, x / rect.width));
+    const targetTime = position * duration;
+    setHoverTime(targetTime);
+
+    if (isDragging && dragMarker) {
+      if (dragMarker === 'A') {
+        playbackEngine.abLoop.setA(targetTime);
+      } else if (dragMarker === 'B') {
+        playbackEngine.abLoop.setB(targetTime);
+      } else if (dragMarker === 'progress') {
+        // Preview logic: play 300ms snippet
+        // This would require specific support in PlaybackEngine for previewing
+        // For now we just hover
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragMarker(null);
   };
 
   const formatTime = (seconds: number) => {
@@ -123,7 +160,11 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         className="relative h-16 w-full cursor-pointer group"
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverTime(null)}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          setHoverTime(null);
+          handleMouseUp();
+        }}
       >
         <canvas ref={canvasRef} width={1000} height={64} className="h-full w-full" />
 
@@ -136,14 +177,22 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* A/B Markers */}
         {abLoop.pointA !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-cyan-400"
-            style={{ left: `${(abLoop.pointA / duration) * 100}%`, transform: 'translateX(-50%)' }}
+            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            style={{
+                left: `${(abLoop.pointA / duration) * 100}%`,
+                transform: 'translateX(-50%)',
+                borderTopColor: '#00FFFF'
+            }}
           />
         )}
         {abLoop.pointB !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-orange-400"
-            style={{ left: `${(abLoop.pointB / duration) * 100}%`, transform: 'translateX(-50%)' }}
+            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            style={{
+                left: `${(abLoop.pointB / duration) * 100}%`,
+                transform: 'translateX(-50%)',
+                borderTopColor: '#FF8C00'
+            }}
           />
         )}
       </div>

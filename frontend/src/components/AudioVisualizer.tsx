@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { playbackEngine } from '@/lib/PlaybackEngine';
+import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 
 interface AudioVisualizerProps {
   className?: string;
@@ -14,6 +15,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   color = '#8B5CF6',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lowPowerMode = useLowPowerMode();
   const animationRef = useRef<number>();
   const [isVisible, setIsVisible] = useState(true);
 
@@ -57,6 +59,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const render = () => {
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
+
+      if (lowPowerMode) {
+        return;
+      }
 
       if (mode === 'spectrum') {
         analyser.getByteFrequencyData(freqData);
@@ -245,7 +251,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [mode, isVisible, color]);
+  }, [mode, isVisible, color, lowPowerMode]);
 
   return (
     <canvas

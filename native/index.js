@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { extractMetadata, generateThumbnail, getSubtitleTracks, extractSubtitleStream, analyzeAudio, generateWaveform } = nativeBinding
+const { extractMetadata, generateThumbnail, getSubtitleTracks, extractSubtitleStream, analyzeAudio, generateWaveform, generateWaveformFingerprint, generateFingerprint, scanFolders } = nativeBinding
 
 module.exports.extractMetadata = extractMetadata
 module.exports.generateThumbnail = generateThumbnail
@@ -318,3 +318,6 @@ module.exports.getSubtitleTracks = getSubtitleTracks
 module.exports.extractSubtitleStream = extractSubtitleStream
 module.exports.analyzeAudio = analyzeAudio
 module.exports.generateWaveform = generateWaveform
+module.exports.generateWaveformFingerprint = generateWaveformFingerprint
+module.exports.generateFingerprint = generateFingerprint
+module.exports.scanFolders = scanFolders

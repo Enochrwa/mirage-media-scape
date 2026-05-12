@@ -29,19 +29,35 @@ export interface SubtitleTrackInfo {
 export interface TrackMetadata {
   title?: string
   artist?: string
+  albumArtist?: string
   album?: string
-  genre?: string
   year?: number
+  genre?: string
   trackNumber?: number
   discNumber?: number
+  composer?: string
+  lyricist?: string
+  comment?: string
+  copyright?: string
+  encoder?: string
   duration: number
-  bitrate: number
   sampleRate?: number
+  bitRate?: number
   channels?: number
+  codecName?: string
+  fileType: string
   width?: number
   height?: number
-  format: string
-  coverArt?: Array<number>
+  frameRate?: number
+  videoCodec?: string
+  audioCodec?: string
+  coverArtBytes?: Array<number>
+  replaygainTrackGain?: number
+  replaygainAlbumGain?: number
+  replaygainTrackPeak?: number
+  replaygainAlbumPeak?: number
+  lyrics?: string
+  syncedLyrics?: string
 }
 export declare function extractMetadata(path: string): TrackMetadata
 export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void
@@ -50,3 +66,14 @@ export declare function extractSubtitleStream(path: string, streamIndex: number)
 export declare function analyzeAudio(path: string): AudioMetadata
 export declare function generateWaveform(path: string): Array<number>
 export declare function generateWaveformFingerprint(path: string): string
+export interface FingerprintResult {
+  fingerprint: string
+  duration: number
+}
+export declare function generateFingerprint(path: string): FingerprintResult
+export interface ScannedFile {
+  path: string
+  mtime: number
+  size: number
+}
+export declare function scanFolders(folders: Array<string>): Array<ScannedFile>

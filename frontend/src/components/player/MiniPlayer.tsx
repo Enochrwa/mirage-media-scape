@@ -1,7 +1,8 @@
 import React from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { Play, Pause, SkipBack, SkipForward, ChevronUp, Volume2, ListMusic } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, ChevronUp, Volume2, ListMusic, Zap } from 'lucide-react';
+import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ export const MiniPlayer: React.FC = () => {
     setPlayerFullscreen
   } = usePlayerStore();
   const { files } = useLibraryStore();
+  const lowPowerMode = useLowPowerMode();
 
   if (!currentFile) return null;
 
@@ -65,6 +67,12 @@ export const MiniPlayer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4 text-muted-foreground">
+          {lowPowerMode && (
+            <div className="hidden lg:flex items-center bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded-full text-[10px] font-bold">
+              <Zap className="h-3 w-3 mr-1 fill-current" />
+              LOW POWER
+            </div>
+          )}
           <Button variant="ghost" size="icon" className="hidden md:inline-flex">
             <Volume2 size={20} />
           </Button>
