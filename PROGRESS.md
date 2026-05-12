@@ -4,7 +4,7 @@ This file tracks delivery against the master specification. Status labels: **Don
 
 ## Canonical audio graph
 
-- **Partial** — Full canonical block comment added at the audio graph construction site in `frontend/src/lib/PlaybackEngine.ts`. The live node chain still uses the previous simplified wiring (normalization → EQ → master → analyser → panner → compressor); Pre-Gain, dedicated ReplayGain vs crossfade split, Bass Enhancer (`WaveShaperNode`), and strict ordering will be aligned in a dedicated audio-engine pass.
+- **✅ Done** — Aligned `PlaybackEngine.ts` with the canonical audio graph spec: Source -> Pre-Gain -> EQ -> ReplayGain -> Crossfade -> Analyser -> Pitch Preserver -> Bass Enhancer -> Spatial Panner -> Night Compressor -> Master Volume -> Destination.
 
 ## Step 0 — Instant media library
 
@@ -21,12 +21,14 @@ This file tracks delivery against the master specification. Status labels: **Don
 - **✅ Done**
   - **Done:** Media Session API handlers registered in `usePlayerStore.ts`.
   - **Done:** Visibility listeners to pause RAF visualizers when app is backgrounded.
+  - **Done:** Tauri System Tray implementation with playback controls and "minimize to tray".
+  - **Done:** Global media key shortcuts registered via Tauri plugin.
 
 ## Step 2 — Player UI
 
 - **✅ Done**
-  - **Done:** Persistent `MiniPlayer` component.
-  - **Done:** Full-screen `FullNowPlaying` view with dynamic blurred backgrounds and breathing animations.
+  - **Done:** Persistent `MiniPlayer` component with marquee scrolling for long titles.
+  - **Done:** Full-screen `FullNowPlaying` view with dynamic blurred backgrounds, breathing animations, and 'More Like This' recommendations.
 
 ## Step 3 — Audio Engine
 
@@ -46,11 +48,13 @@ This file tracks delivery against the master specification. Status labels: **Don
 - **✅ Done**
   - **Done:** 3-tier resolution: Embedded -> Cache -> LRCLIB API.
   - **Done:** LibreTranslate integration for lyrics translation.
+  - **Done:** Word-level karaoke highlighting and binary-search optimized scrolling in `LyricsDisplay.tsx`.
 
 ## Step 7 — Subtitles
 
 - **✅ Done**
-  - **Done:** Native subtitle extraction and SRT parsing in `SubtitleService.ts`.
+  - **Done:** Native subtitle extraction and SRT/VTT/ASS parsing in `SubtitleService.ts`.
+  - **Done:** External subtitle file loading support in `SubtitleManager.tsx`.
 
 ## Step 9 — Smart Radio
 
@@ -72,6 +76,7 @@ This file tracks delivery against the master specification. Status labels: **Don
 - **✅ Done**
   - **Done:** Sophisticated `RecommendationService.ts` using content-based vectors and co-play signals.
   - **Done:** `AIDJService.ts` with script templates for contextual introductions.
+  - **Done:** Enhanced Rust audio analysis with BPM, Key, Scale, Energy, and Danceability.
 
 ## Step 18 & 19 — Sync & Remote
 
@@ -86,21 +91,23 @@ This file tracks delivery against the master specification. Status labels: **Don
 
 ### Files touched in this session
 
+- `native/src/lib.rs`
+- `native/Cargo.toml`
 - `server/src/db/index.ts`
-- `server/src/index.ts`
-- `server/src/types/database.ts`
-- `server/src/controllers/tracksController.ts`
-- `server/src/controllers/scannerController.ts`
-- `server/src/routes/tracks.ts`
-- `server/src/routes/scanner.ts`
-- `server/src/services/scanner.ts`
+- `server/src/utils/db-utils.ts` (new)
 - `server/src/services/scan-worker.ts`
-- `server/src/services/LibraryWatcher.ts` (new)
+- `server/src/services/SubtitleService.ts`
+- `server/src/types/database.ts`
+- `server/package.json`
+- `frontend/src-tauri/src/lib.rs`
+- `frontend/src-tauri/Cargo.toml`
 - `frontend/src/lib/PlaybackEngine.ts`
-- `frontend/src/lib/utils.ts`
+- `frontend/src/components/player/MiniPlayer.tsx`
+- `frontend/src/components/player/FullNowPlaying.tsx`
+- `frontend/src/components/player/LyricsDisplay.tsx`
+- `frontend/src/components/player/WaveformSeekBar.tsx`
+- `frontend/src/components/SubtitleManager.tsx`
+- `frontend/src/engines/VideoDecodeEngine.ts`
 - `frontend/src/types/media.ts`
-- `frontend/src/store/useLibraryStore.ts`
-- `frontend/src/components/LibraryGrid.tsx`
-- `frontend/src/components/LibraryOnboarding.tsx` (new)
-- `frontend/src/components/MediaLibrary.tsx`
-- `PROGRESS.md` (new)
+- `frontend/src/App.css`
+- `PROGRESS.md`

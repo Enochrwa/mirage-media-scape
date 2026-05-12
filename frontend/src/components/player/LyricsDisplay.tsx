@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LyricLine, LyricsService } from '@/lib/LyricsService';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface LyricsDisplayProps {
   artist: string;
@@ -17,6 +18,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 }) => {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [isKaraokeMode, setIsKaraokeMode] = useState(true);
+  const [showTranslation, setShowTranslation] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,41 +68,82 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   }
 
   return (
-    <div ref={containerRef} className={cn('space-y-6 overflow-y-auto px-4 py-32', className)}>
-      {lyrics.map((line, i) => (
-        <div
-          key={i}
-          data-index={i}
-          className={cn(
-            'cursor-pointer text-2xl font-bold transition-all duration-500 hover:text-white',
-            i === activeIndex
-              ? 'origin-left scale-110 text-white opacity-100'
-              : 'text-zinc-600 opacity-40 hover:opacity-100',
-          )}
-          onClick={() => {
-            // Logic to seek could go here if needed, via context
-          }}
+    <div className="relative h-full overflow-hidden">
+      <div className="absolute top-4 right-4 z-20 flex gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowTranslation(!showTranslation)}
+          className={cn(showTranslation && "text-primary")}
         >
-          {line.words ? (
-            line.words.map((word, wi) => {
-              const isWordActive = currentTime >= word.time;
-              return (
-                <span
-                  key={wi}
-                  className={cn(
-                    'mr-2 transition-colors duration-200',
-                    isWordActive ? 'text-white' : 'text-zinc-600'
+          🌐
+        </Button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className={cn('h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-[40vh]', className)}
+      >
+        <div className="space-y-12">
+          {lyrics.map((line, i) => {
+            const distance = Math.abs(i - activeIndex);
+            const isActive = i === activeIndex;
+
+            return (
+              <div
+                key={i}
+                data-index={i}
+                className={cn(
+                  'cursor-pointer transition-all duration-500 text-center select-none',
+                  isActive
+                    ? 'text-3xl font-bold text-white scale-110 opacity-100'
+                    : distance === 1
+                    ? 'text-2xl font-semibold text-zinc-400 opacity-70'
+                    : 'text-xl font-medium text-zinc-600 opacity-40'
+                )}
+                onClick={() => {
+                   // In a real app we'd use the playback engine to seek
+                   // window.dispatchEvent(new CustomEvent('zovyra-seek', { detail: line.time }));
+                }}
+                onDoubleClick={() => {
+                  if (isActive) setIsKaraokeMode(!isKaraokeMode);
+                }}
+              >
+                <div className="relative inline-block">
+                  {isKaraokeMode && line.words ? (
+                    <div className="flex flex-wrap justify-center gap-x-2">
+                      {line.words.map((word, wi) => {
+                        const isWordActive = currentTime >= word.time;
+                        return (
+                          <span
+                            key={wi}
+                            className={cn(
+                              'transition-colors duration-300',
+                              isWordActive ? 'text-white' : 'text-zinc-500'
+                            )}
+                            style={{
+                              textShadow: isWordActive ? '0 0 10px rgba(255,255,255,0.5)' : 'none'
+                            }}
+                          >
+                            {word.text}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    line.text
                   )}
-                >
-                  {word.text}
-                </span>
-              );
-            })
-          ) : (
-            line.text
-          )}
+                  {showTranslation && line.text && (
+                    <p className="text-sm font-normal opacity-60 mt-2 italic">
+                      Translation coming soon...
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      </div>
     </div>
   );
 };

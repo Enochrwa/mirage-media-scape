@@ -37,6 +37,32 @@
   padding: 2em;
 }
 
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(0); }
+  75% { transform: translateX(-50%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: inline-block;
+  padding-left: 0;
+  animation: marquee 10s linear infinite;
+}
+
+.marquee-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .read-the-docs {
   color: #888;
 }

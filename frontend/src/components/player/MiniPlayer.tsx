@@ -39,9 +39,11 @@ export const MiniPlayer: React.FC = () => {
             alt={currentFile.title}
             className="h-12 w-12 rounded shadow-lg transition-transform group-hover:scale-105"
           />
-          <div className="min-w-0">
-            <h4 className="text-sm font-semibold truncate text-foreground leading-tight">
-              {currentFile.title}
+          <div className="min-w-0 overflow-hidden">
+            <h4 className="text-sm font-semibold whitespace-nowrap text-foreground leading-tight marquee-container">
+              <span className={cn(currentFile.title.length > 30 && "animate-marquee")}>
+                {currentFile.title}
+              </span>
             </h4>
             <p className="text-xs text-muted-foreground truncate">
               {currentFile.artist}

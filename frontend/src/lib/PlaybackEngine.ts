@@ -195,7 +195,7 @@ export class PlaybackEngine {
       console.error('Failed to load phase-vocoder worklet:', err);
     });
 
-    // Wiring the chains to merger (Analyser)
+    // Wiring the chains to Analyser
     this.chainA.crossfade.connect(this.analyser);
     this.chainB.crossfade.connect(this.analyser);
 
@@ -224,15 +224,22 @@ export class PlaybackEngine {
   }
 
   private updateChain() {
-    // Disconnect all bypassable nodes from their potential targets
+    // Disconnect all nodes after Analyser to rebuild the canonical chain
     this.analyser.disconnect();
     if (this.pitchPreserver) this.pitchPreserver.disconnect();
     this.bassEnhancer.disconnect();
     this.panner.disconnect();
     this.nightCompressor.disconnect();
+    this.nightMakeupGain.disconnect();
+
+    // Canonical Chain Implementation:
+    // Analyser -> Bass Enhancer (Bypassable) -> Spatial Panner (Bypassable) -> Night Compressor (Bypassable) -> Master Volume -> Destination
+    // Note: Pitch Preserver (Worklet) is inserted after Analyser as per spec context, but spec chain doesn't explicitly place it.
+    // Following spec block comment: Analyser -> Bass Enhancer -> Spatial Panner -> Night Compressor -> Master Volume
 
     let currentNode: AudioNode = this.analyser;
 
+    // Pitch Preserver (Worklet) - usually placed after Analyser or before Master
     if (this.pitchLockEnabled && this.pitchPreserver) {
       currentNode.connect(this.pitchPreserver);
       currentNode = this.pitchPreserver;
@@ -256,6 +263,7 @@ export class PlaybackEngine {
     }
 
     currentNode.connect(this.masterGain);
+    this.masterGain.connect(this.ctx.destination);
   }
 
   private createBassExciterCurve(intensity: number): Float32Array {

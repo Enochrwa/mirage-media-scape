@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import {
@@ -32,6 +32,17 @@ export const FullNowPlaying: React.FC = () => {
     setAiDjEnabled
   } = usePlayerStore();
   const { files } = useLibraryStore();
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (currentFile?.id) {
+       const apiBase = (window as any).API_BASE ?? 'http://localhost:3001';
+       fetch(`${apiBase}/api/recommendations/${currentFile.id}?limit=5`)
+         .then(res => res.json())
+         .then(data => setRecommendations(data))
+         .catch(e => console.error('Failed to fetch recommendations', e));
+    }
+  }, [currentFile?.id]);
 
   if (!currentFile) return null;
 
@@ -78,6 +89,32 @@ export const FullNowPlaying: React.FC = () => {
             <h2 className="text-4xl md:text-5xl font-bold truncate px-4">{currentFile.title}</h2>
             <p className="text-xl md:text-2xl text-muted-foreground truncate px-4">{currentFile.artist}</p>
           </div>
+
+          {recommendations.length > 0 && (
+            <div className="w-full mt-8 overflow-hidden">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 text-left">More Like This</p>
+              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                 {recommendations.map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="flex-shrink-0 w-32 cursor-pointer group"
+                      onClick={() => {
+                        const file = files.find(f => f.id === rec.id);
+                        if (file) usePlayerStore.getState().playFile(file);
+                      }}
+                    >
+                       <img
+                         src={rec.cover || '/placeholder.svg'}
+                         alt={rec.title}
+                         className="w-32 h-32 object-cover rounded-lg shadow-md group-hover:scale-105 transition-transform"
+                       />
+                       <p className="text-xs font-semibold mt-2 truncate">{rec.title}</p>
+                       <p className="text-[10px] text-muted-foreground truncate">{rec.artist}</p>
+                    </div>
+                 ))}
+              </div>
+            </div>
+          )}
         </main>
 
         <footer className="mt-auto space-y-8">

@@ -7,7 +7,8 @@ import { createRequire } from 'node:module';
 import { TrackMetadata, AudioMetadata } from '../../zovyra-native';
 import { Track } from '../types/database';
 
-const requireNative = createRequire(__filename);
+const isESM = typeof import.meta !== 'undefined';
+const requireNative = createRequire(isESM ? (import.meta as any).url : __filename);
 const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 const { dbPath, folders, coversDir } = workerData;
@@ -121,6 +122,7 @@ async function scan() {
         play_count: 0,
         file_type: fileType,
         waveform_data: waveformData,
+        dominant_color: metadata.dominantColor || undefined,
       };
 
       db.prepare(
@@ -130,8 +132,8 @@ async function scan() {
                     bitrate, sample_rate, channels, file_path, file_size,
                     mtime, added_at, loudness, bpm, key, camelot_key,
                     bpm_confidence, cover_cache_path, thumbnail_path, missing, metadata_json,
-                    rating, play_count, file_type, waveform_data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    rating, play_count, file_type, waveform_data, dominant_color
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
       ).run(
         trackData.id,
@@ -161,6 +163,7 @@ async function scan() {
         trackData.play_count,
         trackData.file_type,
         trackData.waveform_data ?? null,
+        trackData.dominant_color ?? null,
       );
 
       newTracks.push(trackData);
