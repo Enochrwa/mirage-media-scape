@@ -21,8 +21,11 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.1",
+    "fast-xml-parser": "^5.7.3",
     "multicast-dns": "^7.2.5",
+    "node-fetch": "^3.3.2",
     "socket.io": "^4.8.1",
+    "ws": "^8.20.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -33,6 +36,8 @@
     "@types/jest": "^29.5.14",
     "@types/multicast-dns": "^7.2.4",
     "@types/node": "^22.15.30",
+    "@types/node-fetch": "^2.6.13",
+    "@types/ws": "^8.18.1",
     "eslint": "^9.25.1",
     "eslint-config-prettier": "^10.1.1",
     "globals": "^15.15.0",

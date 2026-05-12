@@ -38,7 +38,7 @@ export class DuplicateFinderService {
 
       for (const track of group) {
         try {
-          const fp = native.generate_waveform_fingerprint(track.file_path);
+          const fp = native.generateWaveformFingerprint(track.file_path);
           fingerprints[track.id] = fp;
         } catch (e) {
           console.error(`Failed to generate fingerprint for ${track.file_path}:`, e);

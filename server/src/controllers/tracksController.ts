@@ -87,10 +87,11 @@ export const searchTracks = (req: Request, res: Response) => {
     }
 };
 
-export const getRecommendations = (req: Request, res: Response) => {
+export const getRecommendations = async (req: Request, res: Response) => {
     try {
         const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        const recommendations = RecommendationService.findSimilar(id);
+        const recommendationService = new RecommendationService(db);
+        const recommendations = await recommendationService.recommend(id);
         res.json(recommendations);
     } catch (error) {
         console.error('Recommendations error:', error);
@@ -111,10 +112,10 @@ export const identifyTrack = async (req: Request, res: Response) => {
     }
 };
 
-export const getDuplicateCandidates = (req: Request, res: Response) => {
+export const getDuplicateCandidates = async (req: Request, res: Response) => {
     try {
-        const candidates = DuplicateFinderService.findCandidates();
-        const groups = DuplicateFinderService.getDuplicateGroups(candidates);
+        const duplicateFinder = new DuplicateFinderService(db);
+        const groups = await duplicateFinder.findDuplicates();
         res.json(groups);
     } catch (e) {
         res.status(500).json({ error: (e as Error).message });
