@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "test": "jest",
+    "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db jest",
     "build": "tsc",
     "lint": "eslint .",
     "clean": "rm -rf dist node_modules package-lock.json",

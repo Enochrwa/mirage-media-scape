@@ -10,7 +10,7 @@ router.post('/subscribe', async (req, res) => {
   try {
     const id = await podcastService.subscribe(url);
     res.json({ id });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: 'Failed to subscribe' });
   }
 });

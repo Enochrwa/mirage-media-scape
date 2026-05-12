@@ -14,6 +14,7 @@ import {
   Globe2,
   Activity,
   RotateCcw,
+  ChevronUp,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -221,6 +222,15 @@ export function PlaybackController() {
             className="h-1"
           />
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-gray-400 hover:text-white"
+          onClick={() => usePlayerStore.getState().setPlayerFullscreen(true)}
+          title="Open full player"
+        >
+          <ChevronUp className="h-5 w-5" />
+        </Button>
       </div>
     </div>
   );

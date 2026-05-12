@@ -31,6 +31,7 @@ export interface MediaFile {
   waveform_data?: string;
   metadata_json?: string;
   color?: string;
+  dominant_color?: string;
 }
 
 export interface SmartPlaylistCondition {

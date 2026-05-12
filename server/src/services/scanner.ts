@@ -45,17 +45,15 @@ export class ScannerService {
   async scanAll() {
     const folders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
     if (folders.length > 0) {
-      await this.scan(folders.map(f => f.path));
+      await this.scan(folders.map((f) => f.path));
     }
   }
 
   async addFolder(directory: string, options?: { autoDiscovered?: boolean }) {
     const auto = options?.autoDiscovered ? 1 : 0;
-    db.prepare('INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, ?)').run(
-      directory,
-      Date.now(),
-      auto,
-    );
+    db.prepare(
+      'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, ?)',
+    ).run(directory, Date.now(), auto);
     await this.scan([directory]);
   }
 

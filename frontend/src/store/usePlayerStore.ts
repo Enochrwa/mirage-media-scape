@@ -250,6 +250,16 @@ if ('mediaSession' in navigator) {
   });
 }
 
+// Listen for custom seek events (e.g. from LyricsDisplay)
+window.addEventListener('zovyra-seek', (e: Event) => {
+  const customEvent = e as CustomEvent;
+  const time = customEvent.detail;
+  if (typeof time === 'number') {
+    usePlayerStore.getState().seekTo(time);
+    playbackEngine.seek(time);
+  }
+});
+
 // Background Visibility Management
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {

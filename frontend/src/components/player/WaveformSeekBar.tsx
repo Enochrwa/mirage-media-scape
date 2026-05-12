@@ -187,7 +187,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         playbackEngine.abLoop.setB(targetTime);
       } else if (dragMarker === 'progress') {
         const now = Date.now();
-        if (now - lastPreviewTime.current > 400) {
+        if (now - lastPreviewTime.current > 300) {
            playbackEngine.preview(targetTime);
            lastPreviewTime.current = now;
         }

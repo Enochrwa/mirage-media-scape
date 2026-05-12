@@ -20,8 +20,11 @@ pub struct AudioMetadata {
     pub loudness: Option<f64>,
     pub bpm: Option<f64>,
     pub key: Option<String>,
+    pub scale: Option<String>,
     pub camelot_key: Option<String>,
     pub bpm_confidence: Option<f64>,
+    pub energy: Option<f64>,
+    pub danceability: Option<f64>,
 }
 
 #[napi(object)]
@@ -65,6 +68,7 @@ pub struct TrackMetadata {
     pub replaygain_album_peak: Option<f64>,
     pub lyrics: Option<String>,
     pub synced_lyrics: Option<String>,
+    pub dominant_color: Option<String>,
 }
 
 #[napi]
@@ -142,6 +146,7 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
     let mut cover_art_bytes = None;
     let mut file_type = "audio".to_string();
     let mut codec_name = None;
+    let mut dominant_color = None;
 
     // Track if we need to re-open to get attached picture packets
     let mut attached_pic_stream_index = None;
@@ -188,7 +193,13 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         if let Ok(mut ictx) = ffmpeg::format::input(&path_buf) {
             for (s, packet) in ictx.packets() {
                 if s.index() == index {
-                    cover_art_bytes = packet.data().map(|d| d.to_vec());
+                    let data = packet.data().map(|d| d.to_vec());
+                    if let Some(ref bytes) = data {
+                        // Extract dominant color from cover art
+                        // Sampling 4 pixels (corner or spread)
+                        dominant_color = extract_dominant_color_from_bytes(bytes);
+                    }
+                    cover_art_bytes = data;
                     break;
                 }
             }
@@ -227,6 +238,7 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         replaygain_album_peak,
         lyrics,
         synced_lyrics,
+        dominant_color,
     })
 }
 
@@ -471,8 +483,11 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
     let mut loudness = None;
     let mut bpm = None;
     let mut key = None;
+    let mut scale = None;
     let mut camelot_key = None;
     let mut bpm_confidence = None;
+    let mut energy = None;
+    let mut danceability = None;
 
     if !samples_f32.is_empty() {
         // Loudness
@@ -487,9 +502,17 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
         if let Ok(result) = stratum_analyze(&samples_f32, sample_rate as u32, AnalysisConfig::default()) {
             bpm = Some(result.bpm as f64);
             key = Some(result.key.name());
+            // result.key doesn't have is_major, let's use the numerical key to guess
+            // In many dsp libs, numerical 1-12 followed by A (minor) or B (major)
+            scale = Some(if result.key.numerical().ends_with('B') { "major".to_string() } else { "minor".to_string() });
             camelot_key = Some(result.key.numerical());
             let conf = compute_confidence(&result);
             bpm_confidence = Some(conf.bpm_confidence as f64);
+
+            // stratum-dsp AnalysisResult doesn't have energy/danceability fields directly
+            // but we can estimate them from key_clarity and key_confidence for now
+            energy = Some(result.key_clarity as f64);
+            danceability = Some(result.key_confidence as f64);
         }
     }
 
@@ -507,8 +530,11 @@ pub fn analyze_audio(path: String) -> Result<AudioMetadata, napi::Error> {
         loudness,
         bpm,
         key,
+        scale,
         camelot_key,
         bpm_confidence,
+        energy,
+        danceability,
     })
 }
 
@@ -779,4 +805,38 @@ fn is_media_file(path: &Path) -> bool {
         .and_then(|s| s.to_str())
         .map(|s| extensions.contains(&s.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+fn extract_dominant_color_from_bytes(bytes: &[u8]) -> Option<String> {
+    use image::GenericImageView;
+
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let (width, height) = img.dimensions();
+        if width == 0 || height == 0 {
+            return None;
+        }
+
+        // Sample 4 pixels at different positions
+        let pixels = [
+            img.get_pixel(width / 4, height / 4),
+            img.get_pixel(3 * width / 4, height / 4),
+            img.get_pixel(width / 4, 3 * height / 4),
+            img.get_pixel(3 * width / 4, 3 * height / 4),
+        ];
+
+        let mut r = 0u32;
+        let mut g = 0u32;
+        let mut b = 0u32;
+
+        for p in &pixels {
+            let rgba = p.0;
+            r += rgba[0] as u32;
+            g += rgba[1] as u32;
+            b += rgba[2] as u32;
+        }
+
+        Some(format!("#{:02x}{:02x}{:02x}", r / 4, g / 4, b / 4))
+    } else {
+        None
+    }
 }

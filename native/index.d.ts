@@ -17,8 +17,11 @@ export interface AudioMetadata {
   loudness?: number
   bpm?: number
   key?: string
+  scale?: string
   camelotKey?: string
   bpmConfidence?: number
+  energy?: number
+  danceability?: number
 }
 export interface SubtitleTrackInfo {
   index: number
@@ -58,6 +61,7 @@ export interface TrackMetadata {
   replaygainAlbumPeak?: number
   lyrics?: string
   syncedLyrics?: string
+  dominantColor?: string
 }
 export declare function extractMetadata(path: string): TrackMetadata
 export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void

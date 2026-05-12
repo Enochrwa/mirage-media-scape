@@ -26,6 +26,7 @@ export interface Track {
   play_count?: number;
   file_type?: string;
   waveform_data?: string;
+  dominant_color?: string;
 }
 
 export interface Setting {

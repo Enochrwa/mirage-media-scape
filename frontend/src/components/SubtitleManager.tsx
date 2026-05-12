@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Captions } from 'lucide-react';
+import { Captions, Upload } from 'lucide-react';
 
 const SubtitleManager: React.FC = () => {
   const { currentFile, currentTime } = usePlayerStore();
@@ -52,17 +52,39 @@ const SubtitleManager: React.FC = () => {
       `${API_BASE}/api/subtitles/extract?path=${encodeURIComponent(currentFile.file_path || '')}&index=${index}`,
     );
     if (res.ok) {
-      const content = await res.text();
+      const { raw } = await res.json();
+      const format = currentFile.file_path?.endsWith('.ass') ? 'ass' : 'srt';
       const parseRes = await fetch(`${API_BASE}/api/subtitles/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, format: 'srt' }), // Assuming SRT for now
+        body: JSON.stringify({ raw, format }),
       });
       if (parseRes.ok) {
-        const parsedCues = await parseRes.json();
-        setCues(parsedCues);
+        const { cues } = await parseRes.json();
+        setCues(cues);
       }
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const raw = event.target?.result as string;
+      const format = file.name.split('.').pop()?.toLowerCase() || 'srt';
+      const res = await fetch(`${API_BASE}/api/subtitles/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw, format }),
+      });
+      if (res.ok) {
+        const { cues } = await res.json();
+        setCues(cues);
+      }
+    };
+    reader.readAsText(file);
   };
 
   useEffect(() => {
@@ -99,13 +121,24 @@ const SubtitleManager: React.FC = () => {
               <Captions className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900 text-white">
+          <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900 text-white w-64">
             <DropdownMenuItem onClick={() => setCues([])}>None</DropdownMenuItem>
+            <div className="border-t border-zinc-800 my-1" />
+            <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase">Embedded Tracks</div>
             {tracks.map((track) => (
               <DropdownMenuItem key={track.index} onClick={() => selectTrack(track.index)}>
                 {track.title || track.language || `Track ${track.index}`} ({track.codec})
               </DropdownMenuItem>
             ))}
+            <div className="border-t border-zinc-800 my-1" />
+            <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase">External</div>
+            <DropdownMenuItem className="cursor-pointer" asChild>
+              <label className="flex items-center gap-2 w-full">
+                <Upload className="h-4 w-4" />
+                <span>Load Subtitle File...</span>
+                <input type="file" accept=".srt,.vtt,.ass,.ssa,.sbv" className="hidden" onChange={handleFileUpload} />
+              </label>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

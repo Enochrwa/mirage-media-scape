@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getDatabasePath } from '../utils/db-utils';
 
-const dbPath = path.resolve(__dirname, '../../zovyra.db');
+const dbPath = getDatabasePath();
 
 // Ensure the directory exists
 const dbDir = path.dirname(dbPath);
@@ -55,7 +56,8 @@ db.exec(`
         rating INTEGER DEFAULT 0,
         play_count INTEGER DEFAULT 0,
         file_type TEXT,
-        waveform_data TEXT
+        waveform_data TEXT,
+        dominant_color TEXT
     );
 
     CREATE TABLE IF NOT EXISTS watched_folders (
@@ -232,6 +234,7 @@ ensureColumn('tracks', 'rating', 'INTEGER DEFAULT 0');
 ensureColumn('tracks', 'play_count', 'INTEGER DEFAULT 0');
 ensureColumn('tracks', 'file_type', 'TEXT');
 ensureColumn('tracks', 'waveform_data', 'TEXT');
+ensureColumn('tracks', 'dominant_color', 'TEXT');
 ensureColumn('watched_folders', 'auto_discovered', 'INTEGER DEFAULT 0');
 
 export default db;

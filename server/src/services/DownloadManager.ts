@@ -6,6 +6,22 @@ import http from 'http';
 import crypto from 'crypto';
 import { UrlValidator } from '../utils/UrlValidator';
 
+export interface DownloadTask {
+  id: string;
+  track_id?: string;
+  episode_id?: string;
+  url: string;
+  status: string;
+  local_path?: string;
+  progress: number;
+  file_size: number;
+  downloaded_bytes: number;
+  created_at: number;
+  wifi_only: number;
+  priority: number;
+  error?: string;
+}
+
 export class DownloadManager {
   private activeDownloads = 0;
   private maxConcurrent = 3;
@@ -52,7 +68,7 @@ export class DownloadManager {
     }
     query += ` ORDER BY priority DESC, created_at ASC LIMIT 1`;
 
-    const pending = this.db.prepare(query).get() as any;
+    const pending = this.db.prepare(query).get() as DownloadTask | undefined;
 
     if (!pending) return;
 
@@ -61,7 +77,7 @@ export class DownloadManager {
     this.processQueue();
   }
 
-  private startDownload(task: any) {
+  private startDownload(task: DownloadTask) {
     const ext = path.extname(new URL(task.url).pathname) || '.mp3';
     const localPath = path.join(this.downloadDir, `${task.id}${ext}`);
     const file = fs.createWriteStream(localPath);
@@ -84,7 +100,7 @@ export class DownloadManager {
         // Update progress occasionally
         if (downloaded % (1024 * 1024) === 0 || downloaded === total) {
            this.db.prepare("UPDATE downloads SET progress = ?, downloaded_bytes = ? WHERE id = ?")
-             .run(downloaded / total, downloaded, task.id);
+             .run(downloaded / (total || 1), downloaded, task.id);
         }
       });
 
