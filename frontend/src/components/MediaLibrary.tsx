@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import LibraryGrid from './LibraryGrid';
 import LibraryOnboarding from './LibraryOnboarding';
+import EmptyLibraryState from './EmptyLibraryState';
 
 interface MediaLibraryProps {
   className?: string;
@@ -17,6 +18,10 @@ interface MediaLibraryProps {
 const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initialMediaType }) => {
   const { files, fetchInstantTracks, fetchTracks, fetchSmartPlaylists } = useLibraryStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ field: string; direction: 'asc' | 'desc' }>(() => {
+    const saved = localStorage.getItem('ZOVYRA_sort_songs');
+    return saved ? JSON.parse(saved) : { field: 'title', direction: 'asc' };
+  });
   const [mediaType, setMediaType] = useState<MediaType | 'all'>(initialMediaType || 'all');
   const [bootChecked, setBootChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -45,6 +50,10 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
   }, []);
 
   useEffect(() => {
+    localStorage.setItem('ZOVYRA_sort_songs', JSON.stringify(sortConfig));
+  }, [sortConfig]);
+
+  useEffect(() => {
     if (initialMediaType) {
       setMediaType(initialMediaType);
     } else {
@@ -62,28 +71,52 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
   // Ensure files is an array before filtering
   const safeFiles = Array.isArray(files) ? files : [];
 
-  const filteredFiles = safeFiles.filter((file) => {
-    const matchesSearch =
-      file.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (file.artist && file.artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (file.album && file.album.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredFiles = safeFiles
+    .filter((file) => {
+      const matchesSearch =
+        file.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (file.artist && file.artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (file.album && file.album.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesType = mediaType === 'all' || file.type === mediaType;
+      const matchesType = mediaType === 'all' || file.type === mediaType;
 
-    return matchesSearch && matchesType;
-  });
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      const field = sortConfig.field as keyof MediaFile;
+      const aVal = String(a[field] || '').toLowerCase();
+      const bVal = String(b[field] || '').toLowerCase();
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const audioFiles = safeFiles.filter((file) => file.type === 'audio');
   const videoFiles = safeFiles.filter((file) => file.type === 'video');
 
-  const renderMediaGrid = (filesToRender: MediaFile[]) =>
-    filesToRender.length > 0 ? (
-      <LibraryGrid files={filesToRender} />
-    ) : (
+  const renderMediaGrid = (filesToRender: MediaFile[]) => {
+    if (filesToRender.length > 0) {
+      return <LibraryGrid files={filesToRender} />;
+    }
+
+    if (searchTerm) {
+      return (
+        <p className="py-10 text-center text-muted-foreground">
+          No matching files found for "{searchTerm}".
+        </p>
+      );
+    }
+
+    if (safeFiles.length === 0) {
+      return <EmptyLibraryState onAddFolder={() => setShowOnboarding(true)} />;
+    }
+
+    return (
       <p className="py-10 text-center text-muted-foreground">
-        {searchTerm ? 'No matching files found.' : 'No media files found.'}
+        No media files found in this category.
       </p>
     );
+  };
 
   if (!bootChecked) {
     return (

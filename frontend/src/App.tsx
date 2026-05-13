@@ -25,14 +25,31 @@ import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 import { ArtistProfile } from './pages/ArtistProfile';
 import { ZovyraLayout } from './components/ZovyraLayout';
+import { AlbumView } from './pages/AlbumView';
+import { WifiOff } from 'lucide-react';
+import { useState } from 'react';
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const initLibrary = useLibraryStore((state) => state.init);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
     initLibrary();
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    if ('serviceWorker' in navigator) {
+       navigator.serviceWorker.register('/sw.js');
+    }
+
+    return () => {
+       window.removeEventListener('online', onOnline);
+       window.removeEventListener('offline', onOffline);
+    };
   }, [initLibrary]);
 
   useEffect(() => {
@@ -49,10 +66,10 @@ const App = () => {
           player.togglePlayback();
           break;
         case 'n':
-          player.nextTrack(library.files);
+          player.nextTrack();
           break;
         case 'p':
-          player.previousTrack(library.files);
+          player.previousTrack();
           break;
         case 'f':
           if (player.currentFile?.type === 'video') {
@@ -73,6 +90,13 @@ const App = () => {
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
+          {isOffline && (
+             <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600 text-white text-center py-1 text-xs font-bold animate-in slide-in-from-top">
+                <div className="flex items-center justify-center gap-2">
+                   <WifiOff size={14} /> You're offline — local library available
+                </div>
+             </div>
+          )}
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -103,6 +127,8 @@ const App = () => {
               <Route path="/settings" element={<Settings />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/stats" element={<StatsPage />} />
+              <Route path="/album/:id" element={<AlbumView />} />
+              <Route path="/artist/:name" element={<ArtistProfile />} />
               <Route path="/remote" element={<RemotePage />} />
               <Route path="/duplicates" element={<DuplicateManagerPage />} />
               <Route path="/radio" element={<RadioPage />} />

@@ -41,6 +41,8 @@ function resolveMediaType(
 export function mapIncomingTrackToMediaFile(track: IncomingTrack): MediaFile {
   const type = resolveMediaType(track);
   return {
+    missing: (track as unknown as { missing?: number }).missing,
+    dominant_color: (track as unknown as { dominant_color?: string }).dominant_color,
     id: track.id,
     title: track.title,
     artist: track.artist ?? undefined,
@@ -85,8 +87,11 @@ interface LibraryState {
   scanProgress: { scanned: number; total: number; percentage: number } | null;
   db: IDBPDatabase | null;
   socket: Socket | null;
+  folderHandles: FileSystemDirectoryHandle[];
+  needsPermission: boolean;
 
   init: () => Promise<void>;
+  requestFolderPermissions: () => Promise<void>;
   fetchInstantTracks: () => Promise<void>;
   fetchTracks: () => Promise<void>;
   fetchSmartPlaylists: () => Promise<void>;
@@ -99,6 +104,7 @@ interface LibraryState {
 
 const DB_NAME = 'zovyra-web-db';
 const STORE_NAME = 'tracks';
+const HANDLES_STORE = 'handles';
 
 async function persistTracksToIdb(db: IDBPDatabase, tracks: MediaFile[]) {
   const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -116,16 +122,42 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   scanProgress: null,
   db: null,
   socket: null,
+  folderHandles: [],
+  needsPermission: false,
 
   init: async () => {
-    const idb = await openDB(DB_NAME, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
+    const idb = await openDB(DB_NAME, 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore(HANDLES_STORE);
         }
       },
     });
     set({ db: idb });
+
+    // Load handles and check permissions
+    const handles = (await idb.getAll(HANDLES_STORE)) as FileSystemDirectoryHandle[];
+    let needsPermission = false;
+    if (handles.length > 0) {
+      for (const handle of handles) {
+        if (
+          (await (handle as unknown as { queryPermission: (o: { mode: string }) => Promise<string> }).queryPermission({
+            mode: 'read',
+          })) !== 'granted'
+        ) {
+          needsPermission = true;
+          break;
+        }
+      }
+      set({ folderHandles: handles, needsPermission });
+      if (!needsPermission) {
+        // Automatically start background refresh if permission is granted
+        void get().fetchTracks();
+      }
+    }
 
     const cachedTracks = (await idb.getAll(STORE_NAME)) as MediaFile[];
     if (cachedTracks.length > 0) {
@@ -223,6 +255,24 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
   },
 
+  requestFolderPermissions: async () => {
+    const handles = get().folderHandles;
+    const idb = get().db;
+    if (!idb) return;
+
+    for (const handle of handles) {
+      if (
+        (await (handle as unknown as { requestPermission: (o: { mode: string }) => Promise<string> }).requestPermission({
+          mode: 'read',
+        })) !== 'granted'
+      ) {
+        return;
+      }
+    }
+    set({ needsPermission: false });
+    void get().fetchTracks();
+  },
+
   addFolder: async (path) => {
     if (path) {
       await fetch(`${API_BASE}/api/scanner/scan`, {
@@ -232,10 +282,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       });
     } else if ('showDirectoryPicker' in window) {
       try {
-        const win = window as unknown as { showDirectoryPicker: () => Promise<void> };
-        if (win.showDirectoryPicker) {
-          await win.showDirectoryPicker();
-          console.log('Web directory picker not fully implemented in store yet');
+        const handle = await (window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
+        if (handle) {
+          const idb = get().db;
+          if (idb) {
+            await idb.put(HANDLES_STORE, handle, handle.name);
+            set((state) => ({ folderHandles: [...state.folderHandles, handle] }));
+            void get().fetchTracks();
+          }
         }
       } catch (e) {
         console.error('Directory picker failed', e);

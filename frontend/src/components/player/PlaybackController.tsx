@@ -155,7 +155,7 @@ export function PlaybackController() {
             className="text-gray-400 hover:text-white"
             onClick={(e) => {
               e.stopPropagation();
-              previousTrack(files);
+              previousTrack();
             }}
           >
             <SkipBack className="h-5 w-5 fill-current" />
@@ -180,7 +180,7 @@ export function PlaybackController() {
             className="text-gray-400 hover:text-white"
             onClick={(e) => {
               e.stopPropagation();
-              nextTrack(files);
+              nextTrack();
             }}
           >
             <SkipForward className="h-5 w-5 fill-current" />

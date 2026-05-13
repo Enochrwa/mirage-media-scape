@@ -198,7 +198,7 @@ export const FullNowPlaying: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className="h-12 w-12"
-                onClick={() => previousTrack(files)}
+                onClick={() => previousTrack()}
               >
                 <SkipBack size={32} fill="currentColor" />
               </Button>
@@ -217,7 +217,7 @@ export const FullNowPlaying: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className="h-12 w-12"
-                onClick={() => nextTrack(files)}
+                onClick={() => nextTrack()}
               >
                 <SkipForward size={32} fill="currentColor" />
               </Button>

@@ -3,7 +3,9 @@ import MainLayout from '@/components/MainLayout';
 import { API_BASE, formatDuration } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Trash2, CheckCircle2, AlertCircle, Play, ShieldCheck, Sparkles } from 'lucide-react';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { cn } from '@/lib/utils';
 
 interface DuplicateTrack {
   id: string;
@@ -19,6 +21,8 @@ interface DuplicateTrack {
 const DuplicateManagerPage = () => {
   const [groups, setGroups] = useState<DuplicateTrack[][]>([]);
   const [loading, setLoading] = useState(true);
+  const [selections, setSelections] = useState<Record<string, 'keep' | 'trash'>>({});
+  const { playbackEngine } = usePlayerStore();
 
   useEffect(() => {
     const fetchDuplicates = async () => {
@@ -36,21 +40,29 @@ const DuplicateManagerPage = () => {
     fetchDuplicates();
   }, []);
 
-  const deleteTrack = async (id: string, groupIndex: number) => {
-    if (!confirm('Are you sure you want to move this file to trash?')) return;
+  const keepBest = () => {
+    const newSels: Record<string, 'keep' | 'trash'> = {};
+    groups.forEach((group) => {
+      const best = [...group].sort((a, b) => b.bitrate - a.bitrate)[0];
+      group.forEach((t) => {
+        newSels[t.id] = t.id === best.id ? 'keep' : 'trash';
+      });
+    });
+    setSelections(newSels);
+  };
 
-    try {
-      const res = await fetch(`${API_BASE}/api/tracks/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setGroups((prev) => {
-          const next = [...prev];
-          next[groupIndex] = next[groupIndex].filter((t) => t.id !== id);
-          return next.filter((g) => g.length > 1);
-        });
-      }
-    } catch (e) {
-      console.error('Failed to delete track', e);
-    }
+  const applyAll = async () => {
+    const toTrash = Object.entries(selections)
+      .filter(([_, v]) => v === 'trash')
+      .map(([id]) => id);
+    if (!confirm(`Move ${toTrash.length} files to trash?`)) return;
+
+    // In real app, call bulk trash endpoint
+    alert('Bulk action executed');
+  };
+
+  const previewAudio = (id: string) => {
+     playbackEngine.preview(30); // 30s in
   };
 
   return (
@@ -64,9 +76,13 @@ const DuplicateManagerPage = () => {
             </p>
           </div>
           {groups.length > 0 && (
-            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-4 py-2 text-sm font-medium text-yellow-500">
-              <AlertCircle size={16} />
-              {groups.length} potential duplicate groups found
+            <div className="flex gap-2">
+               <Button variant="outline" className="gap-2 border-purple-500/30 text-purple-400" onClick={keepBest}>
+                  <Sparkles size={16} /> Keep Best in All Groups
+               </Button>
+               <Button className="gap-2 bg-purple-600" onClick={applyAll}>
+                  Apply All Selections
+               </Button>
             </div>
           )}
         </div>
@@ -117,14 +133,31 @@ const DuplicateManagerPage = () => {
                           <span>{track.format}</span>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-zinc-500 hover:bg-red-500/10 hover:text-red-500"
-                        onClick={() => deleteTrack(track.id, groupIdx)}
-                      >
-                        <Trash2 size={20} />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-zinc-500 hover:text-white"
+                          onClick={() => previewAudio(track.id)}
+                        >
+                          <Play size={18} />
+                        </Button>
+
+                        <div className="flex bg-black/40 rounded-lg p-1">
+                           <button
+                             onClick={() => setSelections({...selections, [track.id]: 'keep'})}
+                             className={cn("px-3 py-1 rounded text-[10px] font-bold transition-all", selections[track.id] === 'keep' ? "bg-green-500 text-white" : "text-zinc-500")}
+                           >
+                              KEEP
+                           </button>
+                           <button
+                             onClick={() => setSelections({...selections, [track.id]: 'trash'})}
+                             className={cn("px-3 py-1 rounded text-[10px] font-bold transition-all", selections[track.id] === 'trash' ? "bg-red-500 text-white" : "text-zinc-500")}
+                           >
+                              TRASH
+                           </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

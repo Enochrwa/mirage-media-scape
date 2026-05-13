@@ -472,7 +472,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             <span className="w-16 font-mono text-gray-400">{formatTime(duration)}</span>
           </div>
           <div className="flex items-center justify-center gap-6">
-            <Button variant="ghost" size="icon" onClick={() => previousTrack(files)}>
+            <Button variant="ghost" size="icon" onClick={() => previousTrack()}>
               <SkipBack size={28} />
             </Button>
             <Button
@@ -482,7 +482,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             >
               {isPlaying ? <Pause size={36} /> : <Play size={36} className="ml-1" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => nextTrack(files)}>
+            <Button variant="ghost" size="icon" onClick={() => nextTrack()}>
               <SkipForward size={28} />
             </Button>
           </div>
@@ -603,7 +603,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                   variant="ghost"
                   size="icon"
                   className="text-white"
-                  onClick={() => previousTrack(files)}
+                  onClick={() => previousTrack()}
                 >
                   <SkipBack size={24} />
                 </Button>
@@ -618,7 +618,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                   variant="ghost"
                   size="icon"
                   className="text-white"
-                  onClick={() => nextTrack(files)}
+                  onClick={() => nextTrack()}
                 >
                   <SkipForward size={24} />
                 </Button>

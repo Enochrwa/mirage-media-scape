@@ -9,6 +9,7 @@ interface WaveformSeekBarProps {
 
 export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) => {
   const { currentTime, duration, playbackEngine, currentFile } = usePlayerStore();
+  const isStream = currentFile?.file.includes('stream') || !duration || duration === Infinity;
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [abLoop, setABLoop] = useState({
     pointA: null as number | null,
@@ -147,7 +148,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isStream) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const position = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
@@ -207,16 +208,29 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
   };
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn('space-y-2', className)}>
       <div className="flex justify-between text-xs font-mono text-muted-foreground">
         <span>{formatTime(currentTime)}</span>
-        <span className="text-foreground font-bold">{hoverTime !== null ? formatTime(hoverTime) : ''}</span>
-        <span>{formatTime(duration)}</span>
+        <div className="flex items-center gap-2">
+          {isStream && (
+            <div className="flex items-center gap-1 bg-red-500/20 text-red-500 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              LIVE
+            </div>
+          )}
+          <span className="text-foreground font-bold">
+            {hoverTime !== null ? formatTime(hoverTime) : ''}
+          </span>
+        </div>
+        <span>{isStream ? '--:--' : formatTime(duration)}</span>
       </div>
 
       <div
         ref={containerRef}
-        className="relative h-16 w-full cursor-pointer group"
+        className={cn(
+          'relative h-16 w-full group',
+          isStream ? 'cursor-default' : 'cursor-pointer',
+        )}
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -228,10 +242,12 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         <canvas ref={canvasRef} width={1000} height={64} className="h-full w-full" />
 
         {/* Scrubber Handle */}
-        <div
-          className="absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-75 pointer-events-none"
-          style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
-        />
+        {!isStream && (
+          <div
+            className="absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-75 pointer-events-none"
+            style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
+          />
+        )}
 
         {/* A/B Markers */}
         {abLoop.pointA !== null && (

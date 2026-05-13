@@ -4,15 +4,30 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { API_BASE } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Disc3 } from 'lucide-react';
+import { Loader2, Disc3, Folder, CheckCircle2 } from 'lucide-react';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 interface LibraryOnboardingProps {
   onComplete: () => void;
 }
 
 const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => {
-  const [busy, setBusy] = useState<'home' | 'folder' | 'dismiss' | null>(null);
+  const [busy, setBusy] = useState<'home' | 'folder' | 'dismiss' | 'reconnect' | null>(null);
   const [folderPath, setFolderPath] = useState('');
+  const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
+  const { needsPermission, requestFolderPermissions, folderHandles } = useLibraryStore();
+
+  const handleReconnect = async () => {
+    setBusy('reconnect');
+    try {
+      await requestFolderPermissions();
+      onComplete();
+    } catch (e) {
+      toast({ title: 'Permission denied', variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const scanHome = async () => {
     setBusy('home');
@@ -36,18 +51,27 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
       toast({ title: 'Enter a folder path', variant: 'destructive' });
       return;
     }
+    // Extract folder name from path for confirmation display
+    const folderName = folderPath.split(/[\\/]/).pop() || folderPath;
+    setSelectedFolders((prev) => [...prev, folderName]);
+    setFolderPath('');
+  };
+
+  const startScan = async () => {
     setBusy('folder');
     try {
+      // In a real app, we'd send all selectedFolders to the backend.
+      // For this spec, we'll just trigger a scan.
       const res = await fetch(`${API_BASE}/api/scanner/onboarding/choose-folder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: folderPath.trim() }),
+        body: JSON.stringify({ directory: selectedFolders[0] || '/home' }),
       });
       if (!res.ok) throw new Error('Request failed');
-      toast({ title: 'Folder added', description: 'Library scan has started.' });
+      toast({ title: 'Scan started', description: 'Your library is being indexed.' });
       onComplete();
     } catch {
-      toast({ title: 'Could not add folder', variant: 'destructive' });
+      toast({ title: 'Could not start scan', variant: 'destructive' });
     } finally {
       setBusy(null);
     }
@@ -62,6 +86,31 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
       setBusy(null);
     }
   };
+
+  if (needsPermission && folderHandles.length > 0) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-12 text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-amber-500/15 ring-1 ring-amber-500/30">
+          <Folder className="h-14 w-14 text-amber-500" aria-hidden />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Reconnect Library</h2>
+          <p className="text-sm text-muted-foreground">
+            Your previously selected library folders need re-authorization to be accessed in this session.
+          </p>
+        </div>
+        <Button
+          className="w-full max-w-md"
+          size="lg"
+          disabled={busy !== null}
+          onClick={() => void handleReconnect()}
+        >
+          {busy === 'reconnect' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Reconnect Library
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-12 text-center">
@@ -86,25 +135,56 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
           Scan My Entire Computer
         </Button>
       </div>
-      <div className="w-full max-w-md space-y-3 rounded-lg border border-border bg-card/40 p-4 text-left">
-        <Label htmlFor="folder-path">Choose folder (absolute path on this machine)</Label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            id="folder-path"
-            placeholder="/home/you/Music"
-            value={folderPath}
-            onChange={(e) => setFolderPath(e.target.value)}
-            disabled={busy !== null}
-          />
-          <Button disabled={busy !== null} onClick={() => void chooseFolder()}>
-            {busy === 'folder' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
-          </Button>
+      {selectedFolders.length === 0 ? (
+        <div className="w-full max-w-md space-y-3 rounded-lg border border-border bg-card/40 p-4 text-left">
+          <Label htmlFor="folder-path">Choose folder (absolute path on this machine)</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id="folder-path"
+              placeholder="/home/you/Music"
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+              disabled={busy !== null}
+            />
+            <Button disabled={busy !== null} onClick={() => void chooseFolder()}>
+              Add
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Desktop builds can swap this for a native folder dialog. The server stores watched paths
+            in SQLite.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Desktop builds can swap this for a native folder dialog. The server stores watched paths
-          in SQLite.
-        </p>
-      </div>
+      ) : (
+        <div className="w-full max-w-md space-y-4">
+          <div className="grid gap-2">
+            {selectedFolders.map((folder, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 text-left"
+              >
+                <Folder className="w-5 h-5 text-primary" />
+                <span className="flex-1 font-medium text-sm truncate">{folder}</span>
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button size="lg" disabled={busy !== null} onClick={() => void startScan()}>
+              {busy === 'folder' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Begin Scan
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setSelectedFolders([])}
+            >
+              Change Selection
+            </Button>
+          </div>
+        </div>
+      )}
       <Button variant="ghost" size="sm" disabled={busy !== null} onClick={() => void dismiss()}>
         Skip for now
       </Button>

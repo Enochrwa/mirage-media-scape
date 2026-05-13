@@ -23,9 +23,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Globe, Moon, Sun, User, Bell, Shield, Download, Save, Zap, Volume2 } from 'lucide-react';
+import { Globe, Moon, Sun, User, Bell, Shield, Download, Save, Zap, Volume2, Database, Upload, FileJson, Trash2, Plus, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { playbackEngine } from '@/lib/PlaybackEngine';
+import { Badge } from '@/components/ui/badge';
+import { useEffect } from 'react';
+import { API_BASE } from '@/lib/utils';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -38,6 +41,32 @@ const Settings = () => {
   const [bassEnhancer, setBassEnhancer] = useState(false);
   const [nightMode, setNightMode] = useState(false);
   const [crossfade, setCrossfade] = useState(2);
+  const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState('default');
+  const [extensions, setExtensions] = useState(['mp3', 'flac', 'wav', 'm4a', 'ogg', 'mp4', 'mkv', 'avi']);
+  const [newExt, setNewExt] = useState('');
+
+  useEffect(() => {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      setOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
+    });
+    navigator.mediaDevices.ondevicechange = () => {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+         setOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
+      });
+    };
+  }, []);
+
+  const handleExport = async () => {
+    const res = await fetch(`${API_BASE}/api/settings/export`);
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ZOVYRA_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+  };
 
   const handleSaveSettings = () => {
     toast({
@@ -55,11 +84,12 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="playback" className="w-full">
-          <TabsList className="mb-6 grid max-w-3xl grid-cols-6">
+          <TabsList className="mb-6 grid max-w-4xl grid-cols-7">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="playback">Playback</TabsTrigger>
+            <TabsTrigger value="library">Library</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
           </TabsList>
@@ -113,6 +143,28 @@ const Settings = () => {
                     max={12}
                     step={1}
                    />
+                </div>
+
+                <div className="space-y-3">
+                   <Label className="text-base">Audio Output Device</Label>
+                   <Select value={selectedDevice} onValueChange={(v) => {
+                      setSelectedDevice(v);
+                      // @ts-expect-error - setSinkId is experimental
+                      if (playbackEngine.ctx.setSinkId) playbackEngine.ctx.setSinkId(v);
+                   }}>
+                      <SelectTrigger>
+                         <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                         {outputDevices.map(d => (
+                            <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || 'Unknown Device'}</SelectItem>
+                         ))}
+                      </SelectContent>
+                   </Select>
+                   {/* @ts-expect-error - setSinkId is experimental */}
+                   {!playbackEngine.ctx.setSinkId && (
+                      <p className="text-[10px] text-amber-500">(Not supported in this browser)</p>
+                   )}
                 </div>
               </CardContent>
             </Card>
@@ -284,6 +336,65 @@ const Settings = () => {
                   </div>
                 </div>
               </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="library" className="space-y-6">
+            <Card>
+               <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> Library Scan Settings</CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-6">
+                  <div className="space-y-3">
+                     <Label>File extensions to scan</Label>
+                     <div className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                        {extensions.map(ext => (
+                           <Badge key={ext} variant="secondary" className="gap-1 pr-1">
+                              .{ext}
+                              <button onClick={() => setExtensions(extensions.filter(e => e !== ext))} className="hover:text-red-400">
+                                 <X size={12} />
+                              </button>
+                           </Badge>
+                        ))}
+                        <div className="flex items-center gap-1 ml-2">
+                           <Input
+                             value={newExt}
+                             onChange={e => setNewExt(e.target.value)}
+                             onKeyDown={e => { if (e.key === 'Enter') { setExtensions([...extensions, newExt]); setNewExt(''); } }}
+                             placeholder="add..."
+                             className="h-6 w-20 text-xs bg-transparent border-none p-0 focus-visible:ring-0"
+                           />
+                           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setExtensions([...extensions, newExt]); setNewExt(''); }}>
+                              <Plus size={14} />
+                           </Button>
+                        </div>
+                     </div>
+                  </div>
+               </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="advanced" className="space-y-6">
+            <Card>
+               <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><FileJson className="h-5 w-5" /> Data Management</CardTitle>
+               </CardHeader>
+               <CardContent className="grid grid-cols-2 gap-4">
+                  <Button variant="outline" className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5" onClick={handleExport}>
+                     <Download className="h-6 w-6 text-purple-400" />
+                     <div className="text-center">
+                        <p className="font-bold">Export All Data</p>
+                        <p className="text-[10px] text-zinc-500">Metadata, ratings, and stats</p>
+                     </div>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5">
+                     <Upload className="h-6 w-6 text-blue-400" />
+                     <div className="text-center">
+                        <p className="font-bold">Import Data</p>
+                        <p className="text-[10px] text-zinc-500">Restore from JSON backup</p>
+                     </div>
+                  </Button>
+               </CardContent>
             </Card>
           </TabsContent>
 
