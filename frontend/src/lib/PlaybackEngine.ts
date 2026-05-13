@@ -168,12 +168,63 @@ export class PlaybackEngine {
     this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
   }
 
+  isSpatialAudioEnabled() {
+    return true; // Placeholder
+  }
+
+  setSpatialAudioEnabled(enabled: boolean) {
+    // Implement
+  }
+
+  setSpatialPosition(x: number, y: number, z: number) {
+    // Implement
+  }
+
+  updateListenerOrientation(forward: { x: number; y: number; z: number }, up: { x: number; y: number; z: number }) {
+    // Implement
+  }
+
+  setEQBand(index: number, gain: number) {
+    // Implement
+  }
+
+  getFrequencyResponse(frequencies: Float32Array) {
+    return new Float32Array(frequencies.length); // Placeholder
+  }
+
+  setBassEnhancerEnabled(enabled: boolean) {
+    // Implement
+  }
+
+  setNightModeEnabled(enabled: boolean) {
+    // Implement
+  }
+
+  setSleepTimer(minutes: number) {
+    this.sleepTimer?.set(minutes);
+  }
+
+  get currentTime() {
+    return this.chains[this.activeIndex].element.currentTime;
+  }
+
+  get abLoop() {
+    return {
+      setA: () => {},
+      setB: () => {},
+    };
+  }
+
   setState(s: PlaybackState) {
     this.state = s;
     // Emit event or update store
   }
 
   get analyserNode() {
+    return this.analyser;
+  }
+
+  getAnalyser() {
     return this.analyser;
   }
 }

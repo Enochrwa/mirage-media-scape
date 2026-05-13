@@ -6,7 +6,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
 import tracksRouter from './routes/tracks';
-import scannerRouter, { setIo } from './routes/scanner';
+import scannerRouter, { scannerService } from './routes/scanner';
 import playlistsRouter from './routes/playlists';
 import statsRouter from './routes/stats';
 import radioRouter from './routes/radio';
@@ -28,7 +28,7 @@ const io = new Server(httpServer, {
   cors: { origin: '*' },
 });
 
-setIo(io);
+scannerService.setIo(io);
 setLibraryWatcherIo(io);
 refreshLibraryWatcherPaths();
 

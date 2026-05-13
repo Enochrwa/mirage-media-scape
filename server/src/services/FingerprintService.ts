@@ -2,7 +2,7 @@ import { Database } from 'better-sqlite3';
 import fetch from 'node-fetch';
 import { createRequire } from 'node:module';
 
-const requireNative = createRequire(import.meta.url);
+const requireNative = createRequire(__filename);
 const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 export class FingerprintService {

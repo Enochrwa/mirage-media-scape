@@ -9,7 +9,10 @@ export class PodcastService {
   constructor(private db: Database) {}
 
   async subscribe(feedUrl: string) {
-    const res = await fetch(feedUrl, { timeout: 8000 });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(feedUrl, { signal: controller.signal });
+    clearTimeout(timeout);
     const xml = await res.text();
     const data = this.parser.parse(xml);
 
@@ -70,7 +73,10 @@ export class PodcastService {
   async refreshAll() {
     const podcasts = this.db.prepare('SELECT id, feed_url FROM podcast_subscriptions').all() as any[];
     for (const podcast of podcasts) {
-      const res = await fetch(podcast.feed_url, { timeout: 8000 });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(podcast.feed_url, { signal: controller.signal });
+      clearTimeout(timeout);
       const xml = await res.text();
       const data = this.parser.parse(xml);
       const items = Array.isArray(data.rss.channel.item) ? data.rss.channel.item : [data.rss.channel.item];

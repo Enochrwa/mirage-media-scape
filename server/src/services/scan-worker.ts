@@ -6,8 +6,7 @@ import Database from 'better-sqlite3';
 import { createRequire } from 'node:module';
 import type { TrackMetadata, AudioAnalysis } from '../../zovyra-native';
 
-const isESM = typeof (global as any).importMeta !== 'undefined';
-const requireNative = createRequire((global as any).importMeta?.url || __filename);
+const requireNative = createRequire(__filename);
 const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 const { dbPath, folders, coversDir } = workerData;
@@ -118,7 +117,7 @@ async function scan() {
           UPDATE tracks SET
             bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?
           WHERE id = ?
-        `).run(analysis.bpm, analysis.key, analysis.camelot_key, analysis.energy, analysis.loudness, track.id);
+        `).run(analysis.bpm, analysis.key, analysis.camelotKey, analysis.energy, analysis.loudness, track.id);
         // Add small delay to avoid CPU spike
         await new Promise(r => setTimeout(r, 50));
       } catch (e) {

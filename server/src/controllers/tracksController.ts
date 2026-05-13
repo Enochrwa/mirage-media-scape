@@ -110,7 +110,7 @@ export const identifyTrack = async (req: Request, res: Response) => {
   if (!track) return res.status(404).json({ error: 'Track not found' });
 
   try {
-    const metadata = await FingerprintService.identifyTrack(track.file_path);
+    const metadata = await FingerprintService.identifyTrack(track.file_path, db);
     if (!metadata) return res.status(404).json({ error: 'Could not identify track' });
     res.json(metadata);
   } catch (e) {
@@ -198,7 +198,7 @@ export const getTrackWaveform = (req: Request, res: Response) => {
   }
 
   const worker = new Worker(path.resolve(__dirname, '../routes/waveform-worker.js'), {
-    workerData: { filePath: track.file_path },
+    workerData: { filePath: track.file_path, dbPath: db.name },
   });
 
   worker.on('message', (data) => {

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import db from '../db';
-import { SmartPlaylistService, type SmartPlaylistRules } from '../services/SmartPlaylistService';
+import { SmartPlaylistService, type SmartPlaylistDefinition } from '../services/SmartPlaylistService';
 import crypto from 'crypto';
 
 interface SmartPlaylistRow {
@@ -18,7 +18,7 @@ export const getAllSmartPlaylists = (req: Request, res: Response) => {
   res.json(
     playlists.map((p) => ({
       ...p,
-      definition: JSON.parse(p.definition) as SmartPlaylistRules,
+      definition: JSON.parse(p.definition) as SmartPlaylistDefinition,
     })),
   );
 };
@@ -58,7 +58,8 @@ export const getSmartPlaylistTracks = (req: Request, res: Response) => {
 
   try {
     const definition = JSON.parse(playlist.definition);
-    const tracks = SmartPlaylistService.evaluate(definition);
+    const smartService = new SmartPlaylistService(db);
+    const tracks = smartService.evaluate(definition);
     res.json(tracks);
   } catch (error) {
     console.error('Failed to evaluate smart playlist:', error);
@@ -69,7 +70,8 @@ export const getSmartPlaylistTracks = (req: Request, res: Response) => {
 export const previewSmartPlaylist = (req: Request, res: Response) => {
   const { conditions, matchMode } = req.body;
   try {
-    const tracks = SmartPlaylistService.evaluate({ conditions, matchMode });
+    const smartService = new SmartPlaylistService(db);
+    const tracks = smartService.evaluate({ conditions, matchMode });
     res.json({ count: tracks.length });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });

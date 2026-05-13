@@ -3,7 +3,7 @@ import db from '../db';
 import { FingerprintService } from '../services/FingerprintService';
 import { createRequire } from 'node:module';
 
-const requireNative = createRequire(import.meta.url);
+const requireNative = createRequire(__filename);
 const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 const router = Router();

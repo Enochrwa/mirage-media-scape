@@ -33,7 +33,7 @@ router.get('/stream', async (req, res) => {
       headers: { 'Icy-MetaData': '1', 'User-Agent': 'Zovyra/1.0' },
     });
 
-    res.setHeader('Content-Type', response.headers['content-type'] || 'audio/mpeg');
+    res.setHeader('Content-Type', (response.headers['content-type'] as string) || 'audio/mpeg');
     response.data.pipe(res);
   } catch (e) {
     res.status(500).send('Proxy error');

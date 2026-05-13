@@ -1,75 +1,123 @@
 import { create } from 'zustand';
-import { MediaFile } from '@/types/media';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { queueManager } from '@/engines/QueueManager';
-import { Track } from '../../types/track';
-import { toast } from '@/hooks/use-toast';
+import { Track } from '../../../types/track';
 
-interface PlayerState {
-  currentTrack: Track | null;
+export interface PlayerState {
+  currentFile: Track | null; // Keep original name
   isPlaying: boolean;
   volume: number;
   currentTime: number;
   duration: number;
+  shuffle: boolean;
+  repeat: boolean;
+  isPlayerFullscreen: boolean;
+  showMobilePlayer: boolean;
+  aiDjEnabled: boolean;
 
   // Actions
-  playTrack: (track: Track) => Promise<void>;
-  pause: () => void;
-  resume: () => void;
-  toggle: () => void;
-  seek: (time: number) => void;
-  next: () => Promise<void>;
+  init: () => void;
+  playFile: (track: Track) => Promise<void>;
+  pausePlayback: () => void;
+  resumePlayback: () => void;
+  togglePlayback: () => void;
+  seekTo: (time: number) => void;
+  nextTrack: () => Promise<void>;
+  previousTrack: () => void;
   setVolume: (v: number) => void;
+  setAiDjEnabled: (enabled: boolean) => void;
+  setShuffle: (shuffle: boolean) => void;
+  setRepeat: (repeat: boolean) => void;
+  setPlayerFullscreen: (fullscreen: boolean) => void;
+  setShowMobilePlayer: (show: boolean) => void;
+  setCurrentTime: (time: number) => void;
+  setDuration: (duration: number) => void;
+  closePlayer: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
-  currentTrack: null,
+  currentFile: null,
   isPlaying: false,
   volume: 0.8,
   currentTime: 0,
   duration: 0,
+  shuffle: false,
+  repeat: false,
+  isPlayerFullscreen: false,
+  showMobilePlayer: false,
+  aiDjEnabled: false,
 
-  playTrack: async (track: Track) => {
-    set({ currentTrack: track, isPlaying: true });
+  init: () => {
+    const savedQueue = localStorage.getItem('ZOVYRA_queue');
+    const savedIndex = localStorage.getItem('ZOVYRA_currentIndex');
+    if (savedQueue) {
+      try {
+        // queueManager.load(JSON.parse(savedQueue), parseInt(savedIndex || '0'));
+      } catch (e) {
+        console.error('Failed to restore queue', e);
+      }
+    }
+  },
+
+  playFile: async (track: Track) => {
+    set({ currentFile: track, isPlaying: true });
     await playbackEngine.load(track);
     playbackEngine.play();
   },
 
-  pause: () => {
+  pausePlayback: () => {
     playbackEngine.pause();
     set({ isPlaying: false });
   },
 
-  resume: () => {
+  resumePlayback: () => {
     playbackEngine.play();
     set({ isPlaying: true });
   },
 
-  toggle: () => {
+  togglePlayback: () => {
     const { isPlaying } = get();
-    if (isPlaying) get().pause();
-    else get().resume();
+    if (isPlaying) get().pausePlayback();
+    else get().resumePlayback();
   },
 
-  seek: (time) => {
+  seekTo: (time: number) => {
     playbackEngine.seek(time);
     set({ currentTime: time });
   },
 
-  next: async () => {
+  nextTrack: async () => {
     const nextTrack = await queueManager.smartNext();
     if (nextTrack) {
-      get().playTrack(nextTrack);
+      get().playFile(nextTrack);
     }
   },
 
-  setVolume: (v) => {
+  previousTrack: () => {
+    // Implement previous logic
+  },
+
+  setVolume: (v: number) => {
     playbackEngine.setVolume(v);
     set({ volume: v });
+  },
+
+  setAiDjEnabled: (enabled: boolean) => set({ aiDjEnabled: enabled }),
+  setShuffle: (shuffle: boolean) => set({ shuffle }),
+  setRepeat: (repeat: boolean) => set({ repeat }),
+  setPlayerFullscreen: (isPlayerFullscreen: boolean) => set({ isPlayerFullscreen }),
+  setShowMobilePlayer: (showMobilePlayer: boolean) => set({ showMobilePlayer }),
+  setCurrentTime: (currentTime: number) => set({ currentTime }),
+  setDuration: (duration: number) => set({ duration }),
+  closePlayer: () => {
+    get().pausePlayback();
+    set({ currentFile: null });
   },
 }));
 
 // Listen for end of track
-window.addEventListener('zovyra-track-ended', () => {
-  usePlayerStore.getState().next();
-});
+if (typeof window !== 'undefined') {
+  window.addEventListener('zovyra-track-ended', () => {
+    usePlayerStore.getState().nextTrack();
+  });
+}
