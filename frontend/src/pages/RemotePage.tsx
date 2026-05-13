@@ -22,6 +22,11 @@ interface RemoteState {
   queue?: RemoteTrack[];
 }
 
+const isSafeUrl = (url?: string) => {
+  if (!url) return false;
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('/');
+};
+
 const RemotePage = () => {
   const [state, setState] = useState<RemoteState | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -90,16 +95,18 @@ const RemotePage = () => {
 
       {/* Hero Art Background */}
       <div className="absolute inset-0 z-0 opacity-20 blur-3xl">
-        <img src={state.track?.cover} className="h-full w-full object-cover" />
+        {isSafeUrl(state.track?.cover) && (
+          <img src={state.track?.cover} className="h-full w-full object-cover" alt="" />
+        )}
       </div>
 
       <div className="relative z-10 w-full max-w-md flex-1 flex flex-col items-center justify-center p-6 space-y-8">
         <Card className="mx-auto aspect-square w-full max-w-[80vw] overflow-hidden rounded-2xl border-white/10 shadow-2xl">
-          <img
-            src={state.track?.cover || '/placeholder.svg'}
-            className="h-full w-full object-cover"
-            alt=""
-          />
+          {isSafeUrl(state.track?.cover) ? (
+            <img src={state.track?.cover} className="h-full w-full object-cover" alt="" />
+          ) : (
+            <img src="/placeholder.svg" className="h-full w-full object-cover" alt="" />
+          )}
         </Card>
 
         <div className="w-full space-y-1 text-center">
@@ -192,7 +199,11 @@ const RemotePage = () => {
                    onClick={() => { sendCommand('JUMP', i); setShowQueue(false); }}
                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
                  >
-                    <img src={t.cover} className="w-12 h-12 rounded-lg object-cover" />
+                    {isSafeUrl(t.cover) ? (
+                      <img src={t.cover} className="w-12 h-12 rounded-lg object-cover" alt="" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-zinc-800" />
+                    )}
                     <div className="min-w-0 flex-1">
                        <p className="font-bold truncate text-sm">{t.title}</p>
                        <p className="text-xs text-zinc-500 truncate">{t.artist}</p>

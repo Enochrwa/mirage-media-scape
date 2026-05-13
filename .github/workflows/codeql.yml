@@ -36,6 +36,8 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          # Use both for maximum coverage if needed, but 'javascript-typescript' is the modern alias
+          # We keep it as is but ensure category mapping is correct.
 
       - name: Build JavaScript/TypeScript
         run: |
@@ -46,4 +48,4 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: /language:${{ matrix.language }}
+          category: "/language:javascript-typescript"
