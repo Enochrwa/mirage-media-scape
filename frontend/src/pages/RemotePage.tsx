@@ -25,18 +25,15 @@ interface RemoteState {
 const sanitizeUrl = (url?: string): string => {
   if (!url) return '/placeholder.svg';
 
-  try {
-    // Relative paths are always safe in this context
-    if (url.startsWith('/') || url.startsWith('data:image/')) {
-       return url;
-    }
+  // Only allow relative paths, standard http(s) protocols, or data images
+  const safePrefixes = ['/', 'http://', 'https://', 'data:image/'];
+  const isSafe = safePrefixes.some((prefix) => url.startsWith(prefix));
 
-    const parsed = new URL(url);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-       return parsed.toString();
+  if (isSafe) {
+    // Double check for common XSS patterns like javascript: inside the URL string
+    if (!url.toLowerCase().includes('javascript:')) {
+      return url;
     }
-  } catch (e) {
-    // Ignore invalid URLs
   }
 
   return '/placeholder.svg';
@@ -55,8 +52,19 @@ const RemotePage = () => {
     socket.onopen = () => console.log('Remote connected');
     socket.onmessage = (event) => {
       const msg = JSON.parse(event.data);
-      if (msg.type === 'STATE') {
-        setState(msg.payload);
+      if (msg.type === 'STATE' && msg.payload) {
+        const payload = msg.payload;
+        // Pre-sanitize all URLs before putting them in state
+        if (payload.track) {
+          payload.track.cover = sanitizeUrl(payload.track.cover);
+        }
+        if (payload.queue) {
+          payload.queue = payload.queue.map((item: RemoteTrack) => ({
+            ...item,
+            cover: sanitizeUrl(item.cover),
+          }));
+        }
+        setState(payload);
       }
     };
     socket.onclose = () => {
@@ -110,12 +118,18 @@ const RemotePage = () => {
 
       {/* Hero Art Background */}
       <div className="absolute inset-0 z-0 opacity-20 blur-3xl">
-        <img src={sanitizeUrl(state.track?.cover)} className="h-full w-full object-cover" alt="" />
+        {state.track?.cover && (
+          <img src={state.track.cover} className="h-full w-full object-cover" alt="" />
+        )}
       </div>
 
       <div className="relative z-10 w-full max-w-md flex-1 flex flex-col items-center justify-center p-6 space-y-8">
         <Card className="mx-auto aspect-square w-full max-w-[80vw] overflow-hidden rounded-2xl border-white/10 shadow-2xl">
-           <img src={sanitizeUrl(state.track?.cover)} className="h-full w-full object-cover" alt="" />
+          <img
+            src={state.track?.cover || '/placeholder.svg'}
+            className="h-full w-full object-cover"
+            alt=""
+          />
         </Card>
 
         <div className="w-full space-y-1 text-center">
@@ -203,17 +217,24 @@ const RemotePage = () => {
            </div>
            <div className="overflow-y-auto h-full p-4 pb-32 space-y-2">
               {state.queue?.slice(0, 10).map((t, i) => (
-                 <div
-                   key={i}
-                   onClick={() => { sendCommand('JUMP', i); setShowQueue(false); }}
-                   className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
-                 >
-                    <img src={sanitizeUrl(t.cover)} className="w-12 h-12 rounded-lg object-cover" alt="" />
-                    <div className="min-w-0 flex-1">
-                       <p className="font-bold truncate text-sm">{t.title}</p>
-                       <p className="text-xs text-zinc-500 truncate">{t.artist}</p>
-                    </div>
-                 </div>
+                <div
+                  key={i}
+                  onClick={() => {
+                    sendCommand('JUMP', i);
+                    setShowQueue(false);
+                  }}
+                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
+                >
+                  <img
+                    src={t.cover || '/placeholder.svg'}
+                    className="w-12 h-12 rounded-lg object-cover"
+                    alt=""
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold truncate text-sm">{t.title}</p>
+                    <p className="text-xs text-zinc-500 truncate">{t.artist}</p>
+                  </div>
+                </div>
               ))}
            </div>
         </div>
