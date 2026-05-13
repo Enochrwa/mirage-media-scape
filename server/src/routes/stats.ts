@@ -1,50 +1,45 @@
 import { Router } from 'express';
 import db from '../db';
 import { StatsService } from '../services/StatsService';
+import { PlaybackEventService } from '../services/PlaybackEventService';
 
 const router = Router();
+const statsService = new StatsService(db);
 
-router.post('/event', (req, res) => {
-  const { track_id, type, timestamp, position, completed } = req.body;
+router.post('/event/start', (req, res) => {
+  const { trackId, source, deviceId } = req.body;
+  const eventId = PlaybackEventService.startEvent(trackId, source, deviceId);
+  res.json({ data: { eventId } });
+});
 
-  if (type === 'start') {
-    const result = db
-      .prepare(
-        `
-            INSERT INTO play_events (track_id, started_at, position)
-            VALUES (?, ?, ?)
-        `,
-      )
-      .run(track_id, timestamp, position || 0);
-    return res.json({ id: result.lastInsertRowid });
-  } else if (type === 'end') {
-    const { event_id } = req.body;
-    db.prepare(
-      `
-            UPDATE play_events
-            SET ended_at = ?, position = ?, completed = ?
-            WHERE id = ?
-        `,
-    ).run(timestamp, position, completed ? 1 : 0, event_id);
-    return res.json({ success: true });
-  }
-
-  res.status(400).json({ error: 'Invalid event type' });
+router.post('/event/end', (req, res) => {
+  const { eventId, secondsPlayed, completed, skipped } = req.body;
+  PlaybackEventService.endEvent(eventId, secondsPlayed, completed, skipped);
+  res.json({ data: { success: true } });
 });
 
 router.get('/top-tracks', (req, res) => {
-  const tracks = StatsService.getTopTracks(parseInt(req.query.limit as string) || 10);
-  res.json(tracks);
+  const { period = 'all', limit = 10 } = req.query;
+  const tracks = statsService.getTopTracks(period as any, Number(limit));
+  res.json({ data: tracks });
 });
 
-router.get('/history', (req, res) => {
-  const history = StatsService.getHistory(parseInt(req.query.limit as string) || 50);
-  res.json(history);
+router.get('/top-artists', (req, res) => {
+  const { period = 'all', limit = 10 } = req.query;
+  const artists = statsService.getTopArtists(period as any, Number(limit));
+  res.json({ data: artists });
 });
 
-router.get('/summary', (req, res) => {
-  const summary = StatsService.getStats();
-  res.json(summary);
+router.get('/heatmap', (req, res) => {
+  res.json({ data: statsService.getHeatmap() });
+});
+
+router.get('/total-time', (req, res) => {
+  res.json({ data: { totalSeconds: statsService.getTotalTime() } });
+});
+
+router.get('/recap/:year', (req, res) => {
+  res.json({ data: statsService.getYearRecap(Number(req.params.year)) });
 });
 
 export default router;

@@ -1,9 +1,3 @@
-import { createRequire } from 'node:module';
-
-const isESM = typeof (global as any).importMeta !== 'undefined';
-const requireNative = createRequire((global as any).importMeta?.url || __filename);
-const native = requireNative('../../zovyra-native.node');
-
 export interface SubtitleCue {
   start: number;
   end: number;
@@ -11,118 +5,68 @@ export interface SubtitleCue {
 }
 
 export class SubtitleService {
-  public async getTracks(path: string) {
-    return native.get_subtitle_tracks(path);
+  static parseSRT(content: string): SubtitleCue[] {
+    const blocks = content.trim().split(/\n\n+/);
+    return blocks.map(block => {
+      const lines = block.split('\n');
+      if (lines.length < 3) return null;
+      const timing = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/);
+      if (!timing) return null;
+
+      return {
+        start: this.parseTime(timing[1]),
+        end: this.parseTime(timing[2]),
+        text: lines.slice(2).join('\n').replace(/<[^>]*>/g, '')
+      };
+    }).filter((c): c is SubtitleCue => c !== null);
   }
 
-  public async extractAndParse(path: string, index: number): Promise<SubtitleCue[]> {
-    const raw = native.extract_subtitle_stream(path, index);
-    if (raw.includes('-->')) {
-      return this.parseSRT(raw);
-    } else if (raw.includes('WEBVTT')) {
-      return this.parseVTT(raw);
-    } else if (raw.includes('[Events]')) {
-      return this.parseASS(raw);
-    }
-    return [];
+  static parseVTT(content: string): SubtitleCue[] {
+    const lines = content.trim().split('\n');
+    let firstCueIdx = lines.findIndex(l => l.includes('-->'));
+    if (firstCueIdx === -1) return [];
+
+    const blocks = content.slice(content.indexOf(lines[firstCueIdx])).trim().split(/\n\n+/);
+    return blocks.map(block => {
+      const lines = block.split('\n');
+      const timing = lines[0].match(/(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})/);
+      if (!timing) return null;
+
+      return {
+        start: this.parseTime(timing[1]),
+        end: this.parseTime(timing[2]),
+        text: lines.slice(1).join('\n').replace(/<[^>]*>/g, '')
+      };
+    }).filter((c): c is SubtitleCue => c !== null);
   }
 
-  private parseSRT(data: string): SubtitleCue[] {
-    const cues: SubtitleCue[] = [];
-    const blocks = data.split(/\n\s*\n/);
+  static parseASS(content: string): SubtitleCue[] {
+    const eventsIdx = content.indexOf('[Events]');
+    if (eventsIdx === -1) return [];
+    const eventsPart = content.slice(eventsIdx);
+    const lines = eventsPart.split('\n');
+    const dialogueLines = lines.filter(l => l.startsWith('Dialogue:'));
 
-    for (const block of blocks) {
-      const lines = block
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l);
-      if (lines.length < 3) continue;
+    return dialogueLines.map(line => {
+      const parts = line.split(',');
+      if (parts.length < 10) return null;
+      const start = parts[1];
+      const end = parts[2];
+      const text = parts.slice(9).join(',').replace(/\{[^}]*\}/g, '').replace(/\\N/g, '\n').replace(/\\n/g, '\n');
 
-      const timeMatch = lines[1].match(
-        /(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/,
-      );
-      if (timeMatch) {
-        cues.push({
-          start: this.parseTime(timeMatch[1]),
-          end: this.parseTime(timeMatch[2]),
-          text: lines.slice(2).join('\n'),
-        });
-      }
-    }
-    return cues;
+      return {
+        start: this.parseTime(start),
+        end: this.parseTime(end),
+        text: text.trim()
+      };
+    }).filter((c): c is SubtitleCue => c !== null);
   }
 
-  private parseVTT(data: string): SubtitleCue[] {
-    const cues: SubtitleCue[] = [];
-    const blocks = data.split(/\n\s*\n/);
-
-    for (const block of blocks) {
-      if (block.includes('WEBVTT')) continue;
-      const lines = block
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l);
-      if (lines.length < 2) continue;
-
-      const timeMatch = lines[0].match(
-        /(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})/,
-      );
-      if (timeMatch) {
-        cues.push({
-          start: this.parseTime(timeMatch[1]),
-          end: this.parseTime(timeMatch[2]),
-          text: lines.slice(1).join('\n'),
-        });
-      }
-    }
-    return cues;
-  }
-
-  private parseASS(data: string): SubtitleCue[] {
-    const cues: SubtitleCue[] = [];
-    const lines = data.split('\n');
-    let eventsSection = false;
-
-    for (const line of lines) {
-      if (line.includes('[Events]')) {
-        eventsSection = true;
-        continue;
-      }
-      if (eventsSection && line.startsWith('Dialogue:')) {
-        const parts = line.split(',');
-        const start = parts[1];
-        const end = parts[2];
-        const text = parts
-          .slice(9)
-          .join(',')
-          .replace(/\{[^}]+\}/g, '')
-          .replace(/\\N/g, '\n');
-
-        cues.push({
-          start: this.parseTime(start),
-          end: this.parseTime(end),
-          text: text.trim(),
-        });
-      }
-    }
-    return cues;
-  }
-
-  private parseTime(str: string): number {
-    const [hms, frac] = str.replace(',', '.').split('.');
-    const parts = hms.split(':').map(Number);
-    let h, m, s;
+  private static parseTime(str: string): number {
+    const parts = str.replace(',', '.').split(':').map(Number);
     if (parts.length === 3) {
-      [h, m, s] = parts;
-    } else {
-      [h, m, s] = [0, parts[0], parts[1]];
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
     }
-
-    let fraction = 0;
-    if (frac) {
-      fraction = Number(frac.padEnd(3, '0').slice(0, 3)) / 1000;
-    }
-
-    return h * 3600 + m * 60 + s + fraction;
+    return 0;
   }
 }

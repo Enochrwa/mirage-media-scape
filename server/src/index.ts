@@ -13,6 +13,8 @@ import radioRouter from './routes/radio';
 import subtitlesRouter from './routes/subtitles';
 import aidjRouter from './routes/ai-dj';
 import podcastsRouter from './routes/podcasts';
+import downloadsRouter from './routes/downloads';
+import maintenanceRouter from './routes/maintenance';
 
 import { LocalSyncServer } from './services/LocalSyncServer';
 import { RemoteControlServer } from './services/RemoteControlServer';
@@ -46,6 +48,8 @@ app.use('/api/radio', radioRouter);
 app.use('/api/subtitles', subtitlesRouter);
 app.use('/api/ai-dj', aidjRouter);
 app.use('/api/podcasts', podcastsRouter);
+app.use('/api/downloads', downloadsRouter);
+app.use('/api/maintenance', maintenanceRouter);
 
 // Serve covers
 app.use('/api/covers', express.static(path.join(__dirname, '../cache/covers')));

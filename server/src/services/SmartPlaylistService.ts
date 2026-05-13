@@ -1,150 +1,142 @@
-import db from '../db';
-import type { Track } from '../types/database';
+import { Database } from 'better-sqlite3';
 
-type SqlParam = string | number | bigint | null;
-
-export type SmartPlaylistOperator =
-  | 'is'
-  | 'isNot'
-  | 'contains'
-  | 'notContains'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'between'
-  | 'inLastDays';
-
-export interface SmartPlaylistRule {
-  field: string;
-  operator: SmartPlaylistOperator;
-  value: unknown;
-}
-
-export interface SmartPlaylistRules {
+export interface SmartPlaylistDefinition {
+  conditions: RuleCondition[];
   matchMode: 'all' | 'any';
-  conditions: SmartPlaylistRule[];
   limit?: number;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
 }
 
-function asNumber(v: unknown): number | null {
-  if (typeof v === 'number' && !Number.isNaN(v)) return v;
-  if (typeof v === 'string' && v.trim() !== '') {
-    const n = Number(v);
-    if (!Number.isNaN(n)) return n;
-  }
-  return null;
-}
-
-function asString(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  return String(v);
+export interface RuleCondition {
+  field: string;
+  operator: string;
+  value: any;
 }
 
 export class SmartPlaylistService {
-  static evaluate(rules: SmartPlaylistRules): Track[] {
-    let sql = 'SELECT * FROM tracks';
-    const params: SqlParam[] = [];
-    const whereClauses: string[] = [];
+  private allowedFields = new Set([
+    'title', 'artist', 'album', 'genre', 'year', 'bpm', 'rating', 'play_count',
+    'last_played', 'added_at', 'duration', 'key', 'camelot_key', 'energy', 'skip_count'
+  ]);
 
-    for (const condition of rules.conditions) {
-      const clause = this.buildClause(condition, params);
-      if (clause) {
-        whereClauses.push(clause);
-      }
+  constructor(private db: Database) {}
+
+  evaluate(definition: SmartPlaylistDefinition): any[] {
+    const { conditions, matchMode, limit, sortBy, sortDir } = definition;
+    let query = 'SELECT * FROM tracks WHERE missing = 0';
+    const params: any[] = [];
+
+    if (sortBy && !this.allowedFields.has(sortBy)) {
+      throw new Error(`Invalid sort field: ${sortBy}`);
     }
 
-    if (whereClauses.length > 0) {
-      const joiner = rules.matchMode === 'any' ? ' OR ' : ' AND ';
-      sql += ' WHERE ' + whereClauses.join(joiner);
+    if (conditions.length > 0) {
+      const clauses = conditions.map(cond => {
+        if (!this.allowedFields.has(cond.field)) {
+          throw new Error(`Invalid field: ${cond.field}`);
+        }
+        const clause = this.buildConditionClause(cond);
+        if (Array.isArray(cond.value)) {
+          params.push(...cond.value);
+        } else if (cond.operator === 'contains' || cond.operator === 'not_contains') {
+          params.push(`%${cond.value}%`);
+        } else if (cond.operator === 'starts_with') {
+          params.push(`${cond.value}%`);
+        } else if (cond.operator === 'in_last_days') {
+          params.push(Math.floor(Date.now() / 1000) - (cond.value * 86400));
+        } else {
+          params.push(cond.value);
+        }
+        return clause;
+      });
+
+      const joined = clauses.join(matchMode === 'all' ? ' AND ' : ' OR ');
+      query += ` AND (${joined})`;
     }
 
-    if (rules.sortBy) {
-      const dir = rules.sortDir === 'desc' ? 'DESC' : 'ASC';
-      const allowedFields = ['title', 'artist', 'album', 'bpm', 'added_at', 'duration', 'loudness'];
-      if (allowedFields.includes(rules.sortBy)) {
-        sql += ` ORDER BY ${rules.sortBy} ${dir}`;
-      }
+    if (sortBy) {
+      query += ` ORDER BY ${sortBy} ${sortDir || 'ASC'}`;
     }
 
-    if (rules.limit) {
-      sql += ' LIMIT ?';
-      params.push(rules.limit);
+    if (limit) {
+      query += ` LIMIT ${limit}`;
     }
 
-    return db.prepare(sql).all(...params) as Track[];
+    return this.db.prepare(query).all(...params);
   }
 
-  private static buildClause(condition: SmartPlaylistRule, params: SqlParam[]): string | null {
-    const field = condition.field;
-    const allowedFields = [
-      'title',
-      'artist',
-      'album',
-      'genre',
-      'year',
-      'bpm',
-      'duration',
-      'loudness',
-      'added_at',
-      'key',
-      'camelot_key',
-      'play_count',
-      'last_played',
-    ];
-    if (!allowedFields.includes(field)) return null;
-
-    let sqlField = field;
-    if (field === 'title' || field === 'artist' || field === 'album' || field === 'genre') {
-      sqlField = `LOWER(${field})`;
+  private buildConditionClause(cond: RuleCondition): string {
+    const field = cond.field;
+    switch (cond.operator) {
+      case 'is': return `${field} = ?`;
+      case 'is_not': return `${field} != ?`;
+      case 'contains': return `${field} LIKE ?`;
+      case 'not_contains': return `${field} NOT LIKE ?`;
+      case 'starts_with': return `${field} LIKE ?`;
+      case 'gt': return `${field} > ?`;
+      case 'lt': return `${field} < ?`;
+      case 'gte': return `${field} >= ?`;
+      case 'lte': return `${field} <= ?`;
+      case 'between': return `${field} BETWEEN ? AND ?`;
+      case 'in_last_days': return `${field} >= ?`;
+      case 'before': return `${field} < ?`;
+      case 'after': return `${field} > ?`;
+      default: throw new Error(`Unsupported operator: ${cond.operator}`);
     }
+  }
 
-    switch (condition.operator) {
-      case 'is':
-        params.push(asString(condition.value));
-        return `${sqlField} = ?`;
-      case 'isNot':
-        params.push(asString(condition.value));
-        return `${sqlField} != ?`;
-      case 'contains':
-        params.push(`%${asString(condition.value).toLowerCase()}%`);
-        return `${sqlField} LIKE ?`;
-      case 'notContains':
-        params.push(`%${asString(condition.value).toLowerCase()}%`);
-        return `${sqlField} NOT LIKE ?`;
-      case 'gt':
-      case 'gte': {
-        const n = asNumber(condition.value);
-        if (n === null) return null;
-        params.push(n);
-        return `${field} ${condition.operator === 'gt' ? '>' : '>='} ?`;
+  async generateSystemPlaylists() {
+    const systemPlaylists = [
+      {
+        name: 'Most Played',
+        definition: JSON.stringify({
+          conditions: [{ field: 'play_count', operator: 'gt', value: 0 }],
+          matchMode: 'all',
+          limit: 25,
+          sortBy: 'play_count',
+          sortDir: 'desc'
+        })
+      },
+      {
+        name: 'Recently Added',
+        definition: JSON.stringify({
+          conditions: [{ field: 'added_at', operator: 'in_last_days', value: 14 }],
+          matchMode: 'all',
+          sortBy: 'added_at',
+          sortDir: 'desc'
+        })
+      },
+      {
+        name: 'Long Tracks',
+        definition: JSON.stringify({
+          conditions: [{ field: 'duration', operator: 'gt', value: 480 }],
+          matchMode: 'all',
+          sortBy: 'duration',
+          sortDir: 'desc'
+        })
+      },
+      {
+        name: 'High Energy',
+        definition: JSON.stringify({
+          conditions: [
+            { field: 'energy', operator: 'gt', value: 0.7 },
+            { field: 'bpm', operator: 'gt', value: 120 }
+          ],
+          matchMode: 'all',
+          sortBy: 'bpm',
+          sortDir: 'desc'
+        })
       }
-      case 'lt':
-      case 'lte': {
-        const n = asNumber(condition.value);
-        if (n === null) return null;
-        params.push(n);
-        return `${field} ${condition.operator === 'lt' ? '<' : '<='} ?`;
-      }
-      case 'between': {
-        if (!Array.isArray(condition.value) || condition.value.length !== 2) return null;
-        const lo = asNumber(condition.value[0]);
-        const hi = asNumber(condition.value[1]);
-        if (lo === null || hi === null) return null;
-        params.push(lo, hi);
-        return `${field} BETWEEN ? AND ?`;
-      }
-      case 'inLastDays': {
-        const days = asNumber(condition.value);
-        if (days === null) return null;
-        const cutoff = Date.now() - days * 86400000;
-        params.push(cutoff);
-        return `${field} > ?`;
-      }
-      default:
-        return null;
+    ];
+
+    for (const p of systemPlaylists) {
+      this.db.prepare(`
+        INSERT OR IGNORE INTO smart_playlists (id, name, definition, created_at, updated_at, is_system)
+        VALUES (?, ?, ?, ?, ?, 1)
+      `).run(crypto.randomUUID(), p.name, p.definition, Date.now(), Date.now());
     }
   }
 }
+
+import crypto from 'crypto';

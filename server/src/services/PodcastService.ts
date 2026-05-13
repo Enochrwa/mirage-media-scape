@@ -1,101 +1,92 @@
-import Database from 'better-sqlite3';
+import { Database } from 'better-sqlite3';
 import fetch from 'node-fetch';
 import { XMLParser } from 'fast-xml-parser';
 import crypto from 'crypto';
-import { UrlValidator } from '../utils/UrlValidator';
 
 export class PodcastService {
-  private parser: XMLParser;
+  private parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
-  constructor(private db: Database.Database) {
-    this.parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-    });
+  constructor(private db: Database) {}
+
+  async subscribe(feedUrl: string) {
+    const res = await fetch(feedUrl, { timeout: 8000 });
+    const xml = await res.text();
+    const data = this.parser.parse(xml);
+
+    const channel = data.rss.channel;
+    const podcastId = crypto.randomUUID();
+
+    this.db.prepare(`
+      INSERT INTO podcast_subscriptions (id, title, feed_url, description, artwork_url, author, subscribed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      podcastId,
+      channel.title,
+      feedUrl,
+      channel.description,
+      channel['itunes:image']?.['@_href'],
+      channel['itunes:author'],
+      Math.floor(Date.now() / 1000)
+    );
+
+    const items = Array.isArray(channel.item) ? channel.item : [channel.item];
+    for (const item of items) {
+      this.insertEpisode(podcastId, item);
+    }
+
+    return podcastId;
   }
 
-  public async subscribe(feedUrl: string) {
-    try {
-      const url = new URL(feedUrl);
+  private insertEpisode(podcastId: string, item: any) {
+    const episodeId = item.guid?.['#text'] || item.guid || crypto.randomUUID();
+    const pubDate = item.pubDate ? Math.floor(new Date(item.pubDate).getTime() / 1000) : null;
 
-      // Centralized validation for protocol and private IPs
-      UrlValidator.validate(feedUrl);
+    let duration = 0;
+    const durStr = item['itunes:duration'];
+    if (durStr) {
+      if (durStr.includes(':')) {
+        const parts = durStr.split(':').map(Number);
+        if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+      } else {
+        duration = parseInt(durStr);
+      }
+    }
 
-      const response = await fetch(url.href);
-      const xml = await response.text();
+    this.db.prepare(`
+      INSERT OR IGNORE INTO podcast_episodes (id, podcast_id, title, description, audio_url, published_at, duration)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      episodeId,
+      podcastId,
+      item.title,
+      item.description,
+      item.enclosure?.['@_url'],
+      pubDate,
+      duration
+    );
+  }
+
+  async refreshAll() {
+    const podcasts = this.db.prepare('SELECT id, feed_url FROM podcast_subscriptions').all() as any[];
+    for (const podcast of podcasts) {
+      const res = await fetch(podcast.feed_url, { timeout: 8000 });
+      const xml = await res.text();
       const data = this.parser.parse(xml);
-      const channel = data.rss.channel;
-
-      const podcastId = crypto.createHash('md5').update(feedUrl).digest('hex');
-
-      this.db
-        .prepare(
-          `
-        INSERT OR REPLACE INTO podcast_subscriptions (
-          id, title, feed_url, description, artwork_url, author, website, language, subscribed_at, last_fetched
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-        )
-        .run(
-          podcastId,
-          channel.title,
-          feedUrl,
-          channel.description,
-          channel.image?.url || channel['itunes:image']?.['@_href'],
-          channel['itunes:author'] || '',
-          channel.link,
-          channel.language || 'en',
-          Date.now(),
-          Date.now(),
-        );
-
-      const items = Array.isArray(channel.item) ? channel.item : [channel.item];
-      const episodeStmt = this.db.prepare(`
-        INSERT OR IGNORE INTO podcast_episodes (
-          id, podcast_id, guid, title, description, audio_url, published_at, duration
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+      const items = Array.isArray(data.rss.channel.item) ? data.rss.channel.item : [data.rss.channel.item];
 
       for (const item of items) {
-        const episodeId = crypto
-          .createHash('md5')
-          .update(item.guid?.['#text'] || item.guid || item.enclosure?.['@_url'])
-          .digest('hex');
-        episodeStmt.run(
-          episodeId,
-          podcastId,
-          item.guid?.['#text'] || item.guid || item.enclosure?.['@_url'],
-          item.title,
-          item.description || item['content:encoded'] || '',
-          item.enclosure?.['@_url'],
-          item.pubDate ? new Date(item.pubDate).getTime() : Date.now(),
-          this.parseDuration(item['itunes:duration']),
-        );
+        this.insertEpisode(podcast.id, item);
       }
-
-      return podcastId;
-    } catch (e) {
-      console.error('Podcast subscription failed:', e);
-      throw e;
     }
   }
 
-  private parseDuration(dur: string | number | undefined | null): number {
-    if (!dur) return 0;
-    if (typeof dur === 'number') return dur;
-    const parts = String(dur).split(':').map(Number);
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    return parts[0] || 0;
-  }
+  updateProgress(episodeId: string, seconds: number) {
+    const ep = this.db.prepare('SELECT duration FROM podcast_episodes WHERE id = ?').get(episodeId) as { duration: number };
+    const played = ep && ep.duration > 0 && (seconds / ep.duration) > 0.9 ? 1 : 0;
 
-  public async getSubscriptions() {
-    return this.db.prepare('SELECT * FROM podcast_subscriptions ORDER BY subscribed_at DESC').all();
-  }
-
-  public async getEpisodes(podcastId: string) {
-    return this.db
-      .prepare('SELECT * FROM podcast_episodes WHERE podcast_id = ? ORDER BY published_at DESC')
-      .all(podcastId);
+    this.db.prepare(`
+      UPDATE podcast_episodes SET progress_seconds = ?, played = ? WHERE id = ?
+    `).run(seconds, played, episodeId);
   }
 }

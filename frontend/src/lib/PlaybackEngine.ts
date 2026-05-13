@@ -1,807 +1,167 @@
+import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
 
-export class ParametricEQ {
-  private ctx: AudioContext;
-  public bands: BiquadFilterNode[];
+// ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
+// Source
+//   → EQ Chain       (5× BiquadFilterNode: LowShelf 80Hz, Peak 250Hz, Peak 1kHz, Peak 4kHz, HighShelf 12kHz)
+//   → ReplayGain     (GainNode — gain = 10^(replayGainDb/20), default 1.0)
+//   → Crossfade      (GainNode — managed by CrossfadeEngine)
+//   → Analyser       (AnalyserNode — fftSize 2048, smoothing 0.8, tap only — audio passes through)
+//   → Spatial Panner (PannerNode — HRTF, bypassable — zero cost when off)
+//   → Compressor     (DynamicsCompressorNode — bypassable, three levels: off/standard/night)
+//   → Master Volume  (GainNode)
+//   → Destination
 
-  constructor(audioCtx: AudioContext) {
-    this.ctx = audioCtx;
-    this.bands = this.createBands();
-  }
-
-  private createBands() {
-    const bandConfigs = [
-      { type: 'lowshelf' as const, frequency: 80, gain: 0 },
-      { type: 'peaking' as const, frequency: 250, gain: 0, Q: 1.0 },
-      { type: 'peaking' as const, frequency: 1000, gain: 0, Q: 1.0 },
-      { type: 'peaking' as const, frequency: 4000, gain: 0, Q: 1.0 },
-      { type: 'highshelf' as const, frequency: 12000, gain: 0 },
-    ];
-
-    return bandConfigs.map((config) => {
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = config.type;
-      filter.frequency.value = config.frequency;
-      filter.gain.value = config.gain;
-      if (config.Q) filter.Q.value = config.Q;
-      return filter;
-    });
-  }
-
-  setBand(index: number, gain: number) {
-    if (this.bands[index]) {
-      this.bands[index].gain.setTargetAtTime(gain, this.ctx.currentTime, 0.01);
-    }
-  }
-
-  getFrequencyResponse(frequencies: Float32Array): Float32Array {
-    const totalMag = new Float32Array(frequencies.length).fill(1);
-    const magResponse = new Float32Array(frequencies.length);
-    const phaseResponse = new Float32Array(frequencies.length);
-
-    for (const band of this.bands) {
-      // @ts-expect-error - Float32Array type mismatch with older AudioContext definitions
-      band.getFrequencyResponse(frequencies, magResponse, phaseResponse);
-      for (let i = 0; i < frequencies.length; i++) {
-        totalMag[i] *= magResponse[i];
-      }
-    }
-
-    return totalMag;
-  }
-}
-
-export class ABLoop {
-  public pointA: number | null = null;
-  public pointB: number | null = null;
-  public isActive: boolean = false;
-
-  setA(time: number) {
-    this.pointA = time;
-  }
-
-  setB(time: number) {
-    this.pointB = time;
-  }
-
-  toggle() {
-    if (this.pointA !== null && this.pointB !== null) {
-      this.isActive = !this.isActive;
-    }
-  }
-
-  reset() {
-    this.pointA = null;
-    this.pointB = null;
-    this.isActive = false;
-  }
-
-  check(currentTime: number, onLoop: (seekTo: number) => void) {
-    if (this.isActive && this.pointA !== null && this.pointB !== null) {
-      if (currentTime >= this.pointB) {
-        onLoop(this.pointA);
-      }
-    }
-  }
+interface TrackChain {
+  element: HTMLMediaElement;
+  source: MediaElementAudioSourceNode;
+  eq: BiquadFilterNode[];
+  replayGain: GainNode;
+  fade: GainNode;
 }
 
 export type PlaybackState = 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'ENDED' | 'ERROR';
 
-interface TrackChain {
-  preGain: GainNode;
-  eq: ParametricEQ;
-  replayGain: GainNode;
-  crossfade: GainNode;
-}
-
-export type NightModeLevel = 'off' | 'standard' | 'night';
-export type CrossfadeCurve = 'linear' | 'equal-power';
-
 export class PlaybackEngine {
   public ctx!: AudioContext;
-  private state: PlaybackState = 'IDLE';
-  private currentSource: AudioBufferSourceNode | null = null;
-  private nextSource: AudioBufferSourceNode | null = null;
+  private chains: [TrackChain, TrackChain] = [] as any;
+  private activeIndex: number = 0;
 
-  // Canonical Parallel Prefix
-  private chainA!: TrackChain;
-  private chainB!: TrackChain;
-  private activeChain: 'A' | 'B' = 'A';
-
-  // Canonical Shared Nodes
   private analyser!: AnalyserNode;
-  private pitchPreserver: AudioWorkletNode | null = null;
-  private bassEnhancer!: WaveShaperNode;
   private panner!: PannerNode;
-  private convolver!: ConvolverNode;
-  private nightCompressor!: DynamicsCompressorNode;
-  private nightMakeupGain!: GainNode;
+  private compressor!: DynamicsCompressorNode;
   private masterGain!: GainNode;
 
-  public abLoop: ABLoop;
-  private spatialAudioEnabled: boolean = false;
-  private pitchLockEnabled: boolean = false;
-  private bassEnhancerEnabled: boolean = false;
-  private nightModeLevel: NightModeLevel = 'off';
-  private roomPreset: string = 'none';
-  private irCache: Map<string, AudioBuffer> = new Map();
-
-  private nextStartTime: number = 0;
+  private state: PlaybackState = 'IDLE';
   private currentTrackId: string | null = null;
-  private currentEventId: number | null = null;
-  private fadeDuration: number = 2; // Default 2s crossfade
-  private crossfadeCurve: CrossfadeCurve = 'equal-power';
+  private currentEventId: string | null = null;
   public sleepTimer: SleepTimer | null = null;
-  private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
-
-  private nextTrackAudio: HTMLAudioElement | null = null;
-  private previewAudio: HTMLAudioElement | null = null;
-  private previewGain: GainNode | null = null;
 
   constructor() {
-    this.abLoop = new ABLoop();
+    if (typeof window === 'undefined') return;
+    this.initContext();
   }
 
   private initContext() {
-    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
-    const win = window as Window & {
-      AudioContext?: typeof AudioContext;
-      webkitAudioContext?: typeof AudioContext;
-    };
-    const AudioContextClass = win.AudioContext ?? win.webkitAudioContext;
-    if (!AudioContextClass) throw new Error('AudioContext not supported');
-    this.ctx = new AudioContextClass();
-
-    this.chainA = this.createTrackChain();
-    this.chainB = this.createTrackChain();
-
+    // Shared tail of the graph
     this.analyser = this.ctx.createAnalyser();
-    this.bassEnhancer = this.ctx.createWaveShaper();
-    this.panner = this.ctx.createPanner();
-    this.convolver = this.ctx.createConvolver();
-    this.nightCompressor = this.ctx.createDynamicsCompressor();
-    this.nightMakeupGain = this.ctx.createGain();
-    this.masterGain = this.ctx.createGain();
-
     this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.8;
+
+    this.panner = this.ctx.createPanner();
     this.panner.panningModel = 'HRTF';
 
-    // Bass Enhancer curve
-    // @ts-expect-error - Float32Array type mismatch
-    this.bassEnhancer.curve = this.createBassExciterCurve(0.5);
+    this.compressor = this.ctx.createDynamicsCompressor();
+    this.compressor.ratio.value = 1; // Bypass
+
+    this.masterGain = this.ctx.createGain();
+
+    this.analyser.connect(this.panner);
+    this.panner.connect(this.compressor);
+    this.compressor.connect(this.masterGain);
+    this.masterGain.connect(this.ctx.destination);
+
+    // Two parallel chains for crossfading
+    this.chains = [this.createChain(), this.createChain()];
 
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
-
-    // Load Phase Vocoder Worklet
-    this.ctx.audioWorklet?.addModule('/worklets/phase-vocoder.js').then(() => {
-      this.pitchPreserver = new AudioWorkletNode(this.ctx, 'phase-vocoder');
-      this.updateChain();
-    }).catch(err => {
-      console.error('Failed to load phase-vocoder worklet:', err);
-    });
-
-    this.chainA.crossfade.connect(this.analyser);
-    this.chainB.crossfade.connect(this.analyser);
-
-    this.updateChain();
-
-    this.chainA.crossfade.gain.setValueAtTime(1, this.ctx.currentTime);
-    this.chainB.crossfade.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.activeChain = 'A';
-
-    // Create preview setup
-    this.previewGain = this.ctx.createGain();
-    this.previewGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-    this.previewGain.connect(this.analyser); // Connect to analyser for visualization
-    this.previewGain.connect(this.masterGain);
   }
 
-  private createTrackChain(): TrackChain {
-    const preGain = this.ctx.createGain();
-    const eq = new ParametricEQ(this.ctx);
+  private createChain(): TrackChain {
+    const el = new Audio();
+    el.crossOrigin = "anonymous";
+    const source = this.ctx.createMediaElementSource(el);
+
+    // 1. EQ Chain
+    const frequencies = [80, 250, 1000, 4000, 12000];
+    const types: BiquadFilterType[] = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
+    const eq: BiquadFilterNode[] = [];
+
+    let lastNode: AudioNode = source;
+    for (let i = 0; i < 5; i++) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = types[i];
+      filter.frequency.value = frequencies[i];
+      filter.gain.value = 0;
+      lastNode.connect(filter);
+      eq.push(filter);
+      lastNode = filter;
+    }
+
+    // 2. ReplayGain
     const replayGain = this.ctx.createGain();
-    const crossfade = this.ctx.createGain();
+    lastNode.connect(replayGain);
 
-    preGain.connect(eq.bands[0]);
-    for (let i = 0; i < eq.bands.length - 1; i++) {
-      eq.bands[i].connect(eq.bands[i + 1]);
-    }
-    eq.bands[eq.bands.length - 1].connect(replayGain);
-    replayGain.connect(crossfade);
+    // 3. Crossfade (joining point)
+    const fade = this.ctx.createGain();
+    replayGain.connect(fade);
+    fade.connect(this.analyser);
 
-    return { preGain, eq, replayGain, crossfade };
+    return { element: el, source, eq, replayGain, fade };
   }
 
-  private updateChain() {
-    // Disconnect all nodes after Analyser to rebuild the canonical chain
-    this.analyser.disconnect();
-    if (this.pitchPreserver) this.pitchPreserver.disconnect();
-    this.bassEnhancer.disconnect();
-    this.panner.disconnect();
-    this.nightCompressor.disconnect();
-    this.nightMakeupGain.disconnect();
+  async load(track: any, startNext: boolean = false) {
+    const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
+    const chain = this.chains[index];
 
-    // Canonical Chain Implementation:
-    // Analyser -> Bass Enhancer (Bypassable) -> Spatial Panner (Bypassable) -> Night Compressor (Bypassable) -> Master Volume -> Destination
-    // Note: Pitch Preserver (Worklet) is inserted after Analyser as per spec context, but spec chain doesn't explicitly place it.
-    // Following spec block comment: Analyser -> Bass Enhancer -> Spatial Panner -> Night Compressor -> Master Volume
+    this.currentTrackId = track.id;
+    chain.element.src = `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.filePath)}`;
+    chain.element.load();
 
-    let currentNode: AudioNode = this.analyser;
-
-    // Pitch Preserver (Worklet) - usually placed after Analyser or before Master
-    if (this.pitchLockEnabled && this.pitchPreserver) {
-      currentNode.connect(this.pitchPreserver);
-      currentNode = this.pitchPreserver;
-    }
-
-    if (this.bassEnhancerEnabled) {
-      currentNode.connect(this.bassEnhancer);
-      currentNode = this.bassEnhancer;
-    }
-
-    if (this.spatialAudioEnabled) {
-      currentNode.connect(this.panner);
-      currentNode = this.panner;
-    }
-
-    if (this.roomPreset !== 'none') {
-      currentNode.connect(this.convolver);
-      currentNode = this.convolver;
-    }
-
-    if (this.nightModeLevel !== 'off') {
-      this.updateNightCompressorSettings();
-      currentNode.connect(this.nightCompressor);
-      this.nightCompressor.connect(this.nightMakeupGain);
-      currentNode = this.nightMakeupGain;
-    }
-
-    currentNode.connect(this.masterGain);
-    this.masterGain.connect(this.ctx.destination);
-  }
-
-  private createBassExciterCurve(intensity: number): Float32Array {
-    // intensity: 0.0 to 1.0
-    const n_samples = 44100;
-    const curve = new Float32Array(n_samples);
-    const drive = 1.0 + intensity * 4.0; // 1x to 5x drive
-
-    for (let i = 0; i < n_samples; i++) {
-      const x = (i - 22050) / 22050; // -1 to 1
-      // Soft clip curve with even harmonic emphasis
-      const softClip = Math.tanh(x * drive) / Math.tanh(drive);
-      // Mix: blend between clean and saturated based on intensity
-      curve[i] = x * (1 - intensity * 0.5) + softClip * (intensity * 0.5);
-    }
-
-    return curve;
-  }
-
-  private updateNightCompressorSettings() {
-    const now = this.ctx.currentTime;
-    if (this.nightModeLevel === 'standard') {
-      this.nightCompressor.threshold.setTargetAtTime(-18, now, 0.1);
-      this.nightCompressor.knee.setTargetAtTime(8, now, 0.1);
-      this.nightCompressor.ratio.setTargetAtTime(4, now, 0.1);
-      this.nightCompressor.attack.setTargetAtTime(0.01, now, 0.1);
-      this.nightCompressor.release.setTargetAtTime(0.25, now, 0.1);
-      this.nightMakeupGain.gain.setTargetAtTime(1.0, now, 0.1);
-    } else if (this.nightModeLevel === 'night') {
-      this.nightCompressor.threshold.setTargetAtTime(-24, now, 0.1);
-      this.nightCompressor.knee.setTargetAtTime(10, now, 0.1);
-      this.nightCompressor.ratio.setTargetAtTime(12, now, 0.1);
-      this.nightCompressor.attack.setTargetAtTime(0.003, now, 0.1);
-      this.nightCompressor.release.setTargetAtTime(0.25, now, 0.1);
-      // makeup +2.5dB
-      const makeupGain = Math.pow(10, 2.5 / 20);
-      this.nightMakeupGain.gain.setTargetAtTime(makeupGain, now, 0.1);
-    }
-  }
-
-  setState(newState: PlaybackState) {
-    if (this.state !== newState) {
-      this.state = newState;
-      this.stateChangeListeners.forEach((l) => l(newState));
-    }
-  }
-
-  getState() {
-    return this.state;
-  }
-
-  subscribe(listener: (state: PlaybackState) => void) {
-    this.stateChangeListeners.push(listener);
-    return () => {
-      this.stateChangeListeners = this.stateChangeListeners.filter((l) => l !== listener);
-    };
-  }
-
-  async setRoomPreset(preset: string) {
-    this.initContext();
-    this.roomPreset = preset;
-    if (preset === 'none') {
-      this.updateChain();
-      return;
-    }
-
-    const irPath = `/ir/${preset}.wav`;
-    let buffer = this.irCache.get(preset);
-    if (!buffer) {
-      try {
-        const res = await fetch(irPath);
-        const arrayBuffer = await res.arrayBuffer();
-        buffer = await this.ctx.decodeAudioData(arrayBuffer);
-        this.irCache.set(preset, buffer);
-      } catch (e) {
-        console.error(`Failed to load IR: ${preset}`, e);
-        this.roomPreset = 'none';
-      }
-    }
-
-    if (buffer) {
-      this.convolver.buffer = buffer;
-    }
-    this.updateChain();
-  }
-
-  setSpatialAudioEnabled(enabled: boolean) {
-    this.initContext();
-    this.spatialAudioEnabled = enabled;
-    if (!enabled) {
-      this.panner.positionX.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-      this.panner.positionY.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-      this.panner.positionZ.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-    }
-    this.updateChain();
-  }
-
-  isSpatialAudioEnabled() {
-    return this.spatialAudioEnabled;
-  }
-
-  setBassEnhancerEnabled(enabled: boolean, intensity: number = 0.5) {
-    this.bassEnhancerEnabled = enabled;
-    if (enabled) {
-      // @ts-expect-error - Float32Array type mismatch
-      this.bassEnhancer.curve = this.createBassExciterCurve(intensity);
-    }
-    this.updateChain();
-  }
-
-  setNightModeLevel(level: NightModeLevel) {
-    this.nightModeLevel = level;
-    this.updateChain();
-  }
-
-  setNightModeEnabled(enabled: boolean) {
-    this.setNightModeLevel(enabled ? 'standard' : 'off');
-  }
-
-  setPitchLockEnabled(enabled: boolean) {
-    this.pitchLockEnabled = enabled;
-    this.updateChain();
-  }
-
-  setCrossfadeCurve(curve: CrossfadeCurve) {
-    this.crossfadeCurve = curve;
-  }
-
-  setPreGain(gain: number) {
-    const clamped = Math.max(0, Math.min(2.0, gain));
-    const now = this.ctx.currentTime;
-    this.chainA.preGain.gain.setTargetAtTime(clamped, now, 0.1);
-    this.chainB.preGain.gain.setTargetAtTime(clamped, now, 0.1);
-  }
-
-  async seek(time: number) {
-    this.initContext();
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
-    if (!this.currentSource || !this.currentSource.buffer) return;
-
-    const buffer = this.currentSource.buffer;
-    this.play(buffer, time, undefined, this.currentTrackId || undefined);
-  }
-
-  async preview(time: number) {
-    this.initContext();
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
-
-    if (!this.previewAudio) {
-      this.previewAudio = new Audio();
-      const source = this.ctx.createMediaElementSource(this.previewAudio);
-      source.connect(this.previewGain!);
-    }
-
-    if (this.currentTrackId) {
-      const apiBase = (window as unknown as { API_BASE?: string }).API_BASE || 'http://localhost:3001';
-      this.previewAudio.src = `${apiBase}/api/tracks/stream?path=${encodeURIComponent(this.currentTrackId)}`;
-      this.previewAudio.currentTime = time;
-      this.previewAudio.play();
-
-      setTimeout(() => {
-        if (this.previewAudio) {
-          this.previewAudio.pause();
-          this.previewGain?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-          setTimeout(() => {
-             this.previewGain?.gain.setTargetAtTime(0.4, this.ctx.currentTime, 0.05);
-          }, 100);
-        }
-      }, 300);
-    }
-  }
-
-  preBufferNextTrack(trackId: string, url: string) {
-    if (!this.nextTrackAudio) {
-      this.nextTrackAudio = new Audio();
-      this.nextTrackAudio.preload = 'auto';
-    }
-    this.nextTrackAudio.src = url;
-    this.nextTrackAudio.load();
-  }
-
-  setPlaybackSpeed(speed: number) {
-    if (this.currentSource) {
-      if (this.pitchLockEnabled && this.pitchPreserver) {
-        this.currentSource.playbackRate.setValueAtTime(1.0, this.ctx.currentTime);
-        const speedParam = this.pitchPreserver.parameters.get('speed');
-        if (speedParam) {
-          speedParam.setTargetAtTime(speed, this.ctx.currentTime, 0.1);
-        }
-      } else {
-        this.currentSource.playbackRate.setTargetAtTime(speed, this.ctx.currentTime, 0.1);
-      }
-    }
-  }
-
-  setEQBand(index: number, gainDb: number) {
-    this.chainA.eq.setBand(index, gainDb);
-    this.chainB.eq.setBand(index, gainDb);
-  }
-
-  getFrequencyResponse(frequencies: Float32Array): Float32Array {
-    // Both chains should have same EQ, so we can use either
-    return this.chainA.eq.getFrequencyResponse(frequencies);
-  }
-
-  setSpatialPosition(x: number, y: number, z: number) {
-    if (!this.spatialAudioEnabled) return;
-    const now = this.ctx.currentTime;
-    this.panner.positionX.setTargetAtTime(x, now, 0.1);
-    this.panner.positionY.setTargetAtTime(y, now, 0.1);
-    this.panner.positionZ.setTargetAtTime(z, now, 0.1);
-  }
-
-  updateListenerOrientation(
-    forward: { x: number; y: number; z: number },
-    up: { x: number; y: number; z: number },
-  ) {
-    const listener = this.ctx.listener;
-    const now = this.ctx.currentTime;
-    if (listener.forwardX) {
-      listener.forwardX.setTargetAtTime(forward.x, now, 0.1);
-      listener.forwardY.setTargetAtTime(forward.y, now, 0.1);
-      listener.forwardZ.setTargetAtTime(forward.z, now, 0.1);
-      listener.upX.setTargetAtTime(up.x, now, 0.1);
-      listener.upY.setTargetAtTime(up.y, now, 0.1);
-      listener.upZ.setTargetAtTime(up.z, now, 0.1);
+    if (track.replayGainDb) {
+      const gain = Math.pow(10, track.replayGainDb / 20);
+      chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
     } else {
-      // Fallback for older browsers
-      const fallbackListener = listener as AudioListener & {
-        setOrientation?: (
-          x: number,
-          y: number,
-          z: number,
-          x2: number,
-          y2: number,
-          z2: number,
-        ) => void;
-      };
-      fallbackListener.setOrientation?.(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+      chain.replayGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
     }
+
+    if (!startNext) {
+      this.activeIndex = index;
+      chain.fade.gain.setValueAtTime(1, this.ctx.currentTime);
+      this.chains[(index + 1) % 2].fade.gain.setValueAtTime(0, this.ctx.currentTime);
+    }
+
+    this.setupMediaSession(track);
   }
 
-  private async reportEvent(type: 'start' | 'end', data: Record<string, unknown>) {
-    try {
-      const apiBase =
-        (window as Window & { API_BASE?: string }).API_BASE ?? 'http://localhost:3001';
-      const response = await fetch(`${apiBase}/api/stats/event`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          type,
-          timestamp: Date.now(),
-        }),
-      });
-      if (response.ok) {
-        const result = await response.json();
-        if (type === 'start') this.currentEventId = result.id;
-      }
-    } catch (error) {
-      console.error('Failed to report stats event:', error);
-    }
-  }
-
-  play(buffer: AudioBuffer, startTime: number = 0, loudness?: number, trackId?: string) {
-    this.initContext();
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
-
-    if ((this.state === 'PLAYING' || this.state === 'PAUSED') && this.currentTrackId) {
-      this.reportEvent('end', {
-        track_id: this.currentTrackId,
-        event_id: this.currentEventId,
-        position: this.currentTime,
-        completed: false,
+  private setupMediaSession(track: any) {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        artwork: track.coverCachePath ? [{ src: `${API_BASE}/api/tracks/cover/${track.id}`, sizes: '512x512', type: 'image/jpeg' }] : []
       });
     }
-
-    const chain = this.activeChain === 'A' ? this.chainA : this.chainB;
-
-    if (loudness !== undefined) {
-      this.applyReplayGain(loudness, chain);
-    } else {
-      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
-    }
-
-    this.stop();
-
-    try {
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(chain.preGain);
-
-      const now = this.ctx.currentTime;
-      const playTime = now + 0.1;
-
-      chain.crossfade.gain.setValueAtTime(1, playTime);
-      const otherChain = this.activeChain === 'A' ? this.chainB : this.chainA;
-      otherChain.crossfade.gain.setValueAtTime(0, playTime);
-
-      source.start(playTime, startTime);
-
-      source.onended = () => {
-        if (this.currentSource === source) {
-          this.setState('ENDED');
-          this.stop(true);
-        }
-      };
-
-      this.currentSource = source;
-      this.nextStartTime = playTime + buffer.duration - startTime;
-      this.setState('PLAYING');
-      this.currentTrackId = trackId || null;
-
-      // Start A/B Loop Ticker
-      const ticker = setInterval(() => {
-        if (this.state !== 'PLAYING' || !this.currentSource) {
-           clearInterval(ticker);
-           return;
-        }
-
-        // Use native AudioBufferSourceNode looping if A/B is active
-        if (this.abLoop.isActive && this.abLoop.pointA !== null && this.abLoop.pointB !== null) {
-          this.currentSource.loop = true;
-          this.currentSource.loopStart = Math.min(this.abLoop.pointA, this.abLoop.pointB);
-          this.currentSource.loopEnd = Math.max(this.abLoop.pointA, this.abLoop.pointB);
-        } else {
-          this.currentSource.loop = false;
-        }
-      }, 100);
-
-      if (trackId) {
-        this.reportEvent('start', {
-          track_id: trackId,
-          position: startTime,
-        });
-      }
-    } catch (e) {
-      console.error('Failed to start playback:', e);
-      this.setState('ERROR');
-    }
   }
 
-  private getFadeCurves(fadeOut: boolean): Float32Array {
-    const n = 64;
-    const curve = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      if (fadeOut) {
-        curve[i] = this.crossfadeCurve === 'equal-power' ? Math.cos(t * Math.PI / 2) : 1 - t;
-      } else {
-        curve[i] = this.crossfadeCurve === 'equal-power' ? Math.sin(t * Math.PI / 2) : t;
-      }
-    }
-    return curve;
-  }
-
-  queueNext(buffer: AudioBuffer, loudness?: number) {
-    if (this.nextSource) {
-      try {
-        this.nextSource.stop();
-      } catch (e) {
-        /* ignored */
-      }
-    }
-
-    const nextChain = this.activeChain === 'A' ? this.chainB : this.chainA;
-    const currentChain = this.activeChain === 'A' ? this.chainA : this.chainB;
-
-    if (loudness !== undefined) {
-      this.applyReplayGain(loudness, nextChain);
-    } else {
-      nextChain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
-    }
-
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(nextChain.preGain);
-
-    const fadeStart = this.nextStartTime - this.fadeDuration;
-    const now = this.ctx.currentTime;
-    const startTime = Math.max(now, fadeStart);
-
-    if (this.crossfadeCurve === 'equal-power') {
-      currentChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(true), startTime, this.nextStartTime - startTime);
-      nextChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(false), startTime, this.nextStartTime - startTime);
-    } else {
-      currentChain.crossfade.gain.setValueAtTime(1, startTime);
-      currentChain.crossfade.gain.linearRampToValueAtTime(0, this.nextStartTime);
-      nextChain.crossfade.gain.setValueAtTime(0, startTime);
-      nextChain.crossfade.gain.linearRampToValueAtTime(1, this.nextStartTime);
-    }
-
-    source.start(this.nextStartTime);
-    this.nextSource = source;
-
-    // Swap after transition
-    setTimeout(
-      () => {
-        if (this.currentSource) {
-          try {
-            this.currentSource.stop();
-          } catch (e) {
-            /* ignored */
-          }
-        }
-        this.currentSource = this.nextSource;
-        this.nextSource = null;
-        this.activeChain = this.activeChain === 'A' ? 'B' : 'A';
-        this.nextStartTime += buffer.duration;
-      },
-      (this.nextStartTime - this.ctx.currentTime) * 1000,
-    );
-  }
-
-  async crossfadeTo(nextBuffer: AudioBuffer, loudness?: number) {
-    const now = this.ctx.currentTime;
-    const fadeOutEnd = now + this.fadeDuration;
-
-    const currentChain = this.activeChain === 'A' ? this.chainA : this.chainB;
-    const nextChain = this.activeChain === 'A' ? this.chainB : this.chainA;
-
-    if (loudness !== undefined) {
-      this.applyReplayGain(loudness, nextChain);
-    } else {
-      nextChain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
-    }
-
-    // Fade out current
-    if (this.crossfadeCurve === 'equal-power') {
-      currentChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(true), now, this.fadeDuration);
-    } else {
-      currentChain.crossfade.gain.setValueAtTime(currentChain.crossfade.gain.value, now);
-      currentChain.crossfade.gain.linearRampToValueAtTime(0, fadeOutEnd);
-    }
-
-    // Fade in next
-    const nextSource = this.ctx.createBufferSource();
-    nextSource.buffer = nextBuffer;
-    nextSource.connect(nextChain.preGain);
-
-    if (this.crossfadeCurve === 'equal-power') {
-      nextChain.crossfade.gain.setValueCurveAtTime(this.getFadeCurves(false), now, this.fadeDuration);
-    } else {
-      nextChain.crossfade.gain.setValueAtTime(0, now);
-      nextChain.crossfade.gain.linearRampToValueAtTime(1, fadeOutEnd);
-    }
-
-    nextSource.start(now);
-
-    setTimeout(() => {
-      if (this.currentSource) {
-        try {
-          this.currentSource.stop();
-        } catch (e) {
-          /* ignored */
-        }
-      }
-      this.currentSource = nextSource;
-      this.activeChain = this.activeChain === 'A' ? 'B' : 'A';
-      this.nextStartTime = now + nextBuffer.duration;
-    }, this.fadeDuration * 1000);
-  }
-
-  stop(completed: boolean = false) {
-    if (this.state === 'PLAYING' && this.currentTrackId) {
-      this.reportEvent('end', {
-        track_id: this.currentTrackId,
-        event_id: this.currentEventId,
-        position: this.currentTime,
-        completed,
-      });
-    }
-
-    if (this.currentSource) {
-      try {
-        this.currentSource.stop();
-      } catch (e) {
-        /* ignored */
-      }
-      this.currentSource = null;
-    }
-    if (this.nextSource) {
-      try {
-        this.nextSource.stop();
-      } catch (e) {
-        /* ignored */
-      }
-      this.nextSource = null;
-    }
-
-    if (this.state !== 'ENDED') {
-      this.setState('IDLE');
-    }
-
-    this.chainA.crossfade.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.chainB.crossfade.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.chainA.crossfade.gain.setValueAtTime(this.activeChain === 'A' ? 1 : 0, this.ctx.currentTime);
-    this.chainB.crossfade.gain.setValueAtTime(this.activeChain === 'B' ? 1 : 0, this.ctx.currentTime);
+  play() {
+    this.ctx.resume();
+    this.chains[this.activeIndex].element.play();
+    this.setState('PLAYING');
   }
 
   pause() {
-    if (this.ctx && this.ctx.state === 'running') {
-      this.ctx.suspend().then(() => {
-        this.setState('PAUSED');
-      });
-    }
+    this.chains[this.activeIndex].element.pause();
+    this.setState('PAUSED');
   }
 
-  resume() {
-    this.initContext();
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume().then(() => {
-        this.setState('PLAYING');
-      });
-    }
+  seek(seconds: number) {
+    this.chains[this.activeIndex].element.currentTime = seconds;
   }
 
-  setVolume(volume: number) {
-    this.masterGain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
+  setVolume(v: number) {
+    this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
   }
 
-  applyReplayGain(loudness: number, chain?: TrackChain, preAmpDB: number = 0) {
-    const targetLUFS = -14; // Spec says -14 LUFS target
-    const adjustment = targetLUFS - loudness + preAmpDB;
-    const gainMultiplier = Math.pow(10, adjustment / 20);
-
-    // Cap the gain to avoid extreme boosting
-    const cappedGain = Math.min(gainMultiplier, 2.0);
-    const targetChain = chain || (this.activeChain === 'A' ? this.chainA : this.chainB);
-    targetChain.replayGain.gain.setTargetAtTime(cappedGain, this.ctx.currentTime, 0.1);
+  setState(s: PlaybackState) {
+    this.state = s;
+    // Emit event or update store
   }
 
-  get currentTime() {
-    return this.ctx.currentTime;
-  }
-
-  getAnalyser() {
-    return this.analyser;
-  }
-
-  setSleepTimer(minutes: number) {
-    this.sleepTimer?.set(minutes);
-  }
+  get analyserNode() { return this.analyser; }
 }
 
 export const playbackEngine = new PlaybackEngine();

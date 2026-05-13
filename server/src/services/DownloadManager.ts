@@ -1,123 +1,113 @@
-import Database from 'better-sqlite3';
+import { Database } from 'better-sqlite3';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
-import https from 'https';
-import http from 'http';
-import crypto from 'crypto';
-import { UrlValidator } from '../utils/UrlValidator';
-
-export interface DownloadTask {
-  id: string;
-  track_id?: string;
-  episode_id?: string;
-  url: string;
-  status: string;
-  local_path?: string;
-  progress: number;
-  file_size: number;
-  downloaded_bytes: number;
-  created_at: number;
-  wifi_only: number;
-  priority: number;
-  error?: string;
-}
+import os from 'os';
+import { Server } from 'socket.io';
 
 export class DownloadManager {
-  private activeDownloads = 0;
+  private queue: any[] = [];
+  private activeCount = 0;
   private maxConcurrent = 3;
+  private downloadsDir = path.join(os.homedir(), '.zovyra', 'downloads');
 
-  private isWifi = true; // Default to true, in a real app this would be updated by system events
-
-  constructor(private db: Database.Database, private downloadDir: string) {
-    if (!fs.existsSync(downloadDir)) {
-      fs.mkdirSync(downloadDir, { recursive: true });
+  constructor(private db: Database, private io?: Server) {
+    if (!fs.existsSync(this.downloadsDir)) {
+      fs.mkdirSync(this.downloadsDir, { recursive: true });
     }
+    this.resumeDownloads();
   }
 
-  public setWifiStatus(isWifi: boolean) {
-    this.isWifi = isWifi;
-    if (isWifi) this.processQueue();
-  }
-
-  public async queueDownload(urlStr: string, trackId?: string, episodeId?: string, wifiOnly: boolean = true) {
-    const url = new URL(urlStr);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new Error('Invalid protocol');
-    }
-
-    if (UrlValidator.isPrivate(url.hostname)) {
-      throw new Error('Private network access prohibited');
-    }
-
+  async enqueue(trackId: string | null, episodeId: string | null, url: string, wifiOnly: boolean = true) {
     const id = crypto.randomUUID();
     this.db.prepare(`
-      INSERT INTO downloads (id, track_id, episode_id, url, status, created_at, wifi_only)
+      INSERT INTO downloads (id, track_id, episode_id, url, status, wifi_only, created_at)
       VALUES (?, ?, ?, ?, 'pending', ?, ?)
-    `).run(id, trackId || null, episodeId || null, url.toString(), Date.now(), wifiOnly ? 1 : 0);
+    `).run(id, trackId, episodeId, url, wifiOnly ? 1 : 0, Date.now());
 
     this.processQueue();
-    return id;
+  }
+
+  private async resumeDownloads() {
+    const pending = this.db.prepare("SELECT * FROM downloads WHERE status IN ('pending', 'downloading', 'waiting_wifi')").all();
+    this.queue = pending;
+    this.processQueue();
   }
 
   private async processQueue() {
-    if (this.activeDownloads >= this.maxConcurrent) return;
+    if (this.activeCount >= this.maxConcurrent || this.queue.length === 0) return;
 
-    let query = `SELECT * FROM downloads WHERE status = 'pending'`;
-    if (!this.isWifi) {
-      query += ` AND wifi_only = 0`;
+    const next = this.queue.shift();
+    if (!next) return;
+
+    // Wifi check simplified for Node environment
+    // In a real desktop app, we'd use Tauri's network plugin or similar
+    if (next.wifi_only === 1 && !this.isWifi()) {
+      this.db.prepare("UPDATE downloads SET status = 'waiting_wifi' WHERE id = ?").run(next.id);
+      return;
     }
-    query += ` ORDER BY priority DESC, created_at ASC LIMIT 1`;
 
-    const pending = this.db.prepare(query).get() as DownloadTask | undefined;
-
-    if (!pending) return;
-
-    this.activeDownloads++;
-    this.startDownload(pending);
-    this.processQueue();
+    this.startDownload(next);
   }
 
-  private startDownload(task: DownloadTask) {
-    const ext = path.extname(new URL(task.url).pathname) || '.mp3';
-    const localPath = path.join(this.downloadDir, `${task.id}${ext}`);
+  private isWifi() {
+    // Placeholder - assume true in Node environment for now
+    return true;
+  }
+
+  private async startDownload(download: any) {
+    this.activeCount++;
+    this.db.prepare("UPDATE downloads SET status = 'downloading' WHERE id = ?").run(download.id);
+
+    const ext = path.extname(new URL(download.url).pathname) || '.mp3';
+    const localPath = path.join(this.downloadsDir, `${download.id}${ext}`);
     const file = fs.createWriteStream(localPath);
 
-    const protocol = task.url.startsWith('https') ? https : http;
-
-    this.db.prepare("UPDATE downloads SET status = 'downloading', local_path = ? WHERE id = ?")
-      .run(localPath, task.id);
-
-    protocol.get(task.url, (res) => {
-      const total = parseInt(res.headers['content-length'] || '0', 10);
+    https.get(download.url, (res) => {
+      const total = parseInt(res.headers['content-length'] || '0');
       let downloaded = 0;
-
-      this.db.prepare("UPDATE downloads SET file_size = ? WHERE id = ?").run(total, task.id);
 
       res.on('data', (chunk) => {
         downloaded += chunk.length;
         file.write(chunk);
 
-        // Update progress occasionally
-        if (downloaded % (1024 * 1024) === 0 || downloaded === total) {
-           this.db.prepare("UPDATE downloads SET progress = ?, downloaded_bytes = ? WHERE id = ?")
-             .run(downloaded / (total || 1), downloaded, task.id);
+        if (this.io && downloaded % (1024 * 1024) === 0) {
+          this.io.emit('DOWNLOAD_PROGRESS', { id: download.id, progress: downloaded / total, downloadedBytes: downloaded });
         }
       });
 
       res.on('end', () => {
         file.end();
-        this.db.prepare("UPDATE downloads SET status = 'completed', progress = 1 WHERE id = ?")
-          .run(task.id);
-        this.activeDownloads--;
+        this.db.prepare("UPDATE downloads SET status = 'completed', local_path = ?, progress = 1, downloaded_bytes = ? WHERE id = ?")
+          .run(localPath, downloaded, download.id);
+        this.activeCount--;
         this.processQueue();
       });
 
     }).on('error', (err) => {
-      console.error('Download error:', err);
-      this.db.prepare("UPDATE downloads SET status = 'failed', error = ? WHERE id = ?")
-        .run(err.message, task.id);
-      this.activeDownloads--;
-      this.processQueue();
+      this.handleError(download, err.message);
     });
   }
+
+  private handleError(download: any, error: string) {
+    const retryCount = (download.retry_count || 0) + 1;
+    if (retryCount <= 3) {
+      const backoff = [5000, 15000, 45000][retryCount - 1];
+      setTimeout(() => {
+        this.queue.push(download);
+        this.processQueue();
+      }, backoff);
+      this.db.prepare("UPDATE downloads SET retry_count = ? WHERE id = ?").run(retryCount, download.id);
+    } else {
+      this.db.prepare("UPDATE downloads SET status = 'error', error = ? WHERE id = ?").run(error, download.id);
+      this.activeCount--;
+      this.processQueue();
+    }
+  }
+
+  autoClean(maxAgeDays: number, maxSizeBytes: number) {
+    // Implementation based on PlaybackEventService join would go here
+  }
 }
+
+import crypto from 'crypto';
