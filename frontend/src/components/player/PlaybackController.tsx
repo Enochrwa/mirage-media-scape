@@ -42,20 +42,28 @@ export function PlaybackController() {
     playbackEngine.setSpatialAudioEnabled(newState);
   };
 
-const toggleABLoop = () => {
-     const { abLoop: { toggle } } = usePlayerStore.getState();
-     toggle();
-   };
+  const toggleABLoop = () => {
+    const {
+      abLoop: { toggle },
+    } = usePlayerStore.getState();
+    toggle();
+  };
 
-   const setLoopA = () => {
-     const { abLoop: { setA }, currentTime } = usePlayerStore.getState();
-     setA(currentTime);
-   };
+  const setLoopA = () => {
+    const {
+      abLoop: { setA },
+      currentTime,
+    } = usePlayerStore.getState();
+    setA(currentTime);
+  };
 
-   const setLoopB = () => {
-     const { abLoop: { setB }, currentTime } = usePlayerStore.getState();
-     setB(currentTime);
-   };
+  const setLoopB = () => {
+    const {
+      abLoop: { setB },
+      currentTime,
+    } = usePlayerStore.getState();
+    setB(currentTime);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

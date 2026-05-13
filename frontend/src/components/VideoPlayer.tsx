@@ -133,15 +133,15 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean; theme: string 
 };
 
 const VideoPlayer: React.FC = () => {
-const {
-     currentFile,
-     setCurrentTime: updateCurrentTime,
-     setDuration: updateDuration,
-     playbackEngine: pe,
-   } = usePlayerStore();
-   const videoRef = useRef<HTMLVideoElement>(null);
-   const videoContainerRef = useRef<HTMLDivElement>(null);
-   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const {
+    currentFile,
+    setCurrentTime: updateCurrentTime,
+    setDuration: updateDuration,
+    playbackEngine: pe,
+  } = usePlayerStore();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
@@ -394,19 +394,19 @@ const {
     }
   };
 
-const toggleLoop = () => {
-     pe.abLoop.toggle();
-     setIsLooping(pe.abLoop.isActive);
-   };
+  const toggleLoop = () => {
+    pe.abLoop.toggle();
+    setIsLooping(pe.abLoop.isActive);
+  };
 
-   const setPointA = () => {
-     pe.abLoop.setA(currentTime);
-     setIsLooping(pe.abLoop.isActive);
-   };
-   const setPointB = () => {
-     pe.abLoop.setB(currentTime);
-     setIsLooping(pe.abLoop.isActive);
-   };
+  const setPointA = () => {
+    pe.abLoop.setA(currentTime);
+    setIsLooping(pe.abLoop.isActive);
+  };
+  const setPointB = () => {
+    pe.abLoop.setB(currentTime);
+    setIsLooping(pe.abLoop.isActive);
+  };
 
   const handleSubtitleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -468,44 +468,44 @@ const toggleLoop = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-useEffect(() => {
-     const video = videoRef.current;
-     if (!video) return;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-     const handleTimeUpdate = () => {
-       const time = video.currentTime;
-       setCurrentTime(time);
-       updateCurrentTime(time);
+    const handleTimeUpdate = () => {
+      const time = video.currentTime;
+      setCurrentTime(time);
+      updateCurrentTime(time);
 
-       // Handle A-B Loop
-       if (pe.abLoop.isActive && pe.abLoop.pointA !== null && pe.abLoop.pointB !== null) {
-         if (time >= pe.abLoop.pointB) {
-           video.currentTime = pe.abLoop.pointA;
-         }
-       }
+      // Handle A-B Loop
+      if (pe.abLoop.isActive && pe.abLoop.pointA !== null && pe.abLoop.pointB !== null) {
+        if (time >= pe.abLoop.pointB) {
+          video.currentTime = pe.abLoop.pointA;
+        }
+      }
 
-       // Handle Subtitles
-       if (subtitlesEnabled && cues.length > 0) {
-         const cue = cues.find((c) => time >= c.start && time <= c.end);
-         setActiveCue(cue || null);
-       }
-     };
-     const handleLoadedMetadata = () => {
-       setDuration(video.duration);
-       updateDuration(video.duration);
-     };
-     const handleEnded = () => setIsPlaying(false);
+      // Handle Subtitles
+      if (subtitlesEnabled && cues.length > 0) {
+        const cue = cues.find((c) => time >= c.start && time <= c.end);
+        setActiveCue(cue || null);
+      }
+    };
+    const handleLoadedMetadata = () => {
+      setDuration(video.duration);
+      updateDuration(video.duration);
+    };
+    const handleEnded = () => setIsPlaying(false);
 
-     video.addEventListener('timeupdate', handleTimeUpdate);
-     video.addEventListener('loadedmetadata', handleLoadedMetadata);
-     video.addEventListener('ended', handleEnded);
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('ended', handleEnded);
 
-     return () => {
-       video.removeEventListener('timeupdate', handleTimeUpdate);
-       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-       video.removeEventListener('ended', handleEnded);
-     };
-   }, [pe, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [pe, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">
@@ -873,9 +873,7 @@ useEffect(() => {
                           onClick={setPointA}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            pe.abLoop.pointA !== null
-                              ? 'text-purple-400'
-                              : 'text-white/40',
+                            pe.abLoop.pointA !== null ? 'text-purple-400' : 'text-white/40',
                           )}
                         >
                           A
@@ -884,19 +882,14 @@ useEffect(() => {
                           onClick={setPointB}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            pe.abLoop.pointB !== null
-                              ? 'text-purple-400'
-                              : 'text-white/40',
+                            pe.abLoop.pointB !== null ? 'text-purple-400' : 'text-white/40',
                           )}
                         >
                           B
                         </button>
                         <button
                           onClick={toggleLoop}
-                          disabled={
-pe.abLoop.pointA === null ||
-                             pe.abLoop.pointB === null
-                          }
+                          disabled={pe.abLoop.pointA === null || pe.abLoop.pointB === null}
                           className={cn(
                             'rounded-full p-1.5 transition-all',
                             isLooping ? 'text-purple-400' : 'text-white/60 disabled:opacity-30',
@@ -984,10 +977,10 @@ pe.abLoop.pointA === null ||
                       {/* Download */}
                       <button
                         onClick={() => {
-if (!currentFile) return;
-                           const link = document.createElement('a');
-                           link.href = currentFile.file ?? '';
-                           link.download = `${currentFile.title}.mp4`;
+                          if (!currentFile) return;
+                          const link = document.createElement('a');
+                          link.href = currentFile.file ?? '';
+                          link.download = `${currentFile.title}.mp4`;
                           link.click();
                         }}
                         className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
@@ -1015,12 +1008,12 @@ if (!currentFile) return;
             </div>
           </div>
 
-{/* Loading Spinner */}
-           {!videoRef.current?.readyState || videoRef.current?.readyState < 2 ? (
-             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
-             </div>
-           ) : null}
+          {/* Loading Spinner */}
+          {!videoRef.current?.readyState || videoRef.current?.readyState < 2 ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
+            </div>
+          ) : null}
 
           {/* Gesture Indicators */}
           {gestureControl && (

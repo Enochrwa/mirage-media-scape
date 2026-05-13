@@ -161,17 +161,17 @@ export class PlaybackEngine {
     this.setState('PLAYING');
   }
 
-pause() {
-     this.chains[this.activeIndex].element.pause();
-     this.setState('PAUSED');
-   }
+  pause() {
+    this.chains[this.activeIndex].element.pause();
+    this.setState('PAUSED');
+  }
 
-   resume() {
-     this.chains[this.activeIndex].element.play();
-     this.setState('PLAYING');
-   }
+  resume() {
+    this.chains[this.activeIndex].element.play();
+    this.setState('PLAYING');
+  }
 
-   seek(seconds: number) {
+  seek(seconds: number) {
     this.chains[this.activeIndex].element.currentTime = seconds;
   }
 
@@ -230,7 +230,7 @@ pause() {
     return this.chains[this.activeIndex].element.currentTime;
   }
 
-private _setABLoopA(time: number) {
+  private _setABLoopA(time: number) {
     this._abLoop.pointA = time;
     this._abLoop.isActive = this._abLoop.pointA !== null && this._abLoop.pointB !== null;
   }

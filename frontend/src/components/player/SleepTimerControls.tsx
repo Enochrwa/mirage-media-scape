@@ -11,22 +11,22 @@ export const SleepTimerControls: React.FC = () => {
   const [state, setState] = useState(sleepTimer?.getState?.());
   const [customMinutes, setCustomMinutes] = useState('');
 
-useEffect(() => {
-     const interval = setInterval(() => {
-       setState(sleepTimer?.getState?.());
-     }, 1000);
-     return () => clearInterval(interval);
-   }, [sleepTimer]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setState(sleepTimer?.getState?.());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sleepTimer]);
 
-   const setTimer = (mins: number) => {
-     sleepTimer?.set(mins);
-     setState(sleepTimer?.getState?.());
-   };
+  const setTimer = (mins: number) => {
+    sleepTimer?.set(mins);
+    setState(sleepTimer?.getState?.());
+  };
 
-   const cancelTimer = () => {
-     sleepTimer?.clear();
-     setState(sleepTimer?.getState?.());
-   };
+  const cancelTimer = () => {
+    sleepTimer?.clear();
+    setState(sleepTimer?.getState?.());
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -59,17 +59,17 @@ useEffect(() => {
             <Button
               variant="outline"
               size="sm"
-onClick={() =>
-                 pe?.sleepTimer?.setEndOfTrack(
-                   window as unknown as {
-                     addEventListener: (
-                       type: string,
-                       listener: () => void,
-                       options?: unknown,
-                     ) => void;
-                   },
-                 )
-               }
+              onClick={() =>
+                pe?.sleepTimer?.setEndOfTrack(
+                  window as unknown as {
+                    addEventListener: (
+                      type: string,
+                      listener: () => void,
+                      options?: unknown,
+                    ) => void;
+                  },
+                )
+              }
             >
               End of Track
             </Button>

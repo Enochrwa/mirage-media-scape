@@ -76,17 +76,17 @@ const PodcastsPage = () => {
     }
   };
 
-const playEpisode = (episode: Episode) => {
-     const mf: MediaFile = {
-       id: episode.id,
-       title: episode.title,
-       artist: selectedPodcast?.title || 'Podcast',
-       file: episode.audio_url,
-       type: 'audio',
-       cover: selectedPodcast?.artwork_url,
-     };
-     playFile(mf);
-   };
+  const playEpisode = (episode: Episode) => {
+    const mf: MediaFile = {
+      id: episode.id,
+      title: episode.title,
+      artist: selectedPodcast?.title || 'Podcast',
+      file: episode.audio_url,
+      type: 'audio',
+      cover: selectedPodcast?.artwork_url,
+    };
+    playFile(mf);
+  };
 
   return (
     <MainLayout>

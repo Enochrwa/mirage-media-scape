@@ -179,20 +179,22 @@ const StatsPage = () => {
               {topTracks.map((track, i) => (
                 <div
                   key={track.id}
-className="group flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                   onClick={() => {
-const mf: MediaFile = {
-                        id: track.id,
-                        title: track.title,
-                        artist: track.artist ?? undefined,
-                        file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
-                        type: 'audio',
-                        cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
-                      };
-                      playFile(mf);
-                    }}
-                  >
-                   <span className="w-6 text-xl font-bold text-zinc-600">{i + 1}</span>
+                  className="group flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
+                  onClick={() => {
+                    const mf: MediaFile = {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist ?? undefined,
+                      file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
+                      type: 'audio',
+                      cover: track.cover_cache_path
+                        ? `${API_BASE}/api/tracks/cover/${track.id}`
+                        : undefined,
+                    };
+                    playFile(mf);
+                  }}
+                >
+                  <span className="w-6 text-xl font-bold text-zinc-600">{i + 1}</span>
                   <img
                     src={track.cover_cache_path || '/placeholder.svg'}
                     className="h-12 w-12 rounded object-cover"
@@ -221,20 +223,22 @@ const mf: MediaFile = {
               {history.map((track) => (
                 <div
                   key={`${track.id}-${track.started_at}`}
-className="flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                   onClick={() => {
-                     const mf: MediaFile = {
-id: track.id,
-                        title: track.title,
-                        artist: track.artist ?? undefined,
-                        file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
-                        type: 'audio',
-                        cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
-                      };
-                      playFile(mf);
-                    }}
-                  >
-                   <img
+                  className="flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
+                  onClick={() => {
+                    const mf: MediaFile = {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist ?? undefined,
+                      file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
+                      type: 'audio',
+                      cover: track.cover_cache_path
+                        ? `${API_BASE}/api/tracks/cover/${track.id}`
+                        : undefined,
+                    };
+                    playFile(mf);
+                  }}
+                >
+                  <img
                     src={track.cover_cache_path ?? '/placeholder.svg'}
                     className="h-10 w-10 rounded object-cover opacity-60"
                     alt=""
