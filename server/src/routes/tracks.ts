@@ -15,6 +15,7 @@ router.get('/instant', tracksRateLimiter, tracksController.getInstantTracks);
 router.get('/', tracksRateLimiter, tracksController.getAllTracks);
 router.get('/stream', tracksRateLimiter, tracksController.streamTrack);
 router.get('/search', tracksRateLimiter, tracksController.searchTracks);
+router.get('/album/:id', tracksRateLimiter, tracksController.getAlbumDetails);
 router.get('/duplicates/candidates', tracksRateLimiter, tracksController.getDuplicateCandidates);
 router.get('/cover/:id', tracksRateLimiter, tracksController.getTrackCover);
 router.get('/thumbnail/:id', tracksRateLimiter, tracksController.getTrackThumbnail);

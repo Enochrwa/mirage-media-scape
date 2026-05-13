@@ -4,7 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuContent,
-} from '@radix-ui/react-dropdown-menu';
+} from '@/components/ui/dropdown-menu';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -254,6 +254,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     variant="ghost"
                     className="w-full justify-start px-3 font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
+                    {playlist.name}
+                  </Button>
+                ))}
+                {smartPlaylists.map((playlist) => (
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
+                    className="w-full justify-start px-3 font-normal text-purple-400 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <Sparkles size={14} className="mr-2" />
                     {playlist.name}
                   </Button>
                 ))}

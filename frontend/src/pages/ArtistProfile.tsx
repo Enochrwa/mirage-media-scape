@@ -1,10 +1,24 @@
-import { Play, Shuffle, MoreHorizontal, CheckCircle2 } from 'lucide-react';
+import { Play, Shuffle, MoreHorizontal, CheckCircle2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TrackTable } from '@/components/tracks/TrackTable';
+import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { API_BASE } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
 
 export function ArtistProfile() {
+  const { name } = useParams();
+  const [artistData, setArtistData] = useState<Record<string, string | number | undefined> | null>(null);
+  const [history, setHistory] = useState<{ month: string; minutes: number }[]>([]);
+
+  useEffect(() => {
+     fetch(`${API_BASE}/api/stats/artist/${name}/history`)
+       .then(res => res.json())
+       .then(setHistory);
+  }, [name]);
+
   return (
-    <div className="flex-1 overflow-y-auto bg-black">
+    <div className="flex-1 overflow-y-auto bg-black no-scrollbar">
       {/* Hero Section */}
       <div className="relative flex h-[40vh] min-h-[300px] flex-col justify-end overflow-hidden p-8">
         <div
@@ -22,8 +36,8 @@ export function ArtistProfile() {
             <CheckCircle2 className="h-5 w-5 fill-current text-blue-500" />
             <span className="text-sm font-medium">Verified Artist</span>
           </div>
-          <h1 className="mb-6 text-8xl font-black">Dua Lipa</h1>
-          <p className="mb-2 text-gray-300">72,432,109 monthly listeners</p>
+          <h1 className="mb-6 text-8xl font-black">{name || 'Dua Lipa'}</h1>
+          <p className="mb-2 text-gray-300">Verified Artist • {history.reduce((a,b) => a+b.minutes, 0)} mins listened</p>
         </div>
       </div>
 
@@ -47,6 +61,26 @@ export function ArtistProfile() {
       <section className="mb-12">
         <h2 className="mb-4 px-8 text-2xl font-bold">Popular</h2>
         <TrackTable />
+      </section>
+
+      {/* Listening History Arc */}
+      <section className="mb-12 px-8">
+         <h2 className="mb-6 text-2xl font-bold flex items-center gap-2">
+            <History className="text-purple-400" /> Listening History
+         </h2>
+         <div className="h-32 flex items-end gap-1 px-4 bg-white/5 rounded-2xl border border-white/10 p-6">
+            {history.map((m, i) => (
+               <div key={i} className="group relative flex-1">
+                  <div
+                    className="w-full bg-purple-500 rounded-t-sm hover:bg-purple-400 transition-all"
+                    style={{ height: `${(m.minutes / 500) * 100}%`, minHeight: '4px' }}
+                  />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-zinc-800 text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                     {m.month}: {m.minutes} mins
+                  </div>
+               </div>
+            ))}
+         </div>
       </section>
 
       {/* Artist Pick */}

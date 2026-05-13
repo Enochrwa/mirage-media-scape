@@ -164,6 +164,30 @@ export const getTrackById = (req: Request, res: Response) => {
   res.json(track);
 };
 
+export const getAlbumDetails = (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const album = db.prepare('SELECT album as name, artist, year, cover_cache_path as cover FROM tracks WHERE album = ? LIMIT 1').get(id);
+    if (!album) return res.status(404).json({ error: 'Album not found' });
+
+    const tracks = db.prepare('SELECT * FROM tracks WHERE album = ? ORDER BY track_number ASC').all(id);
+    res.json({ album, tracks });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const updateTrackRating = (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { rating } = req.body;
+  try {
+    db.prepare('UPDATE tracks SET rating = ? WHERE id = ?').run(rating, id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
 export const getTrackWaveform = (req: Request, res: Response) => {
   const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
     | { file_path: string }

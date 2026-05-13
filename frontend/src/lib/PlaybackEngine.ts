@@ -98,30 +98,33 @@ export type NightModeLevel = 'off' | 'standard' | 'night';
 export type CrossfadeCurve = 'linear' | 'equal-power';
 
 export class PlaybackEngine {
-  public ctx: AudioContext;
+  public ctx!: AudioContext;
   private state: PlaybackState = 'IDLE';
   private currentSource: AudioBufferSourceNode | null = null;
   private nextSource: AudioBufferSourceNode | null = null;
 
   // Canonical Parallel Prefix
-  private chainA: TrackChain;
-  private chainB: TrackChain;
+  private chainA!: TrackChain;
+  private chainB!: TrackChain;
   private activeChain: 'A' | 'B' = 'A';
 
   // Canonical Shared Nodes
-  private analyser: AnalyserNode;
+  private analyser!: AnalyserNode;
   private pitchPreserver: AudioWorkletNode | null = null;
-  private bassEnhancer: WaveShaperNode;
-  private panner: PannerNode;
-  private nightCompressor: DynamicsCompressorNode;
-  private nightMakeupGain: GainNode;
-  private masterGain: GainNode;
+  private bassEnhancer!: WaveShaperNode;
+  private panner!: PannerNode;
+  private convolver!: ConvolverNode;
+  private nightCompressor!: DynamicsCompressorNode;
+  private nightMakeupGain!: GainNode;
+  private masterGain!: GainNode;
 
   public abLoop: ABLoop;
   private spatialAudioEnabled: boolean = false;
   private pitchLockEnabled: boolean = false;
   private bassEnhancerEnabled: boolean = false;
   private nightModeLevel: NightModeLevel = 'off';
+  private roomPreset: string = 'none';
+  private irCache: Map<string, AudioBuffer> = new Map();
 
   private nextStartTime: number = 0;
   private currentTrackId: string | null = null;
@@ -131,7 +134,17 @@ export class PlaybackEngine {
   public sleepTimer: SleepTimer | null = null;
   private stateChangeListeners: ((state: PlaybackState) => void)[] = [];
 
+  private nextTrackAudio: HTMLAudioElement | null = null;
+  private previewAudio: HTMLAudioElement | null = null;
+  private previewGain: GainNode | null = null;
+
   constructor() {
+    this.abLoop = new ABLoop();
+  }
+
+  private initContext() {
+    if (this.ctx) return;
+
     const win = window as Window & {
       AudioContext?: typeof AudioContext;
       webkitAudioContext?: typeof AudioContext;
@@ -140,51 +153,24 @@ export class PlaybackEngine {
     if (!AudioContextClass) throw new Error('AudioContext not supported');
     this.ctx = new AudioContextClass();
 
-    // ═══════════════════════════════════════════════════════════
-    // zovyra AUDIO GRAPH — CANONICAL CHAIN (insert all nodes here)
-    // ═══════════════════════════════════════════════════════════
-    //
-    // MediaSource / AudioBufferSource
-    //   → Pre-Gain (GainNode) ─────────────── input normalization
-    //   → EQ Band 1: Low Shelf   80 Hz  ─┐
-    //   → EQ Band 2: Peak       250 Hz   │── 5-band parametric EQ
-    //   → EQ Band 3: Peak      1000 Hz   │   (BiquadFilterNodes)
-    //   → EQ Band 4: Peak      4000 Hz   │
-    //   → EQ Band 5: High Shelf 12 kHz ──┘
-    //   → ReplayGain (GainNode) ─────────── loudness normalization
-    //   → Crossfade (GainNode) ──────────── track transition fades
-    //   → Analyser (AnalyserNode) ───────── tap only, no signal change
-    //   → Bass Enhancer (WaveShaperNode) ── bypassable harmonic exciter
-    //   → Spatial Panner (PannerNode) ───── HRTF, bypassable
-    //   → Night Compressor (DynamicsCompressorNode) ── bypassable
-    //   → Master Volume (GainNode)
-    //   → Destination
-    //
-    // ═══════════════════════════════════════════════════════════
-
     this.chainA = this.createTrackChain();
     this.chainB = this.createTrackChain();
 
     this.analyser = this.ctx.createAnalyser();
     this.bassEnhancer = this.ctx.createWaveShaper();
     this.panner = this.ctx.createPanner();
+    this.convolver = this.ctx.createConvolver();
     this.nightCompressor = this.ctx.createDynamicsCompressor();
     this.nightMakeupGain = this.ctx.createGain();
     this.masterGain = this.ctx.createGain();
 
     this.analyser.fftSize = 2048;
-
     this.panner.panningModel = 'HRTF';
-    this.panner.distanceModel = 'inverse';
-    this.panner.refDistance = 1;
-    this.panner.maxDistance = 10000;
-    this.panner.rolloffFactor = 1;
 
-    // Bass Enhancer curve (Soft-clip harmonic exciter)
+    // Bass Enhancer curve
     // @ts-expect-error - Float32Array type mismatch
     this.bassEnhancer.curve = this.createBassExciterCurve(0.5);
 
-    this.abLoop = new ABLoop();
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
 
     // Load Phase Vocoder Worklet
@@ -195,16 +181,20 @@ export class PlaybackEngine {
       console.error('Failed to load phase-vocoder worklet:', err);
     });
 
-    // Wiring the chains to Analyser
     this.chainA.crossfade.connect(this.analyser);
     this.chainB.crossfade.connect(this.analyser);
 
     this.updateChain();
 
-    // Start with chainA active
     this.chainA.crossfade.gain.setValueAtTime(1, this.ctx.currentTime);
     this.chainB.crossfade.gain.setValueAtTime(0, this.ctx.currentTime);
     this.activeChain = 'A';
+
+    // Create preview setup
+    this.previewGain = this.ctx.createGain();
+    this.previewGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+    this.previewGain.connect(this.analyser); // Connect to analyser for visualization
+    this.previewGain.connect(this.masterGain);
   }
 
   private createTrackChain(): TrackChain {
@@ -253,6 +243,11 @@ export class PlaybackEngine {
     if (this.spatialAudioEnabled) {
       currentNode.connect(this.panner);
       currentNode = this.panner;
+    }
+
+    if (this.roomPreset !== 'none') {
+      currentNode.connect(this.convolver);
+      currentNode = this.convolver;
     }
 
     if (this.nightModeLevel !== 'off') {
@@ -322,7 +317,36 @@ export class PlaybackEngine {
     };
   }
 
+  async setRoomPreset(preset: string) {
+    this.initContext();
+    this.roomPreset = preset;
+    if (preset === 'none') {
+      this.updateChain();
+      return;
+    }
+
+    const irPath = `/ir/${preset}.wav`;
+    let buffer = this.irCache.get(preset);
+    if (!buffer) {
+      try {
+        const res = await fetch(irPath);
+        const arrayBuffer = await res.arrayBuffer();
+        buffer = await this.ctx.decodeAudioData(arrayBuffer);
+        this.irCache.set(preset, buffer);
+      } catch (e) {
+        console.error(`Failed to load IR: ${preset}`, e);
+        this.roomPreset = 'none';
+      }
+    }
+
+    if (buffer) {
+      this.convolver.buffer = buffer;
+    }
+    this.updateChain();
+  }
+
   setSpatialAudioEnabled(enabled: boolean) {
+    this.initContext();
     this.spatialAudioEnabled = enabled;
     if (!enabled) {
       this.panner.positionX.setTargetAtTime(0, this.ctx.currentTime, 0.1);
@@ -371,27 +395,49 @@ export class PlaybackEngine {
   }
 
   async seek(time: number) {
+    this.initContext();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
     if (!this.currentSource || !this.currentSource.buffer) return;
 
     const buffer = this.currentSource.buffer;
-    // For simplicity, we just restart with new offset
     this.play(buffer, time, undefined, this.currentTrackId || undefined);
   }
 
   async preview(time: number) {
-    if (!this.currentSource || !this.currentSource.buffer) return;
-    const buffer = this.currentSource.buffer;
+    this.initContext();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
 
-    const previewSource = this.ctx.createBufferSource();
-    previewSource.buffer = buffer;
+    if (!this.previewAudio) {
+      this.previewAudio = new Audio();
+      const source = this.ctx.createMediaElementSource(this.previewAudio);
+      source.connect(this.previewGain!);
+    }
 
-    const previewGain = this.ctx.createGain();
-    previewGain.gain.setValueAtTime(0.3, this.ctx.currentTime); // Lower volume for preview
+    if (this.currentTrackId) {
+      const apiBase = (window as unknown as { API_BASE?: string }).API_BASE || 'http://localhost:3001';
+      this.previewAudio.src = `${apiBase}/api/tracks/stream?path=${encodeURIComponent(this.currentTrackId)}`;
+      this.previewAudio.currentTime = time;
+      this.previewAudio.play();
 
-    previewSource.connect(previewGain);
-    previewGain.connect(this.masterGain);
+      setTimeout(() => {
+        if (this.previewAudio) {
+          this.previewAudio.pause();
+          this.previewGain?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+          setTimeout(() => {
+             this.previewGain?.gain.setTargetAtTime(0.4, this.ctx.currentTime, 0.05);
+          }, 100);
+        }
+      }, 300);
+    }
+  }
 
-    previewSource.start(0, time, 0.3); // Play 300ms
+  preBufferNextTrack(trackId: string, url: string) {
+    if (!this.nextTrackAudio) {
+      this.nextTrackAudio = new Audio();
+      this.nextTrackAudio.preload = 'auto';
+    }
+    this.nextTrackAudio.src = url;
+    this.nextTrackAudio.load();
   }
 
   setPlaybackSpeed(speed: number) {
@@ -478,6 +524,9 @@ export class PlaybackEngine {
   }
 
   play(buffer: AudioBuffer, startTime: number = 0, loudness?: number, trackId?: string) {
+    this.initContext();
+    if (this.ctx.state === 'suspended') void this.ctx.resume();
+
     if ((this.state === 'PLAYING' || this.state === 'PAUSED') && this.currentTrackId) {
       this.reportEvent('end', {
         track_id: this.currentTrackId,
@@ -711,7 +760,7 @@ export class PlaybackEngine {
   }
 
   pause() {
-    if (this.ctx.state === 'running') {
+    if (this.ctx && this.ctx.state === 'running') {
       this.ctx.suspend().then(() => {
         this.setState('PAUSED');
       });
@@ -719,6 +768,7 @@ export class PlaybackEngine {
   }
 
   resume() {
+    this.initContext();
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().then(() => {
         this.setState('PLAYING');

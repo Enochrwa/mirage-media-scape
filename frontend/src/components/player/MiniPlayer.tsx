@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { Play, Pause, SkipBack, SkipForward, ChevronUp, Volume2, ListMusic, Zap } from 'lucide-react';
 import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import { cn, formatDuration } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const MiniPlayer: React.FC = () => {
+  const [tooltipTime, setTooltipTime] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState(0);
+  const progressRef = useRef<HTMLDivElement>(null);
   const {
     currentFile,
     isPlaying,
@@ -23,10 +27,32 @@ export const MiniPlayer: React.FC = () => {
 
   if (!currentFile) return null;
 
+  const handleProgressMouseMove = (e: React.MouseEvent) => {
+    if (!progressRef.current) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = x / rect.width;
+    setTooltipTime(formatDuration(percent * duration));
+    setTooltipPos(percent * 100);
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-lg border-t border-border h-20 px-4">
-      <div className="absolute top-0 left-0 right-0">
+      <div
+        ref={progressRef}
+        className="absolute top-0 left-0 right-0 h-1 group cursor-pointer"
+        onMouseMove={handleProgressMouseMove}
+        onMouseLeave={() => setTooltipTime(null)}
+      >
         <Progress value={(currentTime / duration) * 100} className="h-1 rounded-none bg-primary/20" />
+        {tooltipTime && (
+          <div
+            className="absolute bottom-2 bg-black/90 text-white text-[10px] px-2 py-0.5 rounded border border-white/10 pointer-events-none transition-all duration-75"
+            style={{ left: `${tooltipPos}%`, transform: 'translateX(-50%)' }}
+          >
+            {tooltipTime}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between h-full max-w-7xl mx-auto gap-4">
@@ -53,7 +79,7 @@ export const MiniPlayer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => previousTrack(files)} className="hidden sm:inline-flex">
+          <Button variant="ghost" size="icon" onClick={() => previousTrack()} className="hidden sm:inline-flex">
             <SkipBack size={20} />
           </Button>
           <Button
@@ -63,7 +89,7 @@ export const MiniPlayer: React.FC = () => {
           >
             {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => nextTrack(files)}>
+          <Button variant="ghost" size="icon" onClick={() => nextTrack()}>
             <SkipForward size={20} />
           </Button>
         </div>

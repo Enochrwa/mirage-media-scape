@@ -3,10 +3,17 @@ import { MediaFile } from '@/types/media';
 import { playbackEngine, PlaybackState, PlaybackEngine } from '@/lib/PlaybackEngine';
 import { API_BASE } from '@/lib/utils';
 import type { IncomingTrack } from './useLibraryStore';
+import { toast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { SyncManager } from '@/lib/SyncManager';
+import React from 'react';
 
 interface PlayerState {
   playbackEngine: PlaybackEngine;
   currentFile: MediaFile | null;
+  nextFile: MediaFile | null;
+  queue: MediaFile[];
+  currentIndex: number;
   isPlaying: boolean;
   volume: number;
   currentTime: number;
@@ -18,8 +25,10 @@ interface PlayerState {
   aiDjEnabled: boolean;
 
   // Actions
+  init: () => void;
   setAiDjEnabled: (enabled: boolean) => void;
   setCurrentFile: (file: MediaFile | null) => void;
+  setNextFile: (file: MediaFile | null) => void;
   setIsPlaying: (isPlaying: boolean) => void;
   setVolume: (volume: number) => void;
   setCurrentTime: (time: number) => void;
@@ -30,22 +39,49 @@ interface PlayerState {
   setShowMobilePlayer: (show: boolean) => void;
   closePlayer: () => void;
 
+  setQueue: (queue: MediaFile[]) => void;
+  addToQueue: (file: MediaFile) => void;
+  playNext: (file: MediaFile) => void;
+  removeFromQueue: (fileId: string) => void;
+  clearQueue: () => void;
+  jumpToQueueIndex: (index: number) => void;
+  reorderQueue: (startIndex: number, endIndex: number) => void;
+
   playFile: (file: MediaFile) => Promise<void>;
   pausePlayback: () => void;
   resumePlayback: () => void;
   togglePlayback: () => void;
   seekTo: (time: number) => void;
-  nextTrack: (files: MediaFile[]) => void;
-  previousTrack: (files: MediaFile[]) => void;
+  nextTrack: () => Promise<void>;
+  previousTrack: () => void;
   error: string | null;
   setError: (error: string | null) => void;
 }
 
+const PREBUFFER_THRESHOLD = 15;
+
 export const usePlayerStore = create<PlayerState>((set, get) => ({
+  init: () => {
+    const savedQueue = localStorage.getItem('ZOVYRA_queue');
+    const savedIndex = localStorage.getItem('ZOVYRA_currentIndex');
+    if (savedQueue) {
+      try {
+        const queue = JSON.parse(savedQueue);
+        const index = parseInt(savedIndex || '0');
+        set({ queue, currentIndex: index });
+        if (queue[index]) set({ currentFile: queue[index] });
+      } catch (e) {
+        console.error('Failed to restore queue', e);
+      }
+    }
+  },
   playbackEngine,
   error: null,
   setError: (error) => set({ error }),
   currentFile: null,
+  nextFile: null,
+  queue: [],
+  currentIndex: -1,
   isPlaying: false,
   volume: 0.8,
   currentTime: 0,
@@ -57,12 +93,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   aiDjEnabled: false,
 
   setCurrentFile: (file) => set({ currentFile: file }),
+  setNextFile: (file) => set({ nextFile: file }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setVolume: (volume) => {
     set({ volume });
     playbackEngine.setVolume(volume);
   },
-  setCurrentTime: (currentTime) => set({ currentTime }),
+  setCurrentTime: (currentTime) => {
+    set({ currentTime });
+    const { duration, nextFile } = get();
+    if (duration > 0 && duration - currentTime < PREBUFFER_THRESHOLD && !nextFile) {
+      const { queue: q, currentIndex: idx } = get();
+      if (idx !== -1 && idx < q.length - 1) {
+        const next = q[idx + 1];
+        set({ nextFile: next });
+        playbackEngine.preBufferNextTrack(next.id, next.file);
+      }
+    }
+  },
   setDuration: (duration) => set({ duration }),
   setShuffle: (shuffle) => set({ shuffle }),
   setRepeat: (repeat) => set({ repeat }),
@@ -74,9 +122,83 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ currentFile: null });
   },
 
+  setQueue: (queue) => {
+    set({ queue });
+    localStorage.setItem('ZOVYRA_queue', JSON.stringify(queue));
+  },
+  addToQueue: (file) => {
+    const { queue } = get();
+    const newQueue = [...queue, file];
+    set({ queue: newQueue });
+    localStorage.setItem('ZOVYRA_queue', JSON.stringify(newQueue));
+    toast({
+      title: "Added to queue",
+      description: `${file.title} added to end`,
+    });
+  },
+  playNext: (file) => {
+    const { queue, currentIndex } = get();
+    const newQueue = [...queue];
+    newQueue.splice(currentIndex + 1, 0, file);
+    set({ queue: newQueue });
+    localStorage.setItem('ZOVYRA_queue', JSON.stringify(newQueue));
+    toast({
+      title: "Playing next",
+      description: `${file.title} will play next`,
+    });
+  },
+  removeFromQueue: (fileId) => {
+    const { queue, currentIndex } = get();
+    const newQueue = queue.filter(f => f.id !== fileId);
+    let newIndex = currentIndex;
+    const removedIndex = queue.findIndex(f => f.id === fileId);
+    if (removedIndex <= currentIndex && currentIndex > 0) newIndex--;
+    set({ queue: newQueue, currentIndex: newIndex });
+    localStorage.setItem('ZOVYRA_queue', JSON.stringify(newQueue));
+    localStorage.setItem('ZOVYRA_currentIndex', newIndex.toString());
+  },
+  clearQueue: () => {
+    set({ queue: [], currentIndex: -1 });
+    localStorage.removeItem('ZOVYRA_queue');
+    localStorage.removeItem('ZOVYRA_currentIndex');
+  },
+  jumpToQueueIndex: (index) => {
+    const { queue } = get();
+    if (index >= 0 && index < queue.length) {
+      set({ currentIndex: index });
+      get().playFile(queue[index]);
+    }
+  },
+  reorderQueue: (startIndex, endIndex) => {
+    const { queue, currentIndex } = get();
+    const newQueue = Array.from(queue);
+    const [removed] = newQueue.splice(startIndex, 1);
+    newQueue.splice(endIndex, 0, removed);
+
+    let newIndex = currentIndex;
+    if (currentIndex === startIndex) newIndex = endIndex;
+    else if (startIndex < currentIndex && endIndex >= currentIndex) newIndex--;
+    else if (startIndex > currentIndex && endIndex <= currentIndex) newIndex++;
+
+    set({ queue: newQueue, currentIndex: newIndex });
+    localStorage.setItem('ZOVYRA_queue', JSON.stringify(newQueue));
+    localStorage.setItem('ZOVYRA_currentIndex', newIndex.toString());
+  },
+
   playFile: async (file) => {
     const prevFile = get().currentFile;
-    set({ currentFile: file, isPlaying: true, currentTime: 0 });
+    const { queue } = get();
+    let index = queue.findIndex(f => f.id === file.id);
+    if (index === -1) {
+       index = 0;
+       const newQueue = [file];
+       set({ queue: newQueue, currentIndex: 0 });
+       localStorage.setItem('ZOVYRA_queue', JSON.stringify(newQueue));
+    } else {
+       set({ currentIndex: index });
+    }
+    set({ currentFile: file, isPlaying: true, currentTime: 0, nextFile: null });
+    localStorage.setItem('ZOVYRA_currentIndex', index.toString());
 
     if (file.type === 'audio') {
       playbackEngine.setState('LOADING');
@@ -94,7 +216,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
                  utterance.pitch = 1.0;
                  window.speechSynthesis.speak(utterance);
 
-                 // Duck volume during intro
                  const originalVolume = get().volume;
                  playbackEngine.setVolume(originalVolume * 0.3);
                  utterance.onend = () => {
@@ -106,7 +227,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
         playbackEngine.play(audioBuffer, 0, file.loudness, file.id);
 
-        // Media Session API
         if ('mediaSession' in navigator) {
           navigator.mediaSession.metadata = new MediaMetadata({
             title: file.title,
@@ -119,6 +239,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         console.error('Playback Engine Error:', error);
         playbackEngine.setState('ERROR');
         set({ isPlaying: false });
+
+        // Auto-advance on error
+        const { title } = file;
+        toast({
+          title: 'Playback Error',
+          description: `Couldn't play ${title}. Skipping to next track.`,
+          variant: 'destructive',
+        });
+
+        // Mark missing in DB (optimistic)
+        fetch(`${API_BASE}/api/tracks/${file.id}/missing`, { method: 'POST' });
+
+        setTimeout(() => {
+          get().nextTrack();
+        }, 1000);
       }
     } else {
       playbackEngine.setState('PLAYING');
@@ -152,66 +287,86 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   seekTo: (time) => {
     set({ currentTime: time });
+    playbackEngine.seek(time);
   },
 
-  nextTrack: async (files) => {
-    if (files.length === 0) return;
-    const { currentFile, shuffle, repeat } = get();
-    const currentIndex = files.findIndex((file) => file.id === currentFile?.id);
+  nextTrack: async () => {
+    const { currentFile, shuffle, repeat, nextFile, queue, currentIndex } = get();
+
+    if (nextFile) {
+       get().playFile(nextFile);
+       return;
+    }
+
+    if (queue.length > 0 && currentIndex < queue.length - 1) {
+       get().playFile(queue[currentIndex + 1]);
+       return;
+    }
+
+    const libraryFiles = (window as unknown as { libraryFiles: MediaFile[] }).libraryFiles || [];
+    if (libraryFiles.length === 0) return;
 
     if (shuffle) {
-      // Smart Shuffle attempt
       try {
-        const res = await fetch(`${API_BASE}/api/recommendations/${currentFile?.id}?limit=5`);
+        const res = await fetch(`${API_BASE}/api/tracks/${currentFile?.id}/recommendations?limit=5`);
         if (res.ok) {
            const recs = await res.json() as { id: string }[];
-           const nextFromRecs = recs.find(r => files.some(f => f.id === r.id));
+           const nextFromRecs = recs.find(r => libraryFiles.some((f: MediaFile) => f.id === r.id));
            if (nextFromRecs) {
-              const file = files.find(f => f.id === nextFromRecs.id);
+              const file = libraryFiles.find((f: MediaFile) => f.id === nextFromRecs.id);
               if (file) {
                  get().playFile(file);
                  return;
               }
            }
         }
-      } catch (e) { /* fallback to random */ }
+      } catch (e) {
+        console.error('Shuffle recommendation failed', e);
+      }
 
       let nextIndex;
       do {
-        nextIndex = Math.floor(Math.random() * files.length);
-      } while (nextIndex === currentIndex && files.length > 1);
-      get().playFile(files[nextIndex]);
+        nextIndex = Math.floor(Math.random() * libraryFiles.length);
+      } while (nextIndex === currentIndex && libraryFiles.length > 1);
+      get().playFile(libraryFiles[nextIndex]);
     } else {
-      if (currentIndex < files.length - 1) {
-        get().playFile(files[currentIndex + 1]);
+      const libIndex = libraryFiles.findIndex((f: MediaFile) => f.id === currentFile?.id);
+      if (libIndex !== -1 && libIndex < libraryFiles.length - 1) {
+        get().playFile(libraryFiles[libIndex + 1]);
       } else if (repeat) {
-        get().playFile(files[0]);
+        get().playFile(libraryFiles[0]);
       } else if (currentFile) {
-        // Auto-extend queue when empty
         try {
-           const res = await fetch(`${API_BASE}/api/recommendations/${currentFile.id}?limit=10`);
+           const res = await fetch(`${API_BASE}/api/tracks/${currentFile.id}/recommendations?limit=10`);
            if (res.ok) {
               const recs = await res.json() as IncomingTrack[];
               if (recs.length > 0) {
-                 // In a real app we'd append to queue, here we just play the first recommendation
                  const { mapIncomingTrackToMediaFile } = await import('./useLibraryStore');
                  get().playFile(mapIncomingTrackToMediaFile(recs[0]));
               }
            }
-        } catch (e) { /* end */ }
+        } catch (e) {
+           console.error('Queue extension failed', e);
+        }
       }
     }
   },
 
-  previousTrack: (files) => {
-    if (files.length === 0) return;
-    const { currentFile, repeat } = get();
-    const currentIndex = files.findIndex((file) => file.id === currentFile?.id);
+  previousTrack: () => {
+    const { queue, currentIndex, repeat } = get();
+    if (queue.length > 0 && currentIndex > 0) {
+      get().playFile(queue[currentIndex - 1]);
+      return;
+    }
 
-    if (currentIndex > 0) {
-      get().playFile(files[currentIndex - 1]);
+    const libraryFiles = (window as unknown as { libraryFiles: MediaFile[] }).libraryFiles || [];
+    if (libraryFiles.length === 0) return;
+
+    const libIndex = libraryFiles.findIndex((f: MediaFile) => f.id === get().currentFile?.id);
+    if (libIndex > 0) {
+      get().playFile(libraryFiles[libIndex - 1]);
     } else if (repeat) {
-      get().playFile(files[files.length - 1]);
+      get().playFile(libraryFiles[libraryFiles.length - 1]);
     }
   },
 }));
@@ -220,12 +375,22 @@ playbackEngine.subscribe((state: PlaybackState) => {
   const isPlaying = state === 'PLAYING';
   usePlayerStore.setState({ isPlaying });
 
+  if (isPlaying) {
+     const { currentFile, currentTime } = usePlayerStore.getState();
+     if (currentFile) {
+        SyncManager.emit('POSITION_CHECKPOINT', {
+           trackId: currentFile.id,
+           position: currentTime,
+           timestamp: Date.now()
+        });
+     }
+  }
+
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
   }
 });
 
-// Register Media Session actions
 if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('play', () => {
     usePlayerStore.getState().resumePlayback();
@@ -234,14 +399,10 @@ if ('mediaSession' in navigator) {
     usePlayerStore.getState().pausePlayback();
   });
   navigator.mediaSession.setActionHandler('previoustrack', () => {
-    const store = usePlayerStore.getState();
-    const libraryFiles = (window as unknown as { libraryFiles?: MediaFile[] }).libraryFiles || [];
-    store.previousTrack(libraryFiles);
+    usePlayerStore.getState().previousTrack();
   });
   navigator.mediaSession.setActionHandler('nexttrack', () => {
-    const store = usePlayerStore.getState();
-    const libraryFiles = (window as unknown as { libraryFiles?: MediaFile[] }).libraryFiles || [];
-    store.nextTrack(libraryFiles);
+    usePlayerStore.getState().nextTrack();
   });
   navigator.mediaSession.setActionHandler('seekto', (details) => {
     if (details.seekTime !== undefined) {
@@ -250,21 +411,16 @@ if ('mediaSession' in navigator) {
   });
 }
 
-// Listen for custom seek events (e.g. from LyricsDisplay)
 window.addEventListener('zovyra-seek', (e: Event) => {
   const customEvent = e as CustomEvent;
   const time = customEvent.detail;
   if (typeof time === 'number') {
     usePlayerStore.getState().seekTo(time);
-    playbackEngine.seek(time);
   }
 });
 
-// Background Visibility Management
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    // Stop non-essential RAF loops / animations
-    // The visualizers should subscribe to this or check it
     window.dispatchEvent(new CustomEvent('zovyra-visibility-change', { detail: 'hidden' }));
   } else {
     window.dispatchEvent(new CustomEvent('zovyra-visibility-change', { detail: 'visible' }));
