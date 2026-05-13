@@ -24,10 +24,21 @@ interface RemoteState {
 
 const sanitizeUrl = (url?: string): string => {
   if (!url) return '/placeholder.svg';
-  // Use a more restricted check to satisfy CodeQL
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/') || url.startsWith('data:image/')) {
-     return url;
+
+  try {
+    // Relative paths are always safe in this context
+    if (url.startsWith('/') || url.startsWith('data:image/')) {
+       return url;
+    }
+
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+       return parsed.toString();
+    }
+  } catch (e) {
+    // Ignore invalid URLs
   }
+
   return '/placeholder.svg';
 };
 
