@@ -1,27 +1,35 @@
 export interface Track {
   id: string;
-  filePath: string;
-  fileType: 'audio' | 'video';
+  file_path: string;
+  file_type: 'audio' | 'video';
   title: string;
   artist: string;
   album: string;
-  albumArtist: string;
+  album_artist: string;
   year: number;
   genre: string;
-  trackNumber: number;
-  discNumber: number;
+  track_number: number;
+  disc_number: number;
   duration: number;
   bpm: number;
   key: string;
-  camelotKey: string;
+  camelot_key: string;
   energy: number;
   loudness: number;
-  replayGainDb: number;
-  coverCachePath: string;
-  thumbnailPath: string;
+  replay_gain_db: number;
+  cover_cache_path: string;
+  thumbnail_path: string;
   missing: number;
   rating: number;
-  playCount: number;
-  skipCount: number;
-  addedAt: number;
+  play_count: number;
+  skip_count: number;
+  added_at: number;
+
+  // Frontend compatibility fields
+  file?: string;
+  type?: 'audio' | 'video';
+  cover?: string;
+  thumbnail?: string;
+  waveform_data?: string;
+  metadata_json?: string;
 }

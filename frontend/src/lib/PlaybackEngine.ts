@@ -111,7 +111,7 @@ export class PlaybackEngine {
     const chain = this.chains[index];
 
     this.currentTrackId = track.id;
-    chain.element.src = `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.filePath)}`;
+    chain.element.src = `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`;
     chain.element.load();
 
     if (track.replayGainDb) {
@@ -136,7 +136,7 @@ export class PlaybackEngine {
         title: track.title,
         artist: track.artist,
         album: track.album,
-        artwork: track.coverCachePath
+        artwork: track.cover_cache_path
           ? [
               {
                 src: `${API_BASE}/api/tracks/cover/${track.id}`,
@@ -180,7 +180,10 @@ export class PlaybackEngine {
     // Implement
   }
 
-  updateListenerOrientation(forward: { x: number; y: number; z: number }, up: { x: number; y: number; z: number }) {
+  updateListenerOrientation(
+    forward: { x: number; y: number; z: number },
+    up: { x: number; y: number; z: number },
+  ) {
     // Implement
   }
 
