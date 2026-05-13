@@ -1,6 +1,6 @@
 import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
-import { Track } from '../../../types/track';
+import { MediaFile } from '@/types/media';
 
 // ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
 // Source
@@ -37,6 +37,12 @@ export class PlaybackEngine {
   private currentTrackId: string | null = null;
   private currentEventId: string | null = null;
   public sleepTimer: SleepTimer | null = null;
+
+  private _abLoop: {
+    pointA: number | null;
+    pointB: number | null;
+    isActive: boolean;
+  } = { pointA: null, pointB: null, isActive: false };
 
   constructor() {
     if (typeof window === 'undefined') return;
@@ -106,16 +112,16 @@ export class PlaybackEngine {
     return { element: el, source, eq, replayGain, fade };
   }
 
-  async load(track: Track, startNext: boolean = false) {
+  async load(file: MediaFile, startNext: boolean = false) {
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
-    this.currentTrackId = track.id;
-    chain.element.src = `${API_BASE}/api/tracks/stream?path=${encodeURIComponent(track.file_path)}`;
+    this.currentTrackId = file.id;
+    chain.element.src = file.file;
     chain.element.load();
 
-    if (track.replayGainDb) {
-      const gain = Math.pow(10, track.replayGainDb / 20);
+    if (file.replay_gain_db) {
+      const gain = Math.pow(10, file.replay_gain_db / 20);
       chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
     } else {
       chain.replayGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
@@ -127,19 +133,19 @@ export class PlaybackEngine {
       this.chains[(index + 1) % 2].fade.gain.setValueAtTime(0, this.ctx.currentTime);
     }
 
-    this.setupMediaSession(track);
+    this.setupMediaSession(file);
   }
 
-  private setupMediaSession(track: Track) {
+  private setupMediaSession(file: MediaFile) {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        artwork: track.cover_cache_path
+        title: file.title,
+        artist: file.artist,
+        album: file.album,
+        artwork: file.cover
           ? [
               {
-                src: `${API_BASE}/api/tracks/cover/${track.id}`,
+                src: file.cover,
                 sizes: '512x512',
                 type: 'image/jpeg',
               },
@@ -155,12 +161,17 @@ export class PlaybackEngine {
     this.setState('PLAYING');
   }
 
-  pause() {
-    this.chains[this.activeIndex].element.pause();
-    this.setState('PAUSED');
-  }
+pause() {
+     this.chains[this.activeIndex].element.pause();
+     this.setState('PAUSED');
+   }
 
-  seek(seconds: number) {
+   resume() {
+     this.chains[this.activeIndex].element.play();
+     this.setState('PLAYING');
+   }
+
+   seek(seconds: number) {
     this.chains[this.activeIndex].element.currentTime = seconds;
   }
 
@@ -207,14 +218,40 @@ export class PlaybackEngine {
     this.sleepTimer?.set(minutes);
   }
 
+  preview(time: number) {
+    this.chains[this.activeIndex].element.currentTime = time;
+    this.chains[this.activeIndex].element.play();
+    setTimeout(() => {
+      this.chains[this.activeIndex].element.pause();
+    }, 30000);
+  }
+
   get currentTime() {
     return this.chains[this.activeIndex].element.currentTime;
   }
 
+private _setABLoopA(time: number) {
+    this._abLoop.pointA = time;
+    this._abLoop.isActive = this._abLoop.pointA !== null && this._abLoop.pointB !== null;
+  }
+
+  private _setABLoopB(time: number) {
+    this._abLoop.pointB = time;
+    this._abLoop.isActive = this._abLoop.pointA !== null && this._abLoop.pointB !== null;
+  }
+
+  private _toggleABLoop() {
+    this._abLoop.isActive = !this._abLoop.isActive;
+  }
+
   get abLoop() {
     return {
-      setA: () => {},
-      setB: () => {},
+      pointA: this._abLoop.pointA,
+      pointB: this._abLoop.pointB,
+      isActive: this._abLoop.isActive,
+      setA: this._setABLoopA.bind(this),
+      setB: this._setABLoopB.bind(this),
+      toggle: this._toggleABLoop.bind(this),
     };
   }
 

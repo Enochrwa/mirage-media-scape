@@ -6,26 +6,27 @@ import { Input } from '@/components/ui/input';
 import { Moon, X } from 'lucide-react';
 
 export const SleepTimerControls: React.FC = () => {
-  const { playbackEngine } = usePlayerStore();
-  const [state, setState] = useState(playbackEngine?.sleepTimer?.getState());
+  const { playbackEngine: pe, currentFile } = usePlayerStore();
+  const sleepTimer = pe?.sleepTimer;
+  const [state, setState] = useState(sleepTimer?.getState?.());
   const [customMinutes, setCustomMinutes] = useState('');
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setState(playbackEngine?.sleepTimer?.getState());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [playbackEngine]);
+useEffect(() => {
+     const interval = setInterval(() => {
+       setState(sleepTimer?.getState?.());
+     }, 1000);
+     return () => clearInterval(interval);
+   }, [sleepTimer]);
 
-  const setTimer = (mins: number) => {
-    playbackEngine?.sleepTimer?.set(mins);
-    setState(playbackEngine?.sleepTimer?.getState());
-  };
+   const setTimer = (mins: number) => {
+     sleepTimer?.set(mins);
+     setState(sleepTimer?.getState?.());
+   };
 
-  const cancelTimer = () => {
-    playbackEngine?.sleepTimer?.clear();
-    setState(playbackEngine?.sleepTimer?.getState());
-  };
+   const cancelTimer = () => {
+     sleepTimer?.clear();
+     setState(sleepTimer?.getState?.());
+   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -58,17 +59,17 @@ export const SleepTimerControls: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                playbackEngine?.sleepTimer?.setEndOfTrack(
-                  window as unknown as {
-                    addEventListener: (
-                      type: string,
-                      listener: () => void,
-                      options?: unknown,
-                    ) => void;
-                  },
-                )
-              }
+onClick={() =>
+                 pe?.sleepTimer?.setEndOfTrack(
+                   window as unknown as {
+                     addEventListener: (
+                       type: string,
+                       listener: () => void,
+                       options?: unknown,
+                     ) => void;
+                   },
+                 )
+               }
             >
               End of Track
             </Button>

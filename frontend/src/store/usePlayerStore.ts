@@ -1,10 +1,20 @@
 import { create } from 'zustand';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { queueManager } from '@/engines/QueueManager';
-import { Track } from '../../../types/track';
+import { MediaFile } from '@/types/media';
+
+// Explicit ABLoop type matching what PlaybackEngine.abLoop returns
+export interface ABLoop {
+  pointA: number | null;
+  pointB: number | null;
+  isActive: boolean;
+  setA: (time: number) => void;
+  setB: (time: number) => void;
+  toggle: () => void;
+}
 
 export interface PlayerState {
-  currentFile: Track | null; // Keep original name
+  currentFile: MediaFile | null;
   isPlaying: boolean;
   volume: number;
   currentTime: number;
@@ -14,10 +24,12 @@ export interface PlayerState {
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
+  playbackEngine: typeof playbackEngine;
+  abLoop: ABLoop;
 
   // Actions
   init: () => void;
-  playFile: (track: Track) => Promise<void>;
+  playFile: (file: MediaFile) => Promise<void>;
   pausePlayback: () => void;
   resumePlayback: () => void;
   togglePlayback: () => void;
@@ -35,7 +47,7 @@ export interface PlayerState {
   closePlayer: () => void;
 }
 
-export const usePlayerStore = create<PlayerState>((set, get) => ({
+const store = create<PlayerState>((set, get) => ({
   currentFile: null,
   isPlaying: false,
   volume: 0.8,
@@ -46,6 +58,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isPlayerFullscreen: false,
   showMobilePlayer: false,
   aiDjEnabled: false,
+  playbackEngine,
+  abLoop: playbackEngine.abLoop,
 
   init: () => {
     const savedQueue = localStorage.getItem('ZOVYRA_queue');
@@ -59,9 +73,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
   },
 
-  playFile: async (track: Track) => {
-    set({ currentFile: track, isPlaying: true });
-    await playbackEngine.load(track);
+  playFile: async (file: MediaFile) => {
+    set({ currentFile: file, isPlaying: true });
+    await playbackEngine.load(file);
     playbackEngine.play();
   },
 
@@ -87,9 +101,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   nextTrack: async () => {
-    const nextTrack = await queueManager.smartNext();
-    if (nextTrack) {
-      get().playFile(nextTrack);
+    const nextFile = await queueManager.smartNext();
+    if (nextFile) {
+      get().playFile(nextFile);
     }
   },
 
@@ -118,6 +132,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 // Listen for end of track
 if (typeof window !== 'undefined') {
   window.addEventListener('zovyra-track-ended', () => {
-    usePlayerStore.getState().nextTrack();
+    store.getState().nextTrack();
   });
 }
+
+export const usePlayerStore = store;

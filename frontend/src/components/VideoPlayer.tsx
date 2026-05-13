@@ -45,6 +45,7 @@ import { SubtitleCue, parseSRT } from '@/lib/utils';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
 import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
+import { MediaFile } from '@/types/media';
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -132,15 +133,15 @@ const ParticleSystem = ({ isActive, theme }: { isActive: boolean; theme: string 
 };
 
 const VideoPlayer: React.FC = () => {
-  const {
-    currentFile,
-    setCurrentTime: updateCurrentTime,
-    setDuration: updateDuration,
-    playbackEngine,
-  } = usePlayerStore();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const {
+     currentFile,
+     setCurrentTime: updateCurrentTime,
+     setDuration: updateDuration,
+     playbackEngine: pe,
+   } = usePlayerStore();
+   const videoRef = useRef<HTMLVideoElement>(null);
+   const videoContainerRef = useRef<HTMLDivElement>(null);
+   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
@@ -393,19 +394,19 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const toggleLoop = () => {
-    playbackEngine.abLoop.toggle();
-    setIsLooping(playbackEngine.abLoop.isActive);
-  };
+const toggleLoop = () => {
+     pe.abLoop.toggle();
+     setIsLooping(pe.abLoop.isActive);
+   };
 
-  const setPointA = () => {
-    playbackEngine.abLoop.setA(currentTime);
-    setIsLooping(playbackEngine.abLoop.isActive);
-  };
-  const setPointB = () => {
-    playbackEngine.abLoop.setB(currentTime);
-    setIsLooping(playbackEngine.abLoop.isActive);
-  };
+   const setPointA = () => {
+     pe.abLoop.setA(currentTime);
+     setIsLooping(pe.abLoop.isActive);
+   };
+   const setPointB = () => {
+     pe.abLoop.setB(currentTime);
+     setIsLooping(pe.abLoop.isActive);
+   };
 
   const handleSubtitleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -467,45 +468,44 @@ const VideoPlayer: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const engine = playbackEngine;
+useEffect(() => {
+     const video = videoRef.current;
+     if (!video) return;
 
-    const handleTimeUpdate = () => {
-      const time = video.currentTime;
-      setCurrentTime(time);
-      updateCurrentTime(time);
+     const handleTimeUpdate = () => {
+       const time = video.currentTime;
+       setCurrentTime(time);
+       updateCurrentTime(time);
 
-      // Handle A-B Loop
-      if (engine && engine.abLoop) {
-        engine.abLoop.check(time, (seekTo: number) => {
-          video.currentTime = seekTo;
-        });
-      }
+       // Handle A-B Loop
+       if (pe.abLoop.isActive && pe.abLoop.pointA !== null && pe.abLoop.pointB !== null) {
+         if (time >= pe.abLoop.pointB) {
+           video.currentTime = pe.abLoop.pointA;
+         }
+       }
 
-      // Handle Subtitles
-      if (subtitlesEnabled && cues.length > 0) {
-        const cue = cues.find((c) => time >= c.start && time <= c.end);
-        setActiveCue(cue || null);
-      }
-    };
-    const handleLoadedMetadata = () => {
-      setDuration(video.duration);
-      updateDuration(video.duration);
-    };
-    const handleEnded = () => setIsPlaying(false);
+       // Handle Subtitles
+       if (subtitlesEnabled && cues.length > 0) {
+         const cue = cues.find((c) => time >= c.start && time <= c.end);
+         setActiveCue(cue || null);
+       }
+     };
+     const handleLoadedMetadata = () => {
+       setDuration(video.duration);
+       updateDuration(video.duration);
+     };
+     const handleEnded = () => setIsPlaying(false);
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    video.addEventListener('ended', handleEnded);
+     video.addEventListener('timeupdate', handleTimeUpdate);
+     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+     video.addEventListener('ended', handleEnded);
 
-    return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      video.removeEventListener('ended', handleEnded);
-    };
-  }, [playbackEngine, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
+     return () => {
+       video.removeEventListener('timeupdate', handleTimeUpdate);
+       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+       video.removeEventListener('ended', handleEnded);
+     };
+   }, [pe, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">
@@ -873,7 +873,7 @@ const VideoPlayer: React.FC = () => {
                           onClick={setPointA}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            playbackEngine.abLoop.pointA !== null
+                            pe.abLoop.pointA !== null
                               ? 'text-purple-400'
                               : 'text-white/40',
                           )}
@@ -884,7 +884,7 @@ const VideoPlayer: React.FC = () => {
                           onClick={setPointB}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            playbackEngine.abLoop.pointB !== null
+                            pe.abLoop.pointB !== null
                               ? 'text-purple-400'
                               : 'text-white/40',
                           )}
@@ -894,8 +894,8 @@ const VideoPlayer: React.FC = () => {
                         <button
                           onClick={toggleLoop}
                           disabled={
-                            playbackEngine.abLoop.pointA === null ||
-                            playbackEngine.abLoop.pointB === null
+pe.abLoop.pointA === null ||
+                             pe.abLoop.pointB === null
                           }
                           className={cn(
                             'rounded-full p-1.5 transition-all',
@@ -984,10 +984,10 @@ const VideoPlayer: React.FC = () => {
                       {/* Download */}
                       <button
                         onClick={() => {
-                          if (!currentFile) return;
-                          const link = document.createElement('a');
-                          link.href = currentFile.file;
-                          link.download = `${currentFile.title}.mp4`;
+if (!currentFile) return;
+                           const link = document.createElement('a');
+                           link.href = currentFile.file ?? '';
+                           link.download = `${currentFile.title}.mp4`;
                           link.click();
                         }}
                         className="rounded-full p-1.5 text-white transition-all hover:scale-110 hover:bg-white/10 sm:p-2"
@@ -1015,12 +1015,12 @@ const VideoPlayer: React.FC = () => {
             </div>
           </div>
 
-          {/* Loading Spinner */}
-          {!videoRef.current?.readyState && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
-            </div>
-          )}
+{/* Loading Spinner */}
+           {!videoRef.current?.readyState || videoRef.current?.readyState < 2 ? (
+             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
+             </div>
+           ) : null}
 
           {/* Gesture Indicators */}
           {gestureControl && (

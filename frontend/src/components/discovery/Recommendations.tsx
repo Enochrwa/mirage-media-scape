@@ -42,7 +42,10 @@ const Recommendations: React.FC<RecommendationsProps> = ({ trackId }) => {
           <Card
             key={track.id}
             className="group flex cursor-pointer items-center gap-3 border-transparent bg-white/5 p-2 hover:bg-white/10"
-            onClick={() => playFile(track)}
+            onClick={() => {
+             const file: MediaFile = track;
+             playFile(file);
+           }}
           >
             <div className="relative h-10 w-10 overflow-hidden rounded">
               <img

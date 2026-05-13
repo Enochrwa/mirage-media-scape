@@ -33,6 +33,7 @@ export interface MediaFile {
   color?: string;
   dominant_color?: string;
   missing?: number;
+  replay_gain_db?: number;
 }
 
 export interface SmartPlaylistCondition {

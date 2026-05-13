@@ -1,18 +1,18 @@
-import { Track } from '../../types/track';
+import { MediaFile } from '@/types/media';
 import { API_BASE } from '../lib/utils';
 
 export class QueueManager {
-  private queue: Track[] = [];
+  private queue: MediaFile[] = [];
   private currentIndex: number = -1;
-  private history: Track[] = [];
+  private history: MediaFile[] = [];
   private shuffleMode: 'off' | 'on' | 'smart' = 'off';
   private repeatMode: 'off' | 'one' | 'all' = 'off';
 
-  addToQueue(track: Track, position: 'next' | 'last' = 'last') {
+  addToQueue(file: MediaFile, position: 'next' | 'last' = 'last') {
     if (position === 'next') {
-      this.queue.splice(this.currentIndex + 1, 0, track);
+      this.queue.splice(this.currentIndex + 1, 0, file);
     } else {
-      this.queue.push(track);
+      this.queue.push(file);
     }
     this.save();
   }
@@ -32,16 +32,16 @@ export class QueueManager {
   removeDuplicates() {
     const seen = new Set();
     const originalLen = this.queue.length;
-    this.queue = this.queue.filter((t) => {
-      if (seen.has(t.id)) return false;
-      seen.add(t.id);
+    this.queue = this.queue.filter((f) => {
+      if (seen.has(f.id)) return false;
+      seen.add(f.id);
       return true;
     });
     this.save();
     return originalLen - this.queue.length;
   }
 
-  async smartNext(): Promise<Track | null> {
+  async smartNext(): Promise<MediaFile | null> {
     if (this.currentIndex < this.queue.length - 1) {
       this.currentIndex++;
       return this.queue[this.currentIndex];

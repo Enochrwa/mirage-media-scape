@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Podcast as PodcastIcon, Plus, Play, Clock, Calendar } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { MediaFile } from '@/types/media';
 
 interface Podcast {
   id: string;
@@ -75,16 +76,17 @@ const PodcastsPage = () => {
     }
   };
 
-  const playEpisode = (episode: Episode) => {
-    playFile({
-      id: episode.id,
-      title: episode.title,
-      artist: selectedPodcast?.title || 'Podcast',
-      file: episode.audio_url,
-      type: 'audio',
-      cover: selectedPodcast?.artwork_url || '',
-    });
-  };
+const playEpisode = (episode: Episode) => {
+     const mf: MediaFile = {
+       id: episode.id,
+       title: episode.title,
+       artist: selectedPodcast?.title || 'Podcast',
+       file: episode.audio_url,
+       type: 'audio',
+       cover: selectedPodcast?.artwork_url,
+     };
+     playFile(mf);
+   };
 
   return (
     <MainLayout>
