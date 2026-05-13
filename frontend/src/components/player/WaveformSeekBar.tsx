@@ -137,7 +137,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     }
 
     // Chapter markers
-    chapters.forEach(chapter => {
+    chapters.forEach((chapter) => {
       const x = (chapter.time / duration) * width;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.fillRect(x - 1, 0, 2, height);
@@ -189,8 +189,8 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       } else if (dragMarker === 'progress') {
         const now = Date.now();
         if (now - lastPreviewTime.current > 300) {
-           playbackEngine.preview(targetTime);
-           lastPreviewTime.current = now;
+          playbackEngine.preview(targetTime);
+          lastPreviewTime.current = now;
         }
       }
     }
@@ -209,16 +209,16 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex justify-between text-xs font-mono text-muted-foreground">
+      <div className="flex justify-between font-mono text-xs text-muted-foreground">
         <span>{formatTime(currentTime)}</span>
         <div className="flex items-center gap-2">
           {isStream && (
-            <div className="flex items-center gap-1 bg-red-500/20 text-red-500 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <div className="flex animate-pulse items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-500">
+              <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
               LIVE
             </div>
           )}
-          <span className="text-foreground font-bold">
+          <span className="font-bold text-foreground">
             {hoverTime !== null ? formatTime(hoverTime) : ''}
           </span>
         </div>
@@ -227,10 +227,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
       <div
         ref={containerRef}
-        className={cn(
-          'relative h-16 w-full group',
-          isStream ? 'cursor-default' : 'cursor-pointer',
-        )}
+        className={cn('group relative h-16 w-full', isStream ? 'cursor-default' : 'cursor-pointer')}
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -244,7 +241,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* Scrubber Handle */}
         {!isStream && (
           <div
-            className="absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-75 pointer-events-none"
+            className="pointer-events-none absolute bottom-0 top-0 w-1 bg-white shadow-lg transition-all duration-75"
             style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
           />
         )}
@@ -252,21 +249,21 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* A/B Markers */}
         {abLoop.pointA !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
             style={{
-                left: `${(abLoop.pointA / duration) * 100}%`,
-                transform: 'translateX(-50%)',
-                borderTopColor: '#00FFFF'
+              left: `${(abLoop.pointA / duration) * 100}%`,
+              transform: 'translateX(-50%)',
+              borderTopColor: '#00FFFF',
             }}
           />
         )}
         {abLoop.pointB !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
             style={{
-                left: `${(abLoop.pointB / duration) * 100}%`,
-                transform: 'translateX(-50%)',
-                borderTopColor: '#FF8C00'
+              left: `${(abLoop.pointB / duration) * 100}%`,
+              transform: 'translateX(-50%)',
+              borderTopColor: '#FF8C00',
             }}
           />
         )}

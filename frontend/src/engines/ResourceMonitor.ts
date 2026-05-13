@@ -19,7 +19,15 @@ export class ResourceMonitor {
   private async monitorBattery(): Promise<void> {
     if ('getBattery' in navigator) {
       try {
-        const battery = await (navigator as unknown as { getBattery: () => Promise<{ level: number; charging: boolean; addEventListener: (type: string, listener: () => void) => void }> }).getBattery();
+        const battery = await (
+          navigator as unknown as {
+            getBattery: () => Promise<{
+              level: number;
+              charging: boolean;
+              addEventListener: (type: string, listener: () => void) => void;
+            }>;
+          }
+        ).getBattery();
         const check = () => {
           const lowBattery = battery.level < 0.2 && !battery.charging;
           this.updateState(lowBattery);
@@ -69,12 +77,14 @@ export class ResourceMonitor {
   private updateState(lowPower: boolean): void {
     if (this.isLowPower !== lowPower) {
       this.isLowPower = lowPower;
-      this.listeners.forEach(fn => fn(lowPower));
+      this.listeners.forEach((fn) => fn(lowPower));
       window.dispatchEvent(new CustomEvent('lowpowerchange', { detail: lowPower }));
     }
   }
 
-  isLowPowerMode(): boolean { return this.isLowPower; }
+  isLowPowerMode(): boolean {
+    return this.isLowPower;
+  }
 
   subscribe(fn: (lowPower: boolean) => void): () => void {
     this.listeners.add(fn);

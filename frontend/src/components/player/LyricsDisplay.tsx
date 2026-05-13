@@ -74,12 +74,12 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   return (
     <div className="relative h-full overflow-hidden">
-      <div className="absolute top-4 right-4 z-20 flex gap-2">
+      <div className="absolute right-4 top-4 z-20 flex gap-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setShowTranslation(!showTranslation)}
-          className={cn(showTranslation && "text-primary")}
+          className={cn(showTranslation && 'text-primary')}
         >
           🌐
         </Button>
@@ -87,7 +87,10 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
       <div
         ref={containerRef}
-        className={cn('h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-[40vh]', className)}
+        className={cn(
+          'no-scrollbar h-full overflow-y-auto scroll-smooth px-4 py-[40vh]',
+          className,
+        )}
       >
         <div className="space-y-12">
           {lyrics.map((line, i) => {
@@ -99,12 +102,12 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                 key={i}
                 data-index={i}
                 className={cn(
-                  'cursor-pointer transition-all duration-500 text-center select-none',
+                  'cursor-pointer select-none text-center transition-all duration-500',
                   isActive
-                    ? 'text-3xl font-bold text-white scale-110 opacity-100'
+                    ? 'scale-110 text-3xl font-bold text-white opacity-100'
                     : distance === 1
-                    ? 'text-2xl font-semibold text-zinc-400 opacity-70'
-                    : 'text-xl font-medium text-zinc-600 opacity-40'
+                      ? 'text-2xl font-semibold text-zinc-400 opacity-70'
+                      : 'text-xl font-medium text-zinc-600 opacity-40',
                 )}
                 onClick={() => handleLineClick(line.time)}
                 onDoubleClick={() => {
@@ -121,10 +124,10 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                             key={wi}
                             className={cn(
                               'transition-colors duration-300',
-                              isWordActive ? 'text-white' : 'text-zinc-500'
+                              isWordActive ? 'text-white' : 'text-zinc-500',
                             )}
                             style={{
-                              textShadow: isWordActive ? '0 0 10px rgba(255,255,255,0.5)' : 'none'
+                              textShadow: isWordActive ? '0 0 10px rgba(255,255,255,0.5)' : 'none',
                             }}
                           >
                             {word.text}
@@ -136,7 +139,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     line.text
                   )}
                   {showTranslation && line.text && (
-                    <p className="text-sm font-normal opacity-60 mt-2 italic">
+                    <p className="mt-2 text-sm font-normal italic opacity-60">
                       Translation coming soon...
                     </p>
                   )}

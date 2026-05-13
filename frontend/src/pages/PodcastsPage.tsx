@@ -36,7 +36,9 @@ const PodcastsPage = () => {
     try {
       const res = await fetch(`${API_BASE}/api/podcasts/subscriptions`);
       if (res.ok) setSubscriptions(await res.json());
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -50,14 +52,17 @@ const PodcastsPage = () => {
       const res = await fetch(`${API_BASE}/api/podcasts/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url }),
       });
       if (res.ok) {
         setUrl('');
         fetchSubscriptions();
       }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectPodcast = async (podcast: Podcast) => {
@@ -65,7 +70,9 @@ const PodcastsPage = () => {
     try {
       const res = await fetch(`${API_BASE}/api/podcasts/${podcast.id}/episodes`);
       if (res.ok) setEpisodes(await res.json());
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const playEpisode = (episode: Episode) => {
@@ -82,17 +89,17 @@ const PodcastsPage = () => {
   return (
     <MainLayout>
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold tracking-tight text-white">Podcasts</h1>
             <p className="text-zinc-400">Subscribe to your favorite RSS feeds.</p>
           </div>
-          <div className="flex gap-2 max-w-sm">
+          <div className="flex max-w-sm gap-2">
             <Input
               placeholder="RSS Feed URL..."
               value={url}
-              onChange={e => setUrl(e.target.value)}
-              className="bg-zinc-900 border-white/10"
+              onChange={(e) => setUrl(e.target.value)}
+              className="border-white/10 bg-zinc-900"
             />
             <Button onClick={subscribe} disabled={loading} className="bg-purple-600">
               <Plus size={18} />
@@ -101,62 +108,74 @@ const PodcastsPage = () => {
         </div>
 
         {!selectedPodcast ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {subscriptions.map(pod => (
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-6">
+            {subscriptions.map((pod) => (
               <div
                 key={pod.id}
                 className="group cursor-pointer space-y-3"
                 onClick={() => selectPodcast(pod)}
               >
-                <div className="aspect-square overflow-hidden rounded-xl bg-zinc-800 shadow-lg group-hover:scale-105 transition-transform">
-                  <img src={pod.artwork_url} className="w-full h-full object-cover" alt="" />
+                <div className="aspect-square overflow-hidden rounded-xl bg-zinc-800 shadow-lg transition-transform group-hover:scale-105">
+                  <img src={pod.artwork_url} className="h-full w-full object-cover" alt="" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold truncate text-white">{pod.title}</h3>
-                  <p className="text-xs text-zinc-500 truncate">{pod.author}</p>
+                  <h3 className="truncate font-bold text-white">{pod.title}</h3>
+                  <p className="truncate text-xs text-zinc-500">{pod.author}</p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in slide-in-from-left-4">
-             <Button variant="ghost" onClick={() => setSelectedPodcast(null)} className="mb-4">
-                ← Back to subscriptions
-             </Button>
+            <Button variant="ghost" onClick={() => setSelectedPodcast(null)} className="mb-4">
+              ← Back to subscriptions
+            </Button>
 
-             <div className="flex gap-8 items-start">
-                <img src={selectedPodcast.artwork_url} className="w-48 h-48 rounded-2xl shadow-2xl" alt="" />
-                <div className="space-y-4">
-                   <h2 className="text-5xl font-black">{selectedPodcast.title}</h2>
-                   <p className="text-xl text-zinc-400">{selectedPodcast.author}</p>
-                   <p className="text-sm text-zinc-500 max-w-2xl line-clamp-3">{selectedPodcast.description}</p>
-                </div>
-             </div>
+            <div className="flex items-start gap-8">
+              <img
+                src={selectedPodcast.artwork_url}
+                className="h-48 w-48 rounded-2xl shadow-2xl"
+                alt=""
+              />
+              <div className="space-y-4">
+                <h2 className="text-5xl font-black">{selectedPodcast.title}</h2>
+                <p className="text-xl text-zinc-400">{selectedPodcast.author}</p>
+                <p className="line-clamp-3 max-w-2xl text-sm text-zinc-500">
+                  {selectedPodcast.description}
+                </p>
+              </div>
+            </div>
 
-             <div className="space-y-2 mt-12">
-                <h3 className="text-2xl font-bold mb-4">Episodes</h3>
-                {episodes.map(ep => (
-                  <div
-                    key={ep.id}
-                    className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 group border border-transparent hover:border-white/5 transition-all"
+            <div className="mt-12 space-y-2">
+              <h3 className="mb-4 text-2xl font-bold">Episodes</h3>
+              {episodes.map((ep) => (
+                <div
+                  key={ep.id}
+                  className="group flex items-center gap-4 rounded-xl border border-transparent p-4 transition-all hover:border-white/5 hover:bg-white/5"
+                >
+                  <Button
+                    size="icon"
+                    onClick={() => playEpisode(ep)}
+                    className="h-12 w-12 rounded-full bg-white/10 text-white hover:bg-purple-600"
                   >
-                    <Button
-                      size="icon"
-                      onClick={() => playEpisode(ep)}
-                      className="bg-white/10 hover:bg-purple-600 text-white rounded-full h-12 w-12"
-                    >
-                      <Play size={20} fill="currentColor" />
-                    </Button>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-lg truncate group-hover:text-purple-400 transition-colors">{ep.title}</h4>
-                      <div className="flex items-center gap-4 text-xs text-zinc-500 mt-1">
-                        <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(ep.published_at).toLocaleDateString()}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} /> {Math.round(ep.duration / 60)} min</span>
-                      </div>
+                    <Play size={20} fill="currentColor" />
+                  </Button>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-lg font-bold transition-colors group-hover:text-purple-400">
+                      {ep.title}
+                    </h4>
+                    <div className="mt-1 flex items-center gap-4 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} /> {new Date(ep.published_at).toLocaleDateString()}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} /> {Math.round(ep.duration / 60)} min
+                      </span>
                     </div>
                   </div>
-                ))}
-             </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

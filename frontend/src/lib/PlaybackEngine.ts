@@ -1,5 +1,6 @@
 import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
+import { Track } from '../../../types/track';
 
 // ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
 // Source
@@ -24,7 +25,7 @@ export type PlaybackState = 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'ENDED' 
 
 export class PlaybackEngine {
   public ctx!: AudioContext;
-  private chains: [TrackChain, TrackChain] = [] as any;
+  private chains: [TrackChain, TrackChain] = [] as unknown as [TrackChain, TrackChain];
   private activeIndex: number = 0;
 
   private analyser!: AnalyserNode;
@@ -43,7 +44,10 @@ export class PlaybackEngine {
   }
 
   private initContext() {
-    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    this.ctx = new AudioContextClass();
 
     // Shared tail of the graph
     this.analyser = this.ctx.createAnalyser();
@@ -71,7 +75,7 @@ export class PlaybackEngine {
 
   private createChain(): TrackChain {
     const el = new Audio();
-    el.crossOrigin = "anonymous";
+    el.crossOrigin = 'anonymous';
     const source = this.ctx.createMediaElementSource(el);
 
     // 1. EQ Chain
@@ -102,7 +106,7 @@ export class PlaybackEngine {
     return { element: el, source, eq, replayGain, fade };
   }
 
-  async load(track: any, startNext: boolean = false) {
+  async load(track: Track, startNext: boolean = false) {
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
@@ -126,13 +130,21 @@ export class PlaybackEngine {
     this.setupMediaSession(track);
   }
 
-  private setupMediaSession(track: any) {
+  private setupMediaSession(track: Track) {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
         artist: track.artist,
         album: track.album,
-        artwork: track.coverCachePath ? [{ src: `${API_BASE}/api/tracks/cover/${track.id}`, sizes: '512x512', type: 'image/jpeg' }] : []
+        artwork: track.coverCachePath
+          ? [
+              {
+                src: `${API_BASE}/api/tracks/cover/${track.id}`,
+                sizes: '512x512',
+                type: 'image/jpeg',
+              },
+            ]
+          : [],
       });
     }
   }
@@ -161,7 +173,9 @@ export class PlaybackEngine {
     // Emit event or update store
   }
 
-  get analyserNode() { return this.analyser; }
+  get analyserNode() {
+    return this.analyser;
+  }
 }
 
 export const playbackEngine = new PlaybackEngine();

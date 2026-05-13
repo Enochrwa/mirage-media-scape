@@ -144,7 +144,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     if (handles.length > 0) {
       for (const handle of handles) {
         if (
-          (await (handle as unknown as { queryPermission: (o: { mode: string }) => Promise<string> }).queryPermission({
+          (await (
+            handle as unknown as { queryPermission: (o: { mode: string }) => Promise<string> }
+          ).queryPermission({
             mode: 'read',
           })) !== 'granted'
         ) {
@@ -262,7 +264,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
     for (const handle of handles) {
       if (
-        (await (handle as unknown as { requestPermission: (o: { mode: string }) => Promise<string> }).requestPermission({
+        (await (
+          handle as unknown as { requestPermission: (o: { mode: string }) => Promise<string> }
+        ).requestPermission({
           mode: 'read',
         })) !== 'granted'
       ) {
@@ -282,7 +286,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       });
     } else if ('showDirectoryPicker' in window) {
       try {
-        const handle = await (window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
+        const handle = await (
+          window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
+        ).showDirectoryPicker();
         if (handle) {
           const idb = get().db;
           if (idb) {

@@ -66,7 +66,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setVolume: (v) => {
     playbackEngine.setVolume(v);
     set({ volume: v });
-  }
+  },
 }));
 
 // Listen for end of track

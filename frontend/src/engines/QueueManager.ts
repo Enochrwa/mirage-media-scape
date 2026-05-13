@@ -32,7 +32,7 @@ export class QueueManager {
   removeDuplicates() {
     const seen = new Set();
     const originalLen = this.queue.length;
-    this.queue = this.queue.filter(t => {
+    this.queue = this.queue.filter((t) => {
       if (seen.has(t.id)) return false;
       seen.add(t.id);
       return true;

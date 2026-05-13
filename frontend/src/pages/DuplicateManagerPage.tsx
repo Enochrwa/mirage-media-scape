@@ -62,7 +62,7 @@ const DuplicateManagerPage = () => {
   };
 
   const previewAudio = (id: string) => {
-     playbackEngine.preview(30); // 30s in
+    playbackEngine.preview(30); // 30s in
   };
 
   return (
@@ -77,12 +77,16 @@ const DuplicateManagerPage = () => {
           </div>
           {groups.length > 0 && (
             <div className="flex gap-2">
-               <Button variant="outline" className="gap-2 border-purple-500/30 text-purple-400" onClick={keepBest}>
-                  <Sparkles size={16} /> Keep Best in All Groups
-               </Button>
-               <Button className="gap-2 bg-purple-600" onClick={applyAll}>
-                  Apply All Selections
-               </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-purple-500/30 text-purple-400"
+                onClick={keepBest}
+              >
+                <Sparkles size={16} /> Keep Best in All Groups
+              </Button>
+              <Button className="gap-2 bg-purple-600" onClick={applyAll}>
+                Apply All Selections
+              </Button>
             </div>
           )}
         </div>
@@ -143,19 +147,29 @@ const DuplicateManagerPage = () => {
                           <Play size={18} />
                         </Button>
 
-                        <div className="flex bg-black/40 rounded-lg p-1">
-                           <button
-                             onClick={() => setSelections({...selections, [track.id]: 'keep'})}
-                             className={cn("px-3 py-1 rounded text-[10px] font-bold transition-all", selections[track.id] === 'keep' ? "bg-green-500 text-white" : "text-zinc-500")}
-                           >
-                              KEEP
-                           </button>
-                           <button
-                             onClick={() => setSelections({...selections, [track.id]: 'trash'})}
-                             className={cn("px-3 py-1 rounded text-[10px] font-bold transition-all", selections[track.id] === 'trash' ? "bg-red-500 text-white" : "text-zinc-500")}
-                           >
-                              TRASH
-                           </button>
+                        <div className="flex rounded-lg bg-black/40 p-1">
+                          <button
+                            onClick={() => setSelections({ ...selections, [track.id]: 'keep' })}
+                            className={cn(
+                              'rounded px-3 py-1 text-[10px] font-bold transition-all',
+                              selections[track.id] === 'keep'
+                                ? 'bg-green-500 text-white'
+                                : 'text-zinc-500',
+                            )}
+                          >
+                            KEEP
+                          </button>
+                          <button
+                            onClick={() => setSelections({ ...selections, [track.id]: 'trash' })}
+                            className={cn(
+                              'rounded px-3 py-1 text-[10px] font-bold transition-all',
+                              selections[track.id] === 'trash'
+                                ? 'bg-red-500 text-white'
+                                : 'text-zinc-500',
+                            )}
+                          >
+                            TRASH
+                          </button>
                         </div>
                       </div>
                     </div>

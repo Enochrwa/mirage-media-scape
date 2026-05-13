@@ -1072,7 +1072,7 @@ const VideoPlayer: React.FC = () => {
               </div>
             )}
 
-            {Object.values(hwDecodeSupported).some(v => v) && (
+            {Object.values(hwDecodeSupported).some((v) => v) && (
               <div className="flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-1 text-xs text-green-400 backdrop-blur-sm sm:px-3">
                 <Zap size={10} />
                 <span className="hidden sm:inline">HW Decode</span>

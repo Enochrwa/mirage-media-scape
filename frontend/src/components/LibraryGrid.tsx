@@ -78,12 +78,15 @@ const GridCell = memo(function GridCell({
   useEffect(() => {
     setImgLoaded(false);
     if (!imgRef.current) return;
-    const observer = new IntersectionObserver(([entry]) => {
-       if (entry.isIntersecting) {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
           setShouldLoad(true);
           observer.disconnect();
-       }
-    }, { rootMargin: '100px' });
+        }
+      },
+      { rootMargin: '100px' },
+    );
     observer.observe(imgRef.current);
     return () => observer.disconnect();
   }, [trackId]);
@@ -96,7 +99,8 @@ const GridCell = memo(function GridCell({
   const res = resolutionLabel(file);
   const fmt = formatBadgeLabel(file);
   const isMissing = (file as unknown as { missing?: number }).missing === 1;
-  const dominantColor = (file as unknown as { dominant_color?: string }).dominant_color || '#2a2a2a';
+  const dominantColor =
+    (file as unknown as { dominant_color?: string }).dominant_color || '#2a2a2a';
 
   return (
     <div
@@ -111,18 +115,18 @@ const GridCell = memo(function GridCell({
     >
       <Card
         className={cn(
-          'group flex h-full flex-col overflow-hidden bg-card transition-colors hover:bg-card/80 relative',
-          isSelected && 'ring-2 ring-primary bg-primary/5',
+          'group relative flex h-full flex-col overflow-hidden bg-card transition-colors hover:bg-card/80',
+          isSelected && 'bg-primary/5 ring-2 ring-primary',
           isMissing && 'opacity-60',
         )}
       >
         <div
-          className="relative aspect-square overflow-hidden shimmer-bg"
+          className="shimmer-bg relative aspect-square overflow-hidden"
           style={{ backgroundColor: imgLoaded ? 'transparent' : dominantColor }}
         >
           <img
             ref={imgRef}
-            src={shouldLoad ? (poster || '/placeholder.svg') : undefined}
+            src={shouldLoad ? poster || '/placeholder.svg' : undefined}
             alt={file.title}
             onLoad={() => setImgLoaded(true)}
             className={cn(
@@ -132,11 +136,11 @@ const GridCell = memo(function GridCell({
           />
 
           {(inSelectionMode || isSelected) && (
-            <div className="absolute top-2 left-2 z-10">
+            <div className="absolute left-2 top-2 z-10">
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={() => toggleSelection(file.id)}
-                className="w-5 h-5 bg-background/80"
+                className="h-5 w-5 bg-background/80"
               />
             </div>
           )}
@@ -163,7 +167,7 @@ const GridCell = memo(function GridCell({
           ) : null}
           {isMissing && (
             <div className="absolute bottom-2 right-2 rounded-full bg-destructive/80 p-1">
-              <Link2Off className="w-3 h-3 text-white" />
+              <Link2Off className="h-3 w-3 text-white" />
             </div>
           )}
           {fmt ? (
@@ -225,9 +229,7 @@ const GridCell = memo(function GridCell({
               >
                 Play
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                Add to Queue
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Add to Queue</DropdownMenuItem>
               <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                 Add to Playlist
               </DropdownMenuItem>
@@ -278,7 +280,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
   }
 
   return (
-    <div className="h-full relative">
+    <div className="relative h-full">
       <AutoSizer
         ChildComponent={({ width, height }) => {
           if (width === undefined || height === undefined) {
@@ -313,24 +315,28 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
       />
 
       {selection.size > 0 && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-background/95 backdrop-blur border border-border shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full border border-border bg-background/95 px-6 py-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-4">
           <span className="text-sm font-semibold">{selection.size} selected</span>
-          <div className="h-6 w-px bg-border mx-2" />
+          <div className="mx-2 h-6 w-px bg-border" />
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" className="gap-2">
-              <Play className="w-4 h-4" /> Play All
+              <Play className="h-4 w-4" /> Play All
             </Button>
             <Button variant="ghost" size="sm" className="gap-2">
-              <Plus className="w-4 h-4" /> Add to Queue
+              <Plus className="h-4 w-4" /> Add to Queue
             </Button>
             <Button variant="ghost" size="sm" className="gap-2">
-              <ListPlus className="w-4 h-4" /> Add to Playlist
+              <ListPlus className="h-4 w-4" /> Add to Playlist
             </Button>
             <Button variant="ghost" size="sm" className="gap-2">
-              <Download className="w-4 h-4" /> Download
+              <Download className="h-4 w-4" /> Download
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 text-destructive hover:text-destructive">
-              <Trash2 className="w-4 h-4" /> Delete
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
             </Button>
           </div>
           <Button

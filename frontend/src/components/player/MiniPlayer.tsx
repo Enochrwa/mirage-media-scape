@@ -1,7 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { Play, Pause, SkipBack, SkipForward, ChevronUp, Volume2, ListMusic, Zap } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  ChevronUp,
+  Volume2,
+  ListMusic,
+  Zap,
+} from 'lucide-react';
 import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -20,7 +29,7 @@ export const MiniPlayer: React.FC = () => {
     duration,
     nextTrack,
     previousTrack,
-    setPlayerFullscreen
+    setPlayerFullscreen,
   } = usePlayerStore();
   const { files } = useLibraryStore();
   const lowPowerMode = useLowPowerMode();
@@ -37,17 +46,20 @@ export const MiniPlayer: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-lg border-t border-border h-20 px-4">
+    <div className="fixed bottom-0 left-0 right-0 z-40 h-20 border-t border-border bg-background/80 px-4 backdrop-blur-lg">
       <div
         ref={progressRef}
-        className="absolute top-0 left-0 right-0 h-1 group cursor-pointer"
+        className="group absolute left-0 right-0 top-0 h-1 cursor-pointer"
         onMouseMove={handleProgressMouseMove}
         onMouseLeave={() => setTooltipTime(null)}
       >
-        <Progress value={(currentTime / duration) * 100} className="h-1 rounded-none bg-primary/20" />
+        <Progress
+          value={(currentTime / duration) * 100}
+          className="h-1 rounded-none bg-primary/20"
+        />
         {tooltipTime && (
           <div
-            className="absolute bottom-2 bg-black/90 text-white text-[10px] px-2 py-0.5 rounded border border-white/10 pointer-events-none transition-all duration-75"
+            className="pointer-events-none absolute bottom-2 rounded border border-white/10 bg-black/90 px-2 py-0.5 text-[10px] text-white transition-all duration-75"
             style={{ left: `${tooltipPos}%`, transform: 'translateX(-50%)' }}
           >
             {tooltipTime}
@@ -55,9 +67,9 @@ export const MiniPlayer: React.FC = () => {
         )}
       </div>
 
-      <div className="flex items-center justify-between h-full max-w-7xl mx-auto gap-4">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4">
         <div
-          className="flex items-center gap-3 min-w-0 cursor-pointer group"
+          className="group flex min-w-0 cursor-pointer items-center gap-3"
           onClick={() => setPlayerFullscreen(true)}
         >
           <img
@@ -66,20 +78,26 @@ export const MiniPlayer: React.FC = () => {
             className="h-12 w-12 rounded shadow-lg transition-transform group-hover:scale-105"
           />
           <div className="min-w-0 overflow-hidden">
-            <h4 className="text-sm font-semibold whitespace-nowrap text-foreground leading-tight marquee-container">
-              <span className={cn(currentFile.title.length > 30 && "animate-marquee")}>
+            <h4 className="marquee-container whitespace-nowrap text-sm font-semibold leading-tight text-foreground">
+              <span className={cn(currentFile.title.length > 30 && 'animate-marquee')}>
                 {currentFile.title}
               </span>
             </h4>
-            <p className="text-xs text-muted-foreground truncate">
-              {currentFile.artist}
-            </p>
+            <p className="truncate text-xs text-muted-foreground">{currentFile.artist}</p>
           </div>
-          <ChevronUp size={16} className="text-muted-foreground/50 group-hover:text-foreground transition-colors" />
+          <ChevronUp
+            size={16}
+            className="text-muted-foreground/50 transition-colors group-hover:text-foreground"
+          />
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => previousTrack()} className="hidden sm:inline-flex">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => previousTrack()}
+            className="hidden sm:inline-flex"
+          >
             <SkipBack size={20} />
           </Button>
           <Button
@@ -87,7 +105,11 @@ export const MiniPlayer: React.FC = () => {
             onClick={togglePlayback}
             className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90"
           >
-            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+            {isPlaying ? (
+              <Pause size={24} fill="currentColor" />
+            ) : (
+              <Play size={24} fill="currentColor" className="ml-1" />
+            )}
           </Button>
           <Button variant="ghost" size="icon" onClick={() => nextTrack()}>
             <SkipForward size={20} />
@@ -96,8 +118,8 @@ export const MiniPlayer: React.FC = () => {
 
         <div className="flex items-center gap-4 text-muted-foreground">
           {lowPowerMode && (
-            <div className="hidden lg:flex items-center bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded-full text-[10px] font-bold">
-              <Zap className="h-3 w-3 mr-1 fill-current" />
+            <div className="hidden items-center rounded-full bg-yellow-500/20 px-2 py-1 text-[10px] font-bold text-yellow-500 lg:flex">
+              <Zap className="mr-1 h-3 w-3 fill-current" />
               LOW POWER
             </div>
           )}

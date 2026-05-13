@@ -67,7 +67,7 @@ export const FullNowPlaying: React.FC = () => {
   if (!currentFile) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex animate-in flex-col overflow-hidden bg-background text-foreground slide-in-from-bottom duration-500">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background text-foreground duration-500 animate-in slide-in-from-bottom">
       {/* Dynamic Background */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div
@@ -104,7 +104,7 @@ export const FullNowPlaying: React.FC = () => {
               src={currentFile.cover || '/placeholder.svg'}
               alt={currentFile.title}
               className={cn(
-                'h-full w-full rounded-2xl object-cover shadow-2xl transition-transform duration-[4s] ease-in-out',
+                'duration-[4s] h-full w-full rounded-2xl object-cover shadow-2xl transition-transform ease-in-out',
                 isPlaying ? 'scale-105' : 'scale-100',
               )}
             />
@@ -129,7 +129,12 @@ export const FullNowPlaying: React.FC = () => {
             <Button variant="ghost" size="icon" className="hover:text-primary" title="Like">
               <Heart size={20} />
             </Button>
-            <Button variant="ghost" size="icon" className="hover:text-primary" title="Add to Playlist">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:text-primary"
+              title="Add to Playlist"
+            >
               <Plus size={20} />
             </Button>
             <Button variant="ghost" size="icon" className="hover:text-primary" title="Lyrics">
@@ -213,12 +218,7 @@ export const FullNowPlaying: React.FC = () => {
                   <Play size={40} fill="currentColor" className="ml-2" />
                 )}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-12 w-12"
-                onClick={() => nextTrack()}
-              >
+              <Button variant="ghost" size="icon" className="h-12 w-12" onClick={() => nextTrack()}>
                 <SkipForward size={32} fill="currentColor" />
               </Button>
             </div>

@@ -37,22 +37,24 @@ interface HeatmapEntry {
 const Heatmap: React.FC<{ data: HeatmapEntry[] }> = ({ data }) => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
 
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[600px] space-y-2">
         <div className="flex">
-            <div className="w-10" />
-            {hours.map(h => (
-                <div key={h} className="flex-1 text-[8px] text-zinc-500 text-center">{h}</div>
-            ))}
+          <div className="w-10" />
+          {hours.map((h) => (
+            <div key={h} className="flex-1 text-center text-[8px] text-zinc-500">
+              {h}
+            </div>
+          ))}
         </div>
         {days.map((day, di) => (
           <div key={day} className="flex items-center gap-1">
             <div className="w-10 text-[10px] font-bold text-zinc-400">{day}</div>
-            {hours.map(hour => {
-              const entry = data.find(d => parseInt(d.day) === di && parseInt(d.hour) === hour);
+            {hours.map((hour) => {
+              const entry = data.find((d) => parseInt(d.day) === di && parseInt(d.hour) === hour);
               const count = entry?.count || 0;
               const intensity = count / maxCount;
               return (

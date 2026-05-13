@@ -38,10 +38,18 @@
 }
 
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(0); }
-  75% { transform: translateX(-50%); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(0);
+  }
+  75% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .animate-marquee {
@@ -68,8 +76,12 @@
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .shimmer-bg {
@@ -78,7 +90,7 @@
 }
 
 .shimmer-bg::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   right: 0;
