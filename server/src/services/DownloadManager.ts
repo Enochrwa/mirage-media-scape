@@ -1,10 +1,10 @@
-import { Database } from 'better-sqlite3';
+import crypto from 'crypto';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { Server } from 'socket.io';
-import crypto from 'crypto';
+import type { Server } from 'socket.io';
+import type { Database } from 'better-sqlite3';
 
 type DownloadStatus = 'pending' | 'downloading' | 'waiting_wifi' | 'completed' | 'error';
 
@@ -42,36 +42,34 @@ export class DownloadManager {
     episodeId: string | null,
     url: string,
     wifiOnly: boolean = true,
-  ) {
+  ): Promise<void> {
     const id = crypto.randomUUID();
     this.db
       .prepare(
-        `
-      INSERT INTO downloads (id, track_id, episode_id, url, status, wifi_only, created_at)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?)
-    `,
+        `INSERT INTO downloads (id, track_id, episode_id, url, status, wifi_only, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
       )
       .run(id, trackId, episodeId, url, wifiOnly ? 1 : 0, Date.now());
 
     this.processQueue();
   }
 
-  private async resumeDownloads() {
+  private resumeDownloads(): void {
     const pending = this.db
-      .prepare("SELECT * FROM downloads WHERE status IN ('pending', 'downloading', 'waiting_wifi')")
+      .prepare(
+        "SELECT * FROM downloads WHERE status IN ('pending', 'downloading', 'waiting_wifi')",
+      )
       .all() as DownloadItem[];
     this.queue = pending;
     this.processQueue();
   }
 
-  private async processQueue() {
+  private processQueue(): void {
     if (this.activeCount >= this.maxConcurrent || this.queue.length === 0) return;
 
     const next = this.queue.shift();
     if (!next) return;
 
-    // Wifi check simplified for Node environment
-    // In a real desktop app, we'd use Tauri's network plugin or similar
     if (next.wifi_only === 1 && !this.isWifi()) {
       this.db.prepare("UPDATE downloads SET status = 'waiting_wifi' WHERE id = ?").run(next.id);
       return;
@@ -80,29 +78,35 @@ export class DownloadManager {
     this.startDownload(next);
   }
 
-  private isWifi() {
-    // Placeholder - assume true in Node environment for now
+  private isWifi(): boolean {
+    // Placeholder — assume true in Node environment
     return true;
   }
 
-  private async startDownload(download: DownloadItem) {
+  private startDownload(download: DownloadItem): void {
     this.activeCount++;
     this.db.prepare("UPDATE downloads SET status = 'downloading' WHERE id = ?").run(download.id);
 
-    const ext = path.extname(new URL(download.url).pathname) || '.mp3';
+    let ext: string;
+    try {
+      ext = path.extname(new URL(download.url).pathname) || '.mp3';
+    } catch {
+      ext = '.mp3';
+    }
+
     const localPath = path.join(this.downloadsDir, `${download.id}${ext}`);
     const file = fs.createWriteStream(localPath);
 
     https
       .get(download.url, (res) => {
-        const total = parseInt(res.headers['content-length'] || '0');
+        const total = parseInt(res.headers['content-length'] ?? '0', 10);
         let downloaded = 0;
 
-        res.on('data', (chunk) => {
+        res.on('data', (chunk: Buffer) => {
           downloaded += chunk.length;
           file.write(chunk);
 
-          if (this.io && downloaded % (1024 * 1024) === 0) {
+          if (this.io && total > 0 && downloaded % (1024 * 1024) === 0) {
             this.io.emit('DOWNLOAD_PROGRESS', {
               id: download.id,
               progress: downloaded / total,
@@ -121,20 +125,26 @@ export class DownloadManager {
           this.activeCount--;
           this.processQueue();
         });
+
+        res.on('error', (err) => {
+          file.destroy();
+          this.handleError(download, err.message);
+        });
       })
       .on('error', (err) => {
+        file.destroy();
         this.handleError(download, err.message);
       });
   }
 
-  private handleError(download: DownloadItem, error: string) {
-    const retryCount = (download.retry_count || 0) + 1;
+  private handleError(download: DownloadItem, error: string): void {
+    const retryCount = (download.retry_count ?? 0) + 1;
     if (retryCount <= 3) {
-      const backoff = [5000, 15000, 45000][retryCount - 1];
+      const backoffMs = [5000, 15000, 45000][retryCount - 1] ?? 45000;
       setTimeout(() => {
-        this.queue.push(download);
+        this.queue.push({ ...download, retry_count: retryCount });
         this.processQueue();
-      }, backoff);
+      }, backoffMs);
       this.db
         .prepare('UPDATE downloads SET retry_count = ? WHERE id = ?')
         .run(retryCount, download.id);
@@ -147,31 +157,36 @@ export class DownloadManager {
     }
   }
 
-  autoClean(maxAgeDays: number, maxSizeBytes: number) {
+  autoClean(maxAgeDays: number, maxSizeBytes: number): void {
     const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
     const threshold = Date.now() - maxAgeMs;
-    const files = fs.readdirSync(this.downloadsDir).map((fileName) => {
-      const filePath = path.join(this.downloadsDir, fileName);
-      const stats = fs.statSync(filePath);
-      return { fileName, filePath, stats };
-    });
 
+    const files = fs
+      .readdirSync(this.downloadsDir)
+      .map((fileName) => {
+        const filePath = path.join(this.downloadsDir, fileName);
+        const stats = fs.statSync(filePath);
+        return { fileName, filePath, stats };
+      });
+
+    // Remove files older than maxAgeDays
     for (const file of files) {
       if (file.stats.mtimeMs < threshold) {
         fs.rmSync(file.filePath, { force: true });
       }
     }
 
+    // Evict oldest files if total size exceeds limit
     let totalBytes = files.reduce((sum, file) => sum + file.stats.size, 0);
     if (totalBytes <= maxSizeBytes) return;
 
     const sortedByAge = [...files].sort((a, b) => a.stats.mtimeMs - b.stats.mtimeMs);
     for (const file of sortedByAge) {
       if (totalBytes <= maxSizeBytes) break;
-      fs.rmSync(file.filePath, { force: true });
-      totalBytes -= file.stats.size;
+      if (fs.existsSync(file.filePath)) {
+        fs.rmSync(file.filePath, { force: true });
+        totalBytes -= file.stats.size;
+      }
     }
   }
 }
-
-import crypto from 'crypto';

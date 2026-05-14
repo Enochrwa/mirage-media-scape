@@ -24,6 +24,7 @@ export interface Track {
   metadata_json?: string;
   rating?: number;
   play_count?: number;
+  skip_count?: number;
   file_type?: string;
   waveform_data?: string;
   dominant_color?: string;

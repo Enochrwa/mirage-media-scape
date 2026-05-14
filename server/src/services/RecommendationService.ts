@@ -1,4 +1,4 @@
-import { Database } from 'better-sqlite3';
+import type { Database } from 'better-sqlite3';
 
 interface TrackFeatures {
   id: string;
@@ -13,18 +13,22 @@ interface TrackFeatures {
 
 type TrackRow = TrackFeatures & Record<string, unknown>;
 
+interface PopulationMedians {
+  bpm: number;
+  energy: number;
+  loudness: number;
+}
+
 export class RecommendationService {
   constructor(private db: Database) {}
 
-  private getPopulationMedians() {
-    const getMedian = (field: string) => {
+  private getPopulationMedians(): PopulationMedians {
+    const getMedian = (field: string): number | null => {
       const rows = this.db
         .prepare(
-          `
-        SELECT ${field} FROM tracks
-        WHERE missing = 0 AND ${field} IS NOT NULL
-        ORDER BY ${field}
-      `,
+          `SELECT ${field} FROM tracks
+           WHERE missing = 0 AND ${field} IS NOT NULL
+           ORDER BY ${field}`,
         )
         .all() as Array<Record<string, number>>;
 
@@ -36,27 +40,24 @@ export class RecommendationService {
     };
 
     return {
-      bpm: getMedian('bpm') || 120,
-      energy: getMedian('energy') || 0.5,
-      loudness: getMedian('loudness') || -14,
+      bpm: getMedian('bpm') ?? 120,
+      energy: getMedian('energy') ?? 0.5,
+      loudness: getMedian('loudness') ?? -14,
     };
   }
 
-  private normalizeFeatures(
-    track: TrackFeatures,
-    medians: { bpm: number; energy: number; loudness: number },
-  ): number[] {
-    const bpm = (track.bpm || medians.bpm) / 250;
-    const energy = track.energy || medians.energy;
-    const loudness = (track.loudness || medians.loudness) / -100; // Assuming LUFS scale
+  private normalizeFeatures(track: TrackFeatures, medians: PopulationMedians): number[] {
+    const bpm = (track.bpm ?? medians.bpm) / 250;
+    const energy = track.energy ?? medians.energy;
+    // Negative LUFS scale: louder tracks have values closer to 0
+    const loudness = (track.loudness ?? medians.loudness) / -100;
 
-    // Key parsing
     let keyVal = 0;
     let scaleVal = 0;
     if (track.camelot_key) {
       const match = track.camelot_key.match(/(\d+)([AB])/);
       if (match) {
-        keyVal = (parseInt(match[1]) - 1) / 11;
+        keyVal = (parseInt(match[1], 10) - 1) / 11;
         scaleVal = match[2] === 'B' ? 1 : 0;
       }
     }
@@ -82,7 +83,9 @@ export class RecommendationService {
     limit: number = 20,
     excludeIds: string[] = [],
   ): Promise<TrackRow[]> {
-    const target = this.db.prepare('SELECT * FROM tracks WHERE id = ?').get(trackId) as TrackRow;
+    const target = this.db
+      .prepare('SELECT * FROM tracks WHERE id = ?')
+      .get(trackId) as TrackRow | undefined;
     if (!target) return [];
 
     const medians = this.getPopulationMedians();
@@ -90,11 +93,9 @@ export class RecommendationService {
 
     const candidates = this.db
       .prepare(
-        `
-      SELECT id, bpm, key, camelot_key, energy, loudness, play_count, skip_count
-      FROM tracks
-      WHERE id != ? AND missing = 0 AND bpm IS NOT NULL
-    `,
+        `SELECT id, bpm, key, camelot_key, energy, loudness, play_count, skip_count
+         FROM tracks
+         WHERE id != ? AND missing = 0 AND bpm IS NOT NULL`,
       )
       .all(trackId) as TrackRow[];
 
@@ -104,12 +105,15 @@ export class RecommendationService {
         const vector = this.normalizeFeatures(c, medians);
         let similarity = this.cosineSimilarity(targetVector, vector);
 
-        // Penalize
-        if (c.play_count > 0 && c.skip_count / (c.play_count + c.skip_count) > 0.5) {
+        const playCount = (c.play_count as number) ?? 0;
+        const skipCount = (c.skip_count as number) ?? 0;
+
+        // Penalise heavily-skipped tracks
+        if (playCount > 0 && skipCount / (playCount + skipCount) > 0.5) {
           similarity *= 0.3;
         }
-        // Boost
-        if (c.play_count >= 3) {
+        // Boost frequently-played tracks
+        if (playCount >= 3) {
           similarity *= 1.5;
         }
 
@@ -132,31 +136,27 @@ export class RecommendationService {
 
     const coPlays = this.db
       .prepare(
-        `
-      SELECT
-        CASE WHEN track_a = ? THEN track_b ELSE track_a END as other_id,
-        score
-      FROM track_coplay
-      WHERE track_a = ? OR track_b = ?
-    `,
+        `SELECT
+           CASE WHEN track_a = ? THEN track_b ELSE track_a END as other_id,
+           score
+         FROM track_coplay
+         WHERE track_a = ? OR track_b = ?`,
       )
       .all(trackId, trackId, trackId) as { other_id: string; score: number }[];
 
     const maxCoPlay = coPlays.reduce((max, c) => Math.max(max, c.score), 1);
+    const medians = this.getPopulationMedians();
+    const targetFeatures = this.db
+      .prepare('SELECT * FROM tracks WHERE id = ?')
+      .get(trackId) as TrackFeatures | undefined;
+
+    if (!targetFeatures) return [];
+    const targetVector = this.normalizeFeatures(targetFeatures, medians);
 
     const blended = contentRecs.map((track): TrackRow & { blendedScore: number } => {
       const coPlay = coPlays.find((c) => c.other_id === track.id);
       const coPlayScore = coPlay ? coPlay.score / maxCoPlay : 0;
 
-      // Content similarity is not directly returned by recommend(), let's re-calculate or approximate
-      // For simplicity in this implementation, we'll use the rank in contentRecs as a proxy if we don't have the raw score
-      // but the spec says: content similarity × 0.4 + co-play score × 0.6
-      // Let's assume we re-calculate for the top candidates
-      const medians = this.getPopulationMedians();
-      const target = this.db
-        .prepare('SELECT * FROM tracks WHERE id = ?')
-        .get(trackId) as TrackFeatures;
-      const targetVector = this.normalizeFeatures(target, medians);
       const vector = this.normalizeFeatures(track, medians);
       const contentSimilarity = this.cosineSimilarity(targetVector, vector);
 
@@ -178,14 +178,11 @@ export class RecommendationService {
     limit?: number;
   }): Promise<TrackRow[]> {
     const medians = this.getPopulationMedians();
-    const targetVector = [bpm / 250, 0, 0, energy, medians.loudness / -100]; // Neutral key/loudness
+    // Neutral key / scale / loudness target vector
+    const targetVector = [bpm / 250, 0, 0, energy, medians.loudness / -100];
 
     const candidates = this.db
-      .prepare(
-        `
-      SELECT * FROM tracks WHERE missing = 0 AND bpm IS NOT NULL
-    `,
-      )
+      .prepare('SELECT * FROM tracks WHERE missing = 0 AND bpm IS NOT NULL')
       .all() as TrackRow[];
 
     const scored = candidates.map((c) => {

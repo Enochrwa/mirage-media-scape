@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { getDatabasePath } from '../utils/db-utils';
+import { getDatabasePath } from '../utils/db-utils.js';
 
 const dbPath = getDatabasePath();
 
@@ -20,7 +20,9 @@ db.pragma('synchronous = NORMAL');
 // Initialize schema
 db.exec(`
     CREATE TABLE IF NOT EXISTS watched_folders (
-      path TEXT PRIMARY KEY, added_at INTEGER NOT NULL
+      path TEXT PRIMARY KEY,
+      added_at INTEGER NOT NULL,
+      auto_discovered INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -166,7 +168,10 @@ db.exec(`
 
     CREATE TABLE IF NOT EXISTS lyrics_cache (
       track_id TEXT PRIMARY KEY,
-      synced_lyrics TEXT, plain_lyrics TEXT, fetched_at INTEGER
+      synced_lyrics TEXT,
+      plain_lyrics TEXT,
+      source TEXT,
+      fetched_at INTEGER
     );
     CREATE TABLE IF NOT EXISTS lyrics_translations (
       track_id TEXT NOT NULL, language TEXT NOT NULL,

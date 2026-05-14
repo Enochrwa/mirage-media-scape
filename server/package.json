@@ -2,11 +2,12 @@
   "name": "zovyra-media-server",
   "version": "1.0.0",
   "description": "Node.js backend for Zovyra Media Player",
-  "main": "dist/index.js",
+  "type": "module",
+  "main": "dist/src/index.js",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db jest",
+    "start": "node dist/src/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db NODE_OPTIONS=--experimental-vm-modules jest",
     "build": "tsc",
     "lint": "eslint .",
     "clean": "rm -rf dist node_modules package-lock.json",
@@ -44,7 +45,6 @@
     "jest-util": "^29.7.0",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1"
   }

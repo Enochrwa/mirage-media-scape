@@ -1,8 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import db from '../db';
 import crypto from 'crypto';
 import mdns from 'multicast-dns';
-import { SyncLog, Setting } from '../types/database';
+import db from '../db/index.js';
+import type { SyncLog, Setting } from '../types/database.js';
 
 interface SyncEvent {
   type: string;
@@ -29,17 +29,17 @@ export class LocalSyncServer {
     const idRow = db.prepare("SELECT value FROM settings WHERE key = 'device_id'").get() as
       | Setting
       | undefined;
-    let id: string;
+
     if (!idRow) {
-      id = crypto.randomUUID();
+      const id = crypto.randomUUID();
       db.prepare("INSERT INTO settings (key, value) VALUES ('device_id', ?)").run(id);
-    } else {
-      id = idRow.value || crypto.randomUUID();
+      return id;
     }
-    return id;
+
+    return idRow.value || crypto.randomUUID();
   }
 
-  private initDiscovery(port: number) {
+  private initDiscovery(port: number): void {
     this.mdnsServer.on('query', (query) => {
       if (query.questions.some((q) => q.name === '_zovyra-sync._tcp.local')) {
         this.mdnsServer.respond({
@@ -65,10 +65,10 @@ export class LocalSyncServer {
     });
   }
 
-  private init() {
+  private init(): void {
     this.wss.on('connection', (ws: WebSocket, req) => {
-      const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const since = parseInt(url.searchParams.get('since') || '0');
+      const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+      const since = parseInt(url.searchParams.get('since') ?? '0', 10);
 
       // Send missed events
       const missedEvents = db
@@ -91,22 +91,22 @@ export class LocalSyncServer {
     });
   }
 
-  private handleEvent(event: SyncEvent, sender: WebSocket) {
+  private handleEvent(event: SyncEvent, sender: WebSocket): void {
     const timestamp = Date.now();
     const eventId = crypto.randomUUID();
 
-    // 1. Persist to log
+    // Persist to log
     db.prepare(
-      'INSERT INTO sync_log (id, type, payload, device_id, timestamp) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO sync_log (event_id, type, payload, device_id, timestamp) VALUES (?, ?, ?, ?, ?)',
     ).run(
       eventId,
       event.type,
       JSON.stringify(event.payload),
-      event.deviceId || 'unknown',
+      event.deviceId ?? 'unknown',
       timestamp,
     );
 
-    // 2. Broadcast to others
+    // Broadcast to other connected clients
     const broadcastMsg = JSON.stringify({ ...event, id: eventId, timestamp });
     this.clients.forEach((client) => {
       if (client !== sender && client.readyState === WebSocket.OPEN) {

@@ -1,4 +1,5 @@
-import { Database } from 'better-sqlite3';
+import crypto from 'crypto';
+import type { Database } from 'better-sqlite3';
 
 export interface SmartPlaylistDefinition {
   conditions: RuleCondition[];
@@ -33,6 +34,21 @@ export class SmartPlaylistService {
     'skip_count',
   ]);
 
+  private allowedSortFields = new Set([
+    'title',
+    'artist',
+    'album',
+    'genre',
+    'year',
+    'bpm',
+    'rating',
+    'play_count',
+    'added_at',
+    'duration',
+    'energy',
+    'skip_count',
+  ]);
+
   constructor(private db: Database) {}
 
   evaluate(definition: SmartPlaylistDefinition): Record<string, unknown>[] {
@@ -40,7 +56,7 @@ export class SmartPlaylistService {
     let query = 'SELECT * FROM tracks WHERE missing = 0';
     const params: unknown[] = [];
 
-    if (sortBy && !this.allowedFields.has(sortBy)) {
+    if (sortBy && !this.allowedSortFields.has(sortBy)) {
       throw new Error(`Invalid sort field: ${sortBy}`);
     }
 
@@ -50,10 +66,14 @@ export class SmartPlaylistService {
           throw new Error(`Invalid field: ${cond.field}`);
         }
         const clause = this.buildConditionClause(cond);
+
         const value = cond.value;
         if (Array.isArray(value)) {
           params.push(...value);
-        } else if (cond.operator === 'contains' || cond.operator === 'not_contains') {
+        } else if (
+          cond.operator === 'contains' ||
+          cond.operator === 'not_contains'
+        ) {
           params.push(`%${String(value)}%`);
         } else if (cond.operator === 'starts_with') {
           params.push(`${String(value)}%`);
@@ -62,6 +82,7 @@ export class SmartPlaylistService {
         } else {
           params.push(value);
         }
+
         return clause;
       });
 
@@ -70,11 +91,12 @@ export class SmartPlaylistService {
     }
 
     if (sortBy) {
-      query += ` ORDER BY ${sortBy} ${sortDir || 'ASC'}`;
+      const dir = sortDir?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+      query += ` ORDER BY ${sortBy} ${dir}`;
     }
 
     if (limit) {
-      query += ` LIMIT ${limit}`;
+      query += ` LIMIT ${Math.max(1, Math.floor(limit))}`;
     }
 
     return this.db.prepare(query).all(...params) as Record<string, unknown>[];
@@ -114,7 +136,7 @@ export class SmartPlaylistService {
     }
   }
 
-  async generateSystemPlaylists() {
+  async generateSystemPlaylists(): Promise<void> {
     const systemPlaylists = [
       {
         name: 'Most Played',
@@ -161,14 +183,10 @@ export class SmartPlaylistService {
     for (const p of systemPlaylists) {
       this.db
         .prepare(
-          `
-        INSERT OR IGNORE INTO smart_playlists (id, name, definition, created_at, updated_at, is_system)
-        VALUES (?, ?, ?, ?, ?, 1)
-      `,
+          `INSERT OR IGNORE INTO smart_playlists (id, name, definition, created_at, updated_at, is_system)
+           VALUES (?, ?, ?, ?, ?, 1)`,
         )
         .run(crypto.randomUUID(), p.name, p.definition, Date.now(), Date.now());
     }
   }
 }
-
-import crypto from 'crypto';

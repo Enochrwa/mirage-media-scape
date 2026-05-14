@@ -1,32 +1,32 @@
 import Database from 'better-sqlite3';
-import { createRequire } from 'node:module';
-import { Track } from '../types/database';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import type { Track } from '../types/database.js';
 
-const requireNative = createRequire(__filename);
-const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
+const require = createRequire(import.meta.url);
+// Native addon must be loaded via require since it's a .node/.js CJS build
+const native = require('../../../native/index.js') as typeof import('../../zovyra-native.js');
 
 export class DuplicateFinderService {
   constructor(private db: Database.Database) {}
 
-  public async findDuplicates() {
+  public async findDuplicates(): Promise<Track[][]> {
     const candidates = this.db
       .prepare(
-        `
-      SELECT id, title, artist, duration, file_path, bitrate, file_size
-      FROM tracks
-      WHERE missing = 0
-      AND id IN (
-        SELECT id FROM tracks
-        GROUP BY ROUND(duration), LOWER(TRIM(artist))
-        HAVING COUNT(*) > 1
-      )
-    `,
+        `SELECT id, title, artist, duration, file_path, bitrate, file_size
+         FROM tracks
+         WHERE missing = 0
+           AND id IN (
+             SELECT id FROM tracks
+             GROUP BY ROUND(duration), LOWER(TRIM(artist))
+             HAVING COUNT(*) > 1
+           )`,
       )
       .all() as Track[];
 
     const groups: Record<string, Track[]> = {};
     for (const track of candidates) {
-      const key = `${Math.round(track.duration || 0)}_${(track.artist || '').toLowerCase().trim()}`;
+      const key = `${Math.round(track.duration ?? 0)}_${(track.artist ?? '').toLowerCase().trim()}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(track);
     }
