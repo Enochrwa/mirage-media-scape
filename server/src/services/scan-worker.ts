@@ -1,13 +1,10 @@
-import { parentPort, workerData } from 'worker_threads';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import { parentPort, workerData } from 'node:worker_threads';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
-import { createRequire } from 'node:module';
-import type { TrackMetadata, AudioAnalysis } from '../../zovyra-native';
-
-const requireNative = createRequire(__filename);
-const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
+import native from '../utils/native-loader.js';
+import type { TrackMetadata, AudioAnalysis } from '../../zovyra-native.js';
 
 const { dbPath, folders, coversDir } = workerData;
 const db = new Database(dbPath);
@@ -63,14 +60,12 @@ async function scan() {
       }
 
       db.prepare(
-        `
-        INSERT OR REPLACE INTO tracks (
+        `INSERT OR REPLACE INTO tracks (
           id, file_path, file_type, title, artist, album, album_artist,
           year, genre, track_number, disc_number, duration,
           sample_rate, bitrate, channels, cover_cache_path, thumbnail_path,
           last_modified, file_size, added_at, missing
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       ).run(
         id,
         filePath,
@@ -95,7 +90,7 @@ async function scan() {
       );
 
       const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
-      newTracks.push(track);
+      newTracks.push(track as Record<string, unknown>);
       scanned++;
 
       if (newTracks.length >= 20) {
@@ -139,11 +134,9 @@ async function scan() {
       try {
         const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
         db.prepare(
-          `
-          UPDATE tracks SET
+          `UPDATE tracks SET
             bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?
-          WHERE id = ?
-        `,
+          WHERE id = ?`,
         ).run(
           analysis.bpm,
           analysis.key,

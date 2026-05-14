@@ -1,11 +1,6 @@
-import Database from 'better-sqlite3';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+import type Database from 'better-sqlite3';
+import native from '../utils/native-loader.js';
 import type { Track } from '../types/database.js';
-
-const require = createRequire(import.meta.url);
-// Native addon must be loaded via require since it's a .node/.js CJS build
-const native = require('../../../native/index.js') as typeof import('../../zovyra-native.js');
 
 export class DuplicateFinderService {
   constructor(private db: Database.Database) {}

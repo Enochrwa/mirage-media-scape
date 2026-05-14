@@ -1,10 +1,7 @@
 import { Router } from 'express';
-import db from '../db';
-import { FingerprintService } from '../services/FingerprintService';
-import { createRequire } from 'node:module';
-
-const requireNative = createRequire(__filename);
-const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
+import db from '../db/index.js';
+import { FingerprintService } from '../services/FingerprintService.js';
+import native from '../utils/native-loader.js';
 
 const router = Router();
 
@@ -29,7 +26,7 @@ router.get('/sync/devices', (req, res) => {
   res.json({ data: devices });
 });
 
-router.get('/duplicates/groups', async (req, res) => {
+router.get('/duplicates/groups', async (_req, res) => {
   // Simplified duplicate detection logic would go here
   // typically joining on size/duration then verifying with native.generateWaveformFingerprint
   res.json({ data: [] });

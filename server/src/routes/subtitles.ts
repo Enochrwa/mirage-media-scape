@@ -1,9 +1,6 @@
 import { Router } from 'express';
-import { SubtitleService, SubtitleCue } from '../services/SubtitleService';
-import { createRequire } from 'node:module';
-
-const requireNative = createRequire(__filename);
-const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
+import { SubtitleService, type SubtitleCue } from '../services/SubtitleService.js';
+import native from '../utils/native-loader.js';
 
 const router = Router();
 

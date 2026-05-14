@@ -1,9 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import fetch from 'node-fetch';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const native = require('../../../native/index.js') as typeof import('../../zovyra-native.js');
+import native from '../utils/native-loader.js';
 
 interface AcoustidRelease {
   title?: string;
