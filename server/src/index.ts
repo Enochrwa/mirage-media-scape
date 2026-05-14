@@ -24,15 +24,21 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+// CORS configuration from environment
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
 const io = new Server(httpServer, {
-  cors: { origin: '*' },
+  cors: { origin: corsOrigins, credentials: true },
 });
 
 scannerService.setIo(io);
 setLibraryWatcherIo(io);
 refreshLibraryWatcherPaths();
 
-app.use(cors());
+app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json());
 
 // Initialize services

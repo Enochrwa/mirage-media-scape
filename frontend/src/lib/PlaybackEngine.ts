@@ -36,6 +36,7 @@ export class PlaybackEngine {
   private state: PlaybackState = 'IDLE';
   private currentTrackId: string | null = null;
   private currentEventId: string | null = null;
+  private playbackStartTime: number = 0;
   public sleepTimer: SleepTimer | null = null;
 
   private _abLoop: {
@@ -84,6 +85,12 @@ export class PlaybackEngine {
     el.crossOrigin = 'anonymous';
     const source = this.ctx.createMediaElementSource(el);
 
+    // Stats tracking: monitor media element events
+    el.addEventListener('play', () => this.handlePlay());
+    el.addEventListener('pause', () => this.handlePause());
+    el.addEventListener('ended', () => this.handleEnded());
+    el.addEventListener('error', (e) => this.handleError(e));
+
     // 1. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
     const types: BiquadFilterType[] = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
@@ -113,6 +120,11 @@ export class PlaybackEngine {
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
+    // If this load is replacing the active track (not preloading), report previous track as skipped
+    if (!startNext && this.currentEventId && this.currentTrackId) {
+      await this.reportPlaybackEnd(false, true);
+    }
+
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
@@ -266,6 +278,74 @@ export class PlaybackEngine {
 
   getAnalyser() {
     return this.analyser;
+  }
+
+  // Stats reporting handlers
+  private async handlePlay() {
+    if (!this.currentTrackId) return;
+    // Only report start event if we don't have an active event
+    if (!this.currentEventId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/stats/event/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackId: this.currentTrackId, source: 'player' }),
+        });
+        const { data } = await res.json();
+        this.currentEventId = data?.eventId;
+        this.playbackStartTime = Date.now();
+      } catch (e) {
+        console.error('Failed to report play start', e);
+      }
+    } else {
+      // Resume after pause - update playbackStartTime to account for pause duration?
+      // For simplicity, we treat resumes as continuing the same session
+    }
+  }
+
+  private async handlePause() {
+    // Don't report end yet - could be resume. Stats event end is sent on track switch or ended.
+    // This is handled by track change logic or explicit stop.
+  }
+
+  private async handleEnded() {
+    await this.reportPlaybackEnd(true, false);
+  }
+
+  private async handleError(_e: Event) {
+    await this.reportPlaybackEnd(false, true);
+  }
+
+  private async reportPlaybackEnd(completed: boolean, skipped: boolean) {
+    if (!this.currentEventId || !this.currentTrackId) return;
+    try {
+      const secondsPlayed = (Date.now() - this.playbackStartTime) / 1000;
+      await fetch(`${API_BASE}/api/stats/event/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: this.currentEventId,
+          secondsPlayed,
+          completed,
+          skipped,
+        }),
+      });
+    } catch (e) {
+      console.error('Failed to report play end', e);
+    } finally {
+      this.currentEventId = null;
+      this.currentTrackId = null;
+    }
+  }
+
+  // Call this when skipping to next track before natural end
+  async skipTrack() {
+    await this.reportPlaybackEnd(false, true);
+  }
+
+  // Call this when track ends naturally (also triggered by 'ended' event)
+  async completeTrack() {
+    await this.reportPlaybackEnd(true, false);
   }
 }
 

@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-export const API_BASE = 'http://localhost:3001';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

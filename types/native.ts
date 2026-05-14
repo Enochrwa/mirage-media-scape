@@ -109,3 +109,17 @@ export interface ScannedFile {
   mtime: number;
   size: number;
 }
+
+// Function declarations matching native/index.d.ts
+export declare function extractMetadata(path: string): TrackMetadata;
+export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void;
+export declare function getSubtitleTracks(path: string): SubtitleTrackInfo[];
+export declare function writeTags(path: string, tags: TagInput): void;
+export declare function probeHardwareCodecs(): HardwareCodecSupport;
+export declare function extractSubtitleStream(path: string, streamIndex: number): string;
+export declare function analyzeAudio(path: string): AudioAnalysis;
+export declare function computeReplayGain(paths: string[]): ReplayGainResult[];
+export declare function generateWaveform(path: string): number[];
+export declare function generateWaveformFingerprint(path: string): string;
+export declare function generateFingerprint(path: string): FingerprintResult;
+export declare function scanFolders(folders: string[]): ScannedFile[];

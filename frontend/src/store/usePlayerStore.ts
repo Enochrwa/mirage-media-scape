@@ -62,15 +62,9 @@ const store = create<PlayerState>((set, get) => ({
   abLoop: playbackEngine.abLoop,
 
   init: () => {
-    const savedQueue = localStorage.getItem('ZOVYRA_queue');
-    const savedIndex = localStorage.getItem('ZOVYRA_currentIndex');
-    if (savedQueue) {
-      try {
-        // queueManager.load(JSON.parse(savedQueue), parseInt(savedIndex || '0'));
-      } catch (e) {
-        console.error('Failed to restore queue', e);
-      }
-    }
+    queueManager.load();
+    // Queue state is now managed entirely by QueueManager
+    // Components can subscribe to queueManager changes via addListener
   },
 
   playFile: async (file: MediaFile) => {
@@ -101,6 +95,10 @@ const store = create<PlayerState>((set, get) => ({
   },
 
   nextTrack: async () => {
+    // Report current track as skipped if there is an active track
+    if (get().currentFile) {
+      await playbackEngine.skipTrack();
+    }
     const nextFile = await queueManager.smartNext();
     if (nextFile) {
       get().playFile(nextFile);
@@ -125,6 +123,8 @@ const store = create<PlayerState>((set, get) => ({
   setDuration: (duration: number) => set({ duration }),
   closePlayer: () => {
     get().pausePlayback();
+    // Report current track as skipped/stopped
+    playbackEngine.skipTrack();
     set({ currentFile: null });
   },
 }));

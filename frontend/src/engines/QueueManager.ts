@@ -8,6 +8,20 @@ export class QueueManager {
   private shuffleMode: 'off' | 'on' | 'smart' = 'off';
   private repeatMode: 'off' | 'one' | 'all' = 'off';
 
+  // Event emitter for state changes
+  private listeners: Array<() => void> = [];
+
+  addListener(listener: () => void) {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l());
+  }
+
   addToQueue(file: MediaFile, position: 'next' | 'last' = 'last') {
     if (position === 'next') {
       this.queue.splice(this.currentIndex + 1, 0, file);
@@ -15,18 +29,23 @@ export class QueueManager {
       this.queue.push(file);
     }
     this.save();
+    this.notify();
   }
 
   reorder(fromIndex: number, toIndex: number) {
     const [item] = this.queue.splice(fromIndex, 1);
     this.queue.splice(toIndex, 0, item);
     this.save();
+    this.notify();
   }
 
   remove(index: number) {
     this.queue.splice(index, 1);
-    if (index <= this.currentIndex) this.currentIndex--;
-    this.save();
+    if (index <= this.currentIndex) {
+      this.setCurrentIndex(Math.max(0, this.currentIndex - 1));
+    } else {
+      this.save();
+    }
   }
 
   removeDuplicates() {
@@ -38,17 +57,49 @@ export class QueueManager {
       return true;
     });
     this.save();
+    this.notify();
     return originalLen - this.queue.length;
+  }
+
+  load(): void {
+    try {
+      const savedQueue = localStorage.getItem('ZOVYRA_queue');
+      const savedIndex = localStorage.getItem('ZOVYRA_currentIndex');
+      if (savedQueue) {
+        this.queue = JSON.parse(savedQueue);
+      }
+      if (savedIndex) {
+        this.currentIndex = parseInt(savedIndex, 10);
+      }
+    } catch (e) {
+      console.error('Failed to restore queue', e);
+      this.queue = [];
+      this.currentIndex = -1;
+    }
+  }
+
+  getQueue(): MediaFile[] {
+    return [...this.queue];
+  }
+
+  getCurrentIndex(): number {
+    return this.currentIndex;
+  }
+
+  setCurrentIndex(index: number): void {
+    this.currentIndex = index;
+    this.save();
+    this.notify();
   }
 
   async smartNext(): Promise<MediaFile | null> {
     if (this.currentIndex < this.queue.length - 1) {
-      this.currentIndex++;
+      this.setCurrentIndex(this.currentIndex + 1);
       return this.queue[this.currentIndex];
     }
 
     if (this.repeatMode === 'all') {
-      this.currentIndex = 0;
+      this.setCurrentIndex(0);
       return this.queue[0];
     }
 
@@ -59,8 +110,7 @@ export class QueueManager {
         const { data } = await res.json();
         if (data && data.length > 0) {
           this.queue.push(...data);
-          this.currentIndex++;
-          this.save();
+          this.setCurrentIndex(this.currentIndex + 1);
           return data[0];
         }
       }
