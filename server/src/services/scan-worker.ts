@@ -9,6 +9,10 @@ import type { TrackMetadata, AudioAnalysis } from '../../zovyra-native.js';
 const { dbPath, folders, coversDir } = workerData;
 const db = new Database(dbPath);
 
+// Enable WAL on the worker-side connection for non-blocking writes
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+
 if (!fs.existsSync(coversDir)) {
   fs.mkdirSync(coversDir, { recursive: true });
 }
@@ -24,8 +28,9 @@ async function scan() {
   for (const file of allFiles) {
     const filePath = file.path;
     try {
+      // mtime from Rust is milliseconds (f64). Store as integer ms for comparison.
       const mtime = Math.floor(file.mtime);
-      const fileSize = file.size;
+      const fileSize = Number(file.size);
 
       const existing = db
         .prepare('SELECT last_modified, id, file_size FROM tracks WHERE file_path = ?')
@@ -40,11 +45,16 @@ async function scan() {
       }
 
       const metadata: TrackMetadata = native.extractMetadata(filePath);
-      const id = existing?.id || crypto.createHash('md5').update(filePath).digest('hex');
-      const fileType = metadata.hasVideo ? 'video' : 'audio';
+      const id = existing?.id ?? crypto.createHash('md5').update(filePath).digest('hex');
+
+      // fileType is "audio" | "video" — use it directly, never use a non-existent hasVideo field
+      const fileType = metadata.fileType === 'video' ? 'video' : 'audio';
+
+      // bitRate comes back as number | bigint from NAPI — coerce to number for SQLite
+      const bitRate = metadata.bitRate != null ? Number(metadata.bitRate) : null;
 
       let coverCachePath: string | null = null;
-      if (metadata.coverArtBytes) {
+      if (metadata.coverArtBytes && metadata.coverArtBytes.length > 0) {
         coverCachePath = path.join(coversDir, `${id}.jpg`);
         fs.writeFileSync(coverCachePath, Buffer.from(metadata.coverArtBytes));
       }
@@ -64,28 +74,30 @@ async function scan() {
           id, file_path, file_type, title, artist, album, album_artist,
           year, genre, track_number, disc_number, duration,
           sample_rate, bitrate, channels, cover_cache_path, thumbnail_path,
-          last_modified, file_size, added_at, missing
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+          last_modified, mtime, file_size, added_at, updated_at, missing
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       ).run(
         id,
         filePath,
         fileType,
-        metadata.title,
-        metadata.artist,
-        metadata.album,
-        metadata.albumArtist,
-        metadata.year,
-        metadata.genre,
-        metadata.trackNumber,
-        metadata.discNumber,
+        metadata.title ?? null,
+        metadata.artist ?? null,
+        metadata.album ?? null,
+        metadata.albumArtist ?? null,
+        metadata.year ?? null,
+        metadata.genre ?? null,
+        metadata.trackNumber ?? null,
+        metadata.discNumber ?? null,
         metadata.duration,
-        metadata.sampleRate,
-        metadata.bitRate,
-        metadata.channels,
+        metadata.sampleRate ?? null,
+        bitRate,
+        metadata.channels ?? null,
         coverCachePath,
         thumbnailPath,
         mtime,
+        mtime,
         fileSize,
+        Date.now(),
         Date.now(),
       );
 
@@ -123,19 +135,22 @@ async function scan() {
 
   parentPort?.postMessage({ type: 'SCAN_COMPLETE', scanned, total });
 
-  // Background analysis
+  // Background audio analysis — runs after the scan completes
   setImmediate(async () => {
     const unanalyzed = db
       .prepare(
-        'SELECT id, file_path FROM tracks WHERE bpm IS NULL AND file_type = "audio" AND missing = 0',
+        `SELECT id, file_path FROM tracks
+         WHERE bpm IS NULL AND file_type = 'audio' AND missing = 0`,
       )
       .all() as { id: string; file_path: string }[];
+
     for (const track of unanalyzed) {
       try {
         const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
         db.prepare(
           `UPDATE tracks SET
-            bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?
+            bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?,
+            updated_at = ?
           WHERE id = ?`,
         ).run(
           analysis.bpm,
@@ -143,9 +158,10 @@ async function scan() {
           analysis.camelotKey,
           analysis.energy,
           analysis.loudness,
+          Date.now(),
           track.id,
         );
-        // Add small delay to avoid CPU spike
+        // Small delay to avoid saturating the CPU
         await new Promise((r) => setTimeout(r, 50));
       } catch (_e) {
         console.error(`Analysis failed for ${track.file_path}`, _e);

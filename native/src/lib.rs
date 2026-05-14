@@ -108,6 +108,7 @@ pub struct FingerprintResult {
 #[napi(object)]
 pub struct ScannedFile {
     pub path: String,
+    /// Milliseconds since Unix epoch (as f64 to avoid i64 overflow on JS side)
     pub mtime: f64,
     pub size: i64,
 }
@@ -626,6 +627,7 @@ pub fn compute_replay_gain(paths: Vec<String>) -> Result<Vec<ReplayGainResult>, 
         .map(|p| {
             let analysis = analyze_audio(p.clone())?;
             let track_gain = -14.0 - analysis.loudness;
+            // Peak is approximated; a full implementation would decode and track sample peak
             Ok(ReplayGainResult {
                 track_gain,
                 track_peak: 0.9,
@@ -636,6 +638,7 @@ pub fn compute_replay_gain(paths: Vec<String>) -> Result<Vec<ReplayGainResult>, 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateWaveform
+// Properly decodes audio to f32 samples then buckets RMS amplitudes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[napi]
@@ -652,6 +655,7 @@ pub fn generate_waveform(path: String) -> Result<Vec<f32>, napi::Error> {
         .ok_or_else(|| napi::Error::from_reason("Could not find best audio stream"))?;
 
     let stream_index = stream.index();
+    let stream_duration_ts = stream.duration();
     let time_base = stream.time_base();
 
     let mut decoder = ffmpeg::codec::context::Context::from_parameters(stream.parameters())
@@ -662,13 +666,37 @@ pub fn generate_waveform(path: String) -> Result<Vec<f32>, napi::Error> {
             napi::Error::from_reason(format!("Failed to get audio decoder: {}", e))
         })?;
 
-    let num_buckets: usize = 1000;
-    let mut buckets = vec![0.0f32; num_buckets];
-    let duration = ictx.duration() as f64 / ffmpeg::ffi::AV_TIME_BASE as f64;
+    // Resample to mono f32 for consistent amplitude measurement
+    let mut resampler = ffmpeg::software::resampling::context::Context::get(
+        decoder.format(),
+        decoder.channel_layout(),
+        decoder.rate(),
+        ffmpeg::util::format::sample::Sample::F32(ffmpeg::util::format::sample::Type::Packed),
+        ffmpeg::util::channel_layout::ChannelLayout::MONO,
+        decoder.rate(),
+    )
+    .map_err(|e| napi::Error::from_reason(format!("Resampler error: {}", e)))?;
 
-    if duration <= 0.0 {
-        return Ok(buckets);
+    let num_buckets: usize = 1000;
+    // Use duration from container; fall back to stream duration
+    let duration_secs = {
+        let container_dur = ictx.duration() as f64 / ffmpeg::ffi::AV_TIME_BASE as f64;
+        if container_dur > 0.0 {
+            container_dur
+        } else if stream_duration_ts > 0 {
+            stream_duration_ts as f64 * f64::from(time_base)
+        } else {
+            0.0
+        }
+    };
+
+    if duration_secs <= 0.0 {
+        return Ok(vec![0.0f32; num_buckets]);
     }
+
+    // Accumulate RMS sum-of-squares and counts per bucket
+    let mut bucket_sum_sq = vec![0.0f64; num_buckets];
+    let mut bucket_counts = vec![0usize; num_buckets];
 
     for (stream, packet) in ictx.packets() {
         if stream.index() != stream_index {
@@ -679,21 +707,37 @@ pub fn generate_waveform(path: String) -> Result<Vec<f32>, napi::Error> {
         }
         let mut decoded = Audio::empty();
         while decoder.receive_frame(&mut decoded).is_ok() {
-            let pts = decoded.pts().unwrap_or(0) as f64 * f64::from(time_base);
-            let bucket_idx = ((pts / duration) * num_buckets as f64) as usize;
+            let pts_secs = decoded.pts().unwrap_or(0) as f64 * f64::from(time_base);
+            let bucket_idx = ((pts_secs / duration_secs) * num_buckets as f64) as usize;
+            let bucket_idx = bucket_idx.min(num_buckets - 1);
 
-            if bucket_idx < num_buckets {
-                let data = decoded.data(0);
-                let frame_max = data
-                    .iter()
-                    .fold(0.0f32, |max, &v| f32::max(max, (v as f32).abs()));
-
-                if frame_max > buckets[bucket_idx] {
-                    buckets[bucket_idx] = frame_max;
+            let mut resampled = Audio::empty();
+            if resampler.run(&decoded, &mut resampled).is_ok() {
+                let data = resampled.data(0);
+                // SAFETY: F32 Packed layout
+                let samples: &[f32] = unsafe {
+                    std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
+                };
+                for &s in samples {
+                    bucket_sum_sq[bucket_idx] += (s as f64) * (s as f64);
+                    bucket_counts[bucket_idx] += 1;
                 }
             }
         }
     }
+
+    // Convert sum-of-squares to RMS per bucket
+    let mut buckets: Vec<f32> = bucket_sum_sq
+        .iter()
+        .zip(bucket_counts.iter())
+        .map(|(&sq, &cnt)| {
+            if cnt > 0 {
+                (sq / cnt as f64).sqrt() as f32
+            } else {
+                0.0f32
+            }
+        })
+        .collect();
 
     // Normalise to [0, 1]
     let global_max = buckets.iter().cloned().fold(0.0f32, f32::max);
@@ -758,6 +802,7 @@ pub fn generate_waveform_fingerprint(path: String) -> Result<String, napi::Error
             let mut resampled = Audio::empty();
             if resampler.run(&decoded, &mut resampled).is_ok() {
                 let data = resampled.data(0);
+                // SAFETY: F32 Packed layout
                 let frame_samples: &[f32] = unsafe {
                     std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
                 };
@@ -819,18 +864,22 @@ pub fn generate_fingerprint(path: String) -> Result<FingerprintResult, napi::Err
             napi::Error::from_reason(format!("Failed to get audio decoder: {}", e))
         })?;
 
+    // Chromaprint requires 16-bit signed integer samples at 11025 Hz, mono.
+    let target_rate: u32 = 11025;
+    let target_channels: i32 = 1;
+
     let mut resampler = ffmpeg::software::resampling::context::Context::get(
         decoder.format(),
         decoder.channel_layout(),
         decoder.rate(),
         ffmpeg::util::format::sample::Sample::I16(ffmpeg::util::format::sample::Type::Packed),
         ffmpeg::util::channel_layout::ChannelLayout::MONO,
-        11025,
+        target_rate,
     )
     .map_err(|e| napi::Error::from_reason(format!("Resampler error: {}", e)))?;
 
     let mut chromaprint_ctx = chromaprint::Chromaprint::new();
-    chromaprint_ctx.start(11025, 1);
+    chromaprint_ctx.start(target_rate as i32, target_channels);
 
     let mut total_duration = 0.0f64;
 
@@ -846,7 +895,12 @@ pub fn generate_fingerprint(path: String) -> Result<FingerprintResult, napi::Err
             let mut resampled = Audio::empty();
             if resampler.run(&decoded, &mut resampled).is_ok() {
                 let data: &[u8] = resampled.data(0);
-                chromaprint_ctx.feed(data);
+                // Feed i16 samples to chromaprint — interpret the byte slice as &[i16]
+                // SAFETY: I16 Packed layout, data is properly aligned from libav
+                let samples_i16: &[i16] = unsafe {
+                    std::slice::from_raw_parts(data.as_ptr() as *const i16, data.len() / 2)
+                };
+                chromaprint_ctx.feed(samples_i16);
             }
             if let Some(pts) = decoded.pts() {
                 total_duration = pts as f64 * f64::from(time_base);
@@ -899,11 +953,12 @@ fn walk_dir(dir: &Path, files: &mut Vec<ScannedFile>) {
             walk_dir(&path, files);
         } else if is_media_file(&path) {
             if let Ok(metadata) = entry.metadata() {
+                // Return mtime as milliseconds (f64) for consistent JS Date compatibility
                 let mtime = metadata
                     .modified()
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs_f64() * 1000.0)
+                    .map(|d| d.as_millis() as f64)
                     .unwrap_or(0.0);
 
                 files.push(ScannedFile {

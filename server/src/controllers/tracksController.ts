@@ -58,7 +58,6 @@ export const streamTrack = (req: Request, res: Response): void => {
   const fileSize = stat.size;
   const range = req.headers.range;
 
-  // Detect MIME type from extension for better browser compatibility
   const ext = path.extname(filePath).toLowerCase();
   const mimeMap: Record<string, string> = {
     '.mp3': 'audio/mpeg',
@@ -234,7 +233,10 @@ export const getAlbumDetails = (req: Request, res: Response): void => {
   try {
     const album = db
       .prepare(
-        'SELECT album as name, artist, year, cover_cache_path as cover FROM tracks WHERE album = ? LIMIT 1',
+        `SELECT album as name, artist, year, cover_cache_path as cover
+         FROM tracks
+         WHERE album = ?
+         LIMIT 1`,
       )
       .get(id);
     if (!album) {
@@ -242,7 +244,11 @@ export const getAlbumDetails = (req: Request, res: Response): void => {
       return;
     }
     const tracks = db
-      .prepare('SELECT * FROM tracks WHERE album = ? ORDER BY disc_number ASC, track_number ASC')
+      .prepare(
+        `SELECT * FROM tracks
+         WHERE album = ?
+         ORDER BY disc_number ASC, track_number ASC`,
+      )
       .all(id);
     res.json({ album, tracks });
   } catch (e) {
@@ -288,8 +294,9 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
     return;
   }
 
-  // Resolve the compiled worker JS file relative to this file's location.
-  // In the compiled output: dist/src/controllers/ → dist/src/routes/waveform-worker.js
+  // In compiled output the tree is:
+  //   dist/src/controllers/tracksController.js  ← __dirname
+  //   dist/src/routes/waveform-worker.js        ← target
   const workerPath = path.resolve(__dirname, '../routes/waveform-worker.js');
 
   const worker = new Worker(workerPath, {
@@ -300,7 +307,7 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
     if (data.error) {
       res.status(500).json({ error: data.error });
     } else {
-      res.json({ peaks: data.peaks });
+      res.json({ peaks: data.peaks ?? [] });
     }
   });
 
