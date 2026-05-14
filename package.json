@@ -2,19 +2,26 @@
   "name": "zovyra-media-player-root",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "install:all": "npm install && cd frontend && npm install && cd ../server && npm install",
+    "install:all": "npm install && cd native && npm install && cd ../frontend && npm install && cd ../server && npm install",
+    "postinstall": "node scripts/check-native.js",
+    "predev": "node scripts/check-native.js",
+    "prebuild": "node scripts/check-native.js",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:server\"",
+    "dev": "concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"npm run dev:frontend\" \"npm run dev:server\"",
+    "build:native": "cd native && npm install && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "build:server": "cd server && npm run build",
-    "build": "npm run build:frontend && npm run build:server",
-    "lint": "cd frontend && npm run lint",
-    "test": "cd server && npm test"
+    "build": "npm run build:native && npm run build:server && npm run build:frontend",
+    "start": "concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"cd frontend && npm run preview\" \"cd server && npm start\"",
+    "lint": "cd frontend && npm run lint && cd ../server && npm run lint",
+    "test": "cd server && npm test",
+    "clean": "cd frontend && npm run clean; cd ../server && npm run clean; cd ../native && rm -f *.node",
+    "reinstall": "npm run clean && npm run install:all"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "typescript": "6.0.3"
+    "concurrently": "^8.2.2"
   }
 }
