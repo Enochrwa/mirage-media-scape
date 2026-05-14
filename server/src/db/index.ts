@@ -11,7 +11,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+const db: Database.Database = new Database(dbPath);
 
 // Enable WAL mode for high-performance concurrent access
 db.pragma('journal_mode = WAL');

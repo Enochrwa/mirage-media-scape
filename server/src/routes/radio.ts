@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import db from '../db';
-import { RadioService } from '../services/RadioService';
-import { UrlValidator } from '../utils/UrlValidator';
+import db from '../db/index.js';
+import { RadioService } from '../services/RadioService.js';
+import { UrlValidator } from '../utils/UrlValidator.js';
 import axios from 'axios';
 
 const router = Router();

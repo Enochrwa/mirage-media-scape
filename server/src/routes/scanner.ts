@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { scannerService, ScannerService } from '../services/scanner';
+import { scannerService, ScannerService } from '../services/scanner.js';
 
 const router = Router();
 export { scannerService };

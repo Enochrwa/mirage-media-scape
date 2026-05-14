@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { AIDJService } from '../services/AIDJService';
+import { AIDJService } from '../services/AIDJService.js';
 
 const router = Router();
-import db from '../db';
+import db from '../db/index.js';
 const djService = new AIDJService(db);
 
 router.post('/generate-intro', (req, res) => {

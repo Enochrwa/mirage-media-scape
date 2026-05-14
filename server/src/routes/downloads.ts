@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import db from '../db';
-import { DownloadManager } from '../services/DownloadManager';
+import db from '../db/index.js';
+import { DownloadManager } from '../services/DownloadManager.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';

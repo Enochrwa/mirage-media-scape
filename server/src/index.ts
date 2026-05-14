@@ -5,20 +5,20 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
-import tracksRouter from './routes/tracks';
-import scannerRouter, { scannerService } from './routes/scanner';
-import playlistsRouter from './routes/playlists';
-import statsRouter from './routes/stats';
-import radioRouter from './routes/radio';
-import subtitlesRouter from './routes/subtitles';
-import aidjRouter from './routes/ai-dj';
-import podcastsRouter from './routes/podcasts';
-import downloadsRouter from './routes/downloads';
-import maintenanceRouter from './routes/maintenance';
+import tracksRouter from './routes/tracks.js';
+import scannerRouter, { scannerService } from './routes/scanner.js';
+import playlistsRouter from './routes/playlists.js';
+import statsRouter from './routes/stats.js';
+import radioRouter from './routes/radio.js';
+import subtitlesRouter from './routes/subtitles.js';
+import aidjRouter from './routes/ai-dj.js';
+import podcastsRouter from './routes/podcasts.js';
+import downloadsRouter from './routes/downloads.js';
+import maintenanceRouter from './routes/maintenance.js';
 
-import { LocalSyncServer } from './services/LocalSyncServer';
-import { RemoteControlServer } from './services/RemoteControlServer';
-import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/LibraryWatcher';
+import { LocalSyncServer } from './services/LocalSyncServer.js';
+import { RemoteControlServer } from './services/RemoteControlServer.js';
+import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/LibraryWatcher.js';
 
 dotenv.config();
 

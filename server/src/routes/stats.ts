@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import db from '../db';
-import { StatsService } from '../services/StatsService';
-import { PlaybackEventService } from '../services/PlaybackEventService';
+import db from '../db/index.js';
+import { StatsService } from '../services/StatsService.js';
+import { PlaybackEventService } from '../services/PlaybackEventService.js';
 
 const router = Router();
 const statsService = new StatsService(db);

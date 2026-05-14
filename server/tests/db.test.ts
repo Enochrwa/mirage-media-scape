@@ -1,4 +1,4 @@
-import db from '../src/db';
+import db from '../src/db/index.js';
 
 describe('Database', () => {
   it('should have initialized the tracks table', () => {

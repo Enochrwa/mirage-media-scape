@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import db from '../db';
-import { PodcastService } from '../services/PodcastService';
+import db from '../db/index.js';
+import { PodcastService } from '../services/PodcastService.js';
 
 const router = Router();
 const podcastService = new PodcastService(db);

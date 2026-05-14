@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import db from '../db';
-import { SmartPlaylistService } from '../services/SmartPlaylistService';
+import db from '../db/index.js';
+import { SmartPlaylistService } from '../services/SmartPlaylistService.js';
 
 const router = Router();
 const smartService = new SmartPlaylistService(db);
