@@ -6,10 +6,10 @@
   "main": "dist/src/index.js",
   "scripts": {
     "start": "node dist/src/index.js",
-    "dev": "node --loader ts-node/esm src/index.ts",
-    "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db NODE_OPTIONS=--experimental-vm-modules jest",
+    "dev": "ts-node-dev --esm --respawn --transpile-only --exit-child src/index.ts",
     "build": "tsc",
     "lint": "eslint .",
+    "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db NODE_OPTIONS=--experimental-vm-modules jest",
     "clean": "rm -rf dist node_modules package-lock.json",
     "reinstall": "npm run clean && npm install"
   },
@@ -45,6 +45,7 @@
     "jest-util": "^29.7.0",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1"
   }
