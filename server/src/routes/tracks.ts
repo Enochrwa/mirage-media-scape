@@ -1,38 +1,77 @@
 import { Router } from 'express';
-import db from '../db';
-import { RecommendationService } from '../services/RecommendationService';
+import {
+  getAllTracks,
+  getInstantTracks,
+  getTrackById,
+  streamTrack,
+  searchTracks,
+  getRecommendations,
+  identifyTrack,
+  getDuplicateCandidates,
+  getTrackCover,
+  getTrackThumbnail,
+  getAlbumDetails,
+  updateTrackRating,
+  getTrackWaveform,
+} from '../controllers/tracksController.js';
+import db from '../db/index.js';
+import { RecommendationService } from '../services/RecommendationService.js';
 
 const router = Router();
 const recService = new RecommendationService(db);
 
-router.get('/tracks', (req, res) => {
-  const tracks = db.prepare("SELECT * FROM tracks WHERE missing = 0").all();
-  res.json({ data: tracks });
-});
+// ── Library listing ────────────────────────────────────────────────────────
+/** GET /api/tracks/instant — fast first-500 for initial render */
+router.get('/instant', getInstantTracks);
 
-router.get('/tracks/:id', (req, res) => {
-  const track = db.prepare("SELECT * FROM tracks WHERE id = ?").get(req.params.id);
-  res.json({ data: track });
-});
+/** GET /api/tracks — full library */
+router.get('/', getAllTracks);
 
-router.patch('/tracks/:id', (req, res) => {
-  const { rating } = req.body;
-  db.prepare("UPDATE tracks SET rating = ? WHERE id = ?").run(rating, req.params.id);
-  res.json({ data: { success: true } });
-});
+// ── Search ─────────────────────────────────────────────────────────────────
+/** GET /api/tracks/search?q=... */
+router.get('/search', searchTracks);
 
-router.get('/recommendations/:trackId', async (req, res) => {
-  const limit = parseInt(req.query.limit as string) || 20;
-  const recs = await recService.recommend(req.params.trackId, limit);
-  res.json({ data: recs });
-});
+// ── Streaming ──────────────────────────────────────────────────────────────
+/** GET /api/tracks/stream?path=... */
+router.get('/stream', streamTrack);
 
+// ── Duplicates ─────────────────────────────────────────────────────────────
+/** GET /api/tracks/duplicates */
+router.get('/duplicates', getDuplicateCandidates);
+
+// ── Mood recommendations ───────────────────────────────────────────────────
+/** GET /api/tracks/recommendations/mood?energy=&bpm=&limit= */
 router.get('/recommendations/mood', async (req, res) => {
   const energy = parseFloat(req.query.energy as string) || 0.5;
   const bpm = parseFloat(req.query.bpm as string) || 120;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const limit = parseInt(req.query.limit as string, 10) || 20;
   const recs = await recService.recommendByMood({ energy, bpm, limit });
   res.json({ data: recs });
 });
+
+// ── Per-track routes ───────────────────────────────────────────────────────
+/** GET /api/tracks/:id */
+router.get('/:id', getTrackById);
+
+/** PATCH /api/tracks/:id/rating */
+router.patch('/:id/rating', updateTrackRating);
+
+/** GET /api/tracks/:id/cover */
+router.get('/:id/cover', getTrackCover);
+
+/** GET /api/tracks/:id/thumbnail */
+router.get('/:id/thumbnail', getTrackThumbnail);
+
+/** GET /api/tracks/:id/waveform */
+router.get('/:id/waveform', getTrackWaveform);
+
+/** GET /api/tracks/:id/recommendations */
+router.get('/:id/recommendations', getRecommendations);
+
+/** POST /api/tracks/:id/identify */
+router.post('/:id/identify', identifyTrack);
+
+/** GET /api/tracks/album/:id */
+router.get('/album/:id', getAlbumDetails);
 
 export default router;

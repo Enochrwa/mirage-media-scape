@@ -1,45 +1,81 @@
 import { Request, Response } from 'express';
-import db from '../db';
+import db from '../db/index.js';
 import path from 'path';
 import fs from 'fs';
 import { Worker } from 'worker_threads';
-import { RecommendationService } from '../services/RecommendationService';
-import { FingerprintService } from '../services/FingerprintService';
-import { DuplicateFinderService } from '../services/DuplicateFinderService';
+import { fileURLToPath } from 'url';
+import { RecommendationService } from '../services/RecommendationService.js';
+import { FingerprintService } from '../services/FingerprintService.js';
+import { DuplicateFinderService } from '../services/DuplicateFinderService.js';
 
-export const getInstantTracks = (_req: Request, res: Response) => {
+// ESM-safe __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Library queries
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getInstantTracks = (_req: Request, res: Response): void => {
   const rows = db
     .prepare(
       `SELECT id, title, artist, album, duration, cover_cache_path,
-                    thumbnail_path, file_path, file_type, bpm, camelot_key,
-                    rating, play_count, missing
-             FROM tracks
-             WHERE missing = 0
-             ORDER BY added_at DESC
-             LIMIT 500`,
+              thumbnail_path, file_path, file_type, bpm, camelot_key,
+              rating, play_count, missing
+       FROM tracks
+       WHERE missing = 0
+       ORDER BY added_at DESC
+       LIMIT 500`,
     )
     .all();
   res.json(rows);
 };
 
-export const getAllTracks = (req: Request, res: Response) => {
-  const tracks = db.prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC').all();
+export const getAllTracks = (_req: Request, res: Response): void => {
+  const tracks = db
+    .prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC')
+    .all();
   res.json(tracks);
 };
 
-export const streamTrack = (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Streaming
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const streamTrack = (req: Request, res: Response): void => {
   const { path: filePath } = req.query;
   if (!filePath || typeof filePath !== 'string') {
-    return res.status(400).send('Path is required');
+    res.status(400).send('Path is required');
+    return;
   }
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).send('File not found');
+    res.status(404).send('File not found');
+    return;
   }
 
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
   const range = req.headers.range;
+
+  // Detect MIME type from extension for better browser compatibility
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeMap: Record<string, string> = {
+    '.mp3': 'audio/mpeg',
+    '.flac': 'audio/flac',
+    '.wav': 'audio/wav',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.ogg': 'audio/ogg',
+    '.opus': 'audio/ogg; codecs=opus',
+    '.wma': 'audio/x-ms-wma',
+    '.mp4': 'video/mp4',
+    '.mkv': 'video/x-matroska',
+    '.avi': 'video/x-msvideo',
+    '.mov': 'video/quicktime',
+    '.webm': 'video/webm',
+  };
+  const contentType = mimeMap[ext] ?? 'application/octet-stream';
 
   if (range) {
     const parts = range.replace(/bytes=/, '').split('-');
@@ -47,41 +83,43 @@ export const streamTrack = (req: Request, res: Response) => {
     const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
     const chunksize = end - start + 1;
     const file = fs.createReadStream(filePath, { start, end });
-    const head = {
+    res.writeHead(206, {
       'Content-Range': `bytes ${start}-${end}/${fileSize}`,
       'Accept-Ranges': 'bytes',
       'Content-Length': chunksize,
-      'Content-Type': 'audio/mpeg',
-    };
-    res.writeHead(206, head);
+      'Content-Type': contentType,
+    });
     file.pipe(res);
   } else {
-    const head = {
+    res.writeHead(200, {
       'Content-Length': fileSize,
-      'Content-Type': 'audio/mpeg',
-    };
-    res.writeHead(200, head);
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+    });
     fs.createReadStream(filePath).pipe(res);
   }
 };
 
-export const searchTracks = (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Search
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const searchTracks = (req: Request, res: Response): void => {
   const { q } = req.query;
   if (!q || typeof q !== 'string') {
-    return res.status(400).json({ error: 'Search query is required' });
+    res.status(400).json({ error: 'Search query is required' });
+    return;
   }
 
   try {
     const results = db
       .prepare(
-        `
-            SELECT t.*, bm25(tracks_fts) as rank
-            FROM tracks_fts f
-            JOIN tracks t ON t.id = f.id
-            WHERE tracks_fts MATCH ?
-            ORDER BY rank
-            LIMIT 50
-        `,
+        `SELECT t.*, bm25(tracks_fts) as rank
+         FROM tracks_fts f
+         JOIN tracks t ON t.id = f.id
+         WHERE tracks_fts MATCH ?
+         ORDER BY rank
+         LIMIT 50`,
       )
       .all(`${q}*`);
     res.json(results);
@@ -91,11 +129,16 @@ export const searchTracks = (req: Request, res: Response) => {
   }
 };
 
-export const getRecommendations = async (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Recommendations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const limit = parseInt(req.query.limit as string, 10) || 20;
     const recommendationService = new RecommendationService(db);
-    const recommendations = await recommendationService.recommend(id);
+    const recommendations = await recommendationService.recommend(id, limit);
     res.json(recommendations);
   } catch (error) {
     console.error('Recommendations error:', error);
@@ -103,22 +146,37 @@ export const getRecommendations = async (req: Request, res: Response) => {
   }
 };
 
-export const identifyTrack = async (req: Request, res: Response) => {
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
-    | { file_path: string }
-    | undefined;
-  if (!track) return res.status(404).json({ error: 'Track not found' });
+// ─────────────────────────────────────────────────────────────────────────────
+// Fingerprint / identify
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const identifyTrack = async (req: Request, res: Response): Promise<void> => {
+  const track = db
+    .prepare('SELECT file_path FROM tracks WHERE id = ?')
+    .get(req.params.id) as { file_path: string } | undefined;
+
+  if (!track) {
+    res.status(404).json({ error: 'Track not found' });
+    return;
+  }
 
   try {
     const metadata = await FingerprintService.identifyTrack(track.file_path, db);
-    if (!metadata) return res.status(404).json({ error: 'Could not identify track' });
+    if (!metadata) {
+      res.status(404).json({ error: 'Could not identify track' });
+      return;
+    }
     res.json(metadata);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
 };
 
-export const getDuplicateCandidates = async (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Duplicates
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getDuplicateCandidates = async (_req: Request, res: Response): Promise<void> => {
   try {
     const duplicateFinder = new DuplicateFinderService(db);
     const groups = await duplicateFinder.findDuplicates();
@@ -128,80 +186,117 @@ export const getDuplicateCandidates = async (req: Request, res: Response) => {
   }
 };
 
-export const getTrackCover = (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Cover / thumbnail
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getTrackCover = (req: Request, res: Response): void => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const row = db.prepare('SELECT cover_cache_path FROM tracks WHERE id = ?').get(id) as
-    | { cover_cache_path?: string }
-    | undefined;
-  if (!row?.cover_cache_path) {
-    return res.status(404).end();
-  }
-  if (!fs.existsSync(row.cover_cache_path)) {
-    return res.status(404).end();
+  const row = db
+    .prepare('SELECT cover_cache_path FROM tracks WHERE id = ?')
+    .get(id) as { cover_cache_path?: string } | undefined;
+
+  if (!row?.cover_cache_path || !fs.existsSync(row.cover_cache_path)) {
+    res.status(404).end();
+    return;
   }
   res.sendFile(path.resolve(row.cover_cache_path));
 };
 
-export const getTrackThumbnail = (req: Request, res: Response) => {
+export const getTrackThumbnail = (req: Request, res: Response): void => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const row = db.prepare('SELECT thumbnail_path FROM tracks WHERE id = ?').get(id) as
-    | { thumbnail_path?: string }
-    | undefined;
-  if (!row?.thumbnail_path) {
-    return res.status(404).end();
-  }
-  if (!fs.existsSync(row.thumbnail_path)) {
-    return res.status(404).end();
+  const row = db
+    .prepare('SELECT thumbnail_path FROM tracks WHERE id = ?')
+    .get(id) as { thumbnail_path?: string } | undefined;
+
+  if (!row?.thumbnail_path || !fs.existsSync(row.thumbnail_path)) {
+    res.status(404).end();
+    return;
   }
   res.sendFile(path.resolve(row.thumbnail_path));
 };
 
-export const getTrackById = (req: Request, res: Response) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Individual track / album
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getTrackById = (req: Request, res: Response): void => {
   const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(req.params.id);
   if (!track) {
-    return res.status(404).json({ error: 'Track not found' });
+    res.status(404).json({ error: 'Track not found' });
+    return;
   }
   res.json(track);
 };
 
-export const getAlbumDetails = (req: Request, res: Response) => {
+export const getAlbumDetails = (req: Request, res: Response): void => {
   const { id } = req.params;
   try {
-    const album = db.prepare('SELECT album as name, artist, year, cover_cache_path as cover FROM tracks WHERE album = ? LIMIT 1').get(id);
-    if (!album) return res.status(404).json({ error: 'Album not found' });
-
-    const tracks = db.prepare('SELECT * FROM tracks WHERE album = ? ORDER BY track_number ASC').all(id);
+    const album = db
+      .prepare(
+        'SELECT album as name, artist, year, cover_cache_path as cover FROM tracks WHERE album = ? LIMIT 1',
+      )
+      .get(id);
+    if (!album) {
+      res.status(404).json({ error: 'Album not found' });
+      return;
+    }
+    const tracks = db
+      .prepare('SELECT * FROM tracks WHERE album = ? ORDER BY disc_number ASC, track_number ASC')
+      .all(id);
     res.json({ album, tracks });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
 };
 
-export const updateTrackRating = (req: Request, res: Response) => {
+export const updateTrackRating = (req: Request, res: Response): void => {
   const { id } = req.params;
-  const { rating } = req.body;
+  const { rating } = req.body as { rating: unknown };
+
+  const ratingNum = Number(rating);
+  if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 5) {
+    res.status(400).json({ error: 'Rating must be an integer between 0 and 5' });
+    return;
+  }
+
   try {
-    db.prepare('UPDATE tracks SET rating = ? WHERE id = ?').run(rating, id);
+    const result = db
+      .prepare('UPDATE tracks SET rating = ? WHERE id = ?')
+      .run(ratingNum, id);
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Track not found' });
+      return;
+    }
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
 };
 
-export const getTrackWaveform = (req: Request, res: Response) => {
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
-    | { file_path: string }
-    | undefined;
+// ─────────────────────────────────────────────────────────────────────────────
+// Waveform (Worker thread)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getTrackWaveform = (req: Request, res: Response): void => {
+  const track = db
+    .prepare('SELECT file_path FROM tracks WHERE id = ?')
+    .get(req.params.id) as { file_path: string } | undefined;
 
   if (!track) {
-    return res.status(404).json({ error: 'Track not found' });
+    res.status(404).json({ error: 'Track not found' });
+    return;
   }
 
-  const worker = new Worker(path.resolve(__dirname, '../routes/waveform-worker.js'), {
+  // Resolve the compiled worker JS file relative to this file's location.
+  // In the compiled output: dist/src/controllers/ → dist/src/routes/waveform-worker.js
+  const workerPath = path.resolve(__dirname, '../routes/waveform-worker.js');
+
+  const worker = new Worker(workerPath, {
     workerData: { filePath: track.file_path, dbPath: db.name },
   });
 
-  worker.on('message', (data) => {
+  worker.once('message', (data: { peaks?: number[]; error?: string }) => {
     if (data.error) {
       res.status(500).json({ error: data.error });
     } else {
@@ -209,14 +304,14 @@ export const getTrackWaveform = (req: Request, res: Response) => {
     }
   });
 
-  worker.on('error', (error) => {
-    console.error('Worker error:', error);
+  worker.once('error', (error) => {
+    console.error('Waveform worker error:', error);
     res.status(500).json({ error: 'Internal worker error' });
   });
 
-  worker.on('exit', (code) => {
+  worker.once('exit', (code) => {
     if (code !== 0) {
-      console.error(`Worker stopped with exit code ${code}`);
+      console.error(`Waveform worker exited with code ${code}`);
     }
   });
 };

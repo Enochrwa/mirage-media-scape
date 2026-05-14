@@ -23,13 +23,16 @@ export interface AudioMetadata {
   energy?: number
   danceability?: number
 }
+
 export interface SubtitleTrackInfo {
   index: number
   codec: string
   language?: string
   title?: string
 }
+
 export interface TrackMetadata {
+  // ── tags ──────────────────────────────────────────────────────────────
   title?: string
   artist?: string
   albumArtist?: string
@@ -43,41 +46,95 @@ export interface TrackMetadata {
   comment?: string
   copyright?: string
   encoder?: string
+  lyrics?: string
+  syncedLyrics?: string
+
+  // ── stream info ────────────────────────────────────────────────────────
   duration: number
   sampleRate?: number
   bitRate?: number
   channels?: number
+  /** Primary audio codec name (e.g. "aac", "mp3") */
   codecName?: string
+  /** "audio" | "video" */
   fileType: string
+
+  // ── video-specific ─────────────────────────────────────────────────────
   width?: number
   height?: number
   frameRate?: number
   videoCodec?: string
   audioCodec?: string
+
+  // ── cover art ──────────────────────────────────────────────────────────
   coverArtBytes?: Array<number>
+  dominantColor?: string
+
+  // ── ReplayGain tags ────────────────────────────────────────────────────
   replaygainTrackGain?: number
   replaygainAlbumGain?: number
   replaygainTrackPeak?: number
   replaygainAlbumPeak?: number
-  lyrics?: string
-  syncedLyrics?: string
-  dominantColor?: string
 }
-export declare function extractMetadata(path: string): TrackMetadata
-export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void
-export declare function getSubtitleTracks(path: string): Array<SubtitleTrackInfo>
-export declare function extractSubtitleStream(path: string, streamIndex: number): string
-export declare function analyzeAudio(path: string): AudioMetadata
-export declare function generateWaveform(path: string): Array<number>
-export declare function generateWaveformFingerprint(path: string): string
+
+export interface AudioAnalysis {
+  bpm: number
+  key: string
+  camelotKey: string
+  energy: number
+  loudness: number
+}
+
+export interface ReplayGainResult {
+  trackGain: number
+  trackPeak: number
+}
+
+export interface SubtitleTrack {
+  index: number
+  codecName: string
+  language?: string
+  title?: string
+}
+
+export interface TagInput {
+  title?: string
+  artist?: string
+  album?: string
+  albumArtist?: string
+  year?: number
+  genre?: string
+  trackNumber?: number
+  discNumber?: number
+}
+
+export interface HardwareCodecSupport {
+  h264: boolean
+  hevc: boolean
+  av1: boolean
+  vp9: boolean
+}
+
 export interface FingerprintResult {
   fingerprint: string
   duration: number
 }
-export declare function generateFingerprint(path: string): FingerprintResult
+
 export interface ScannedFile {
   path: string
   mtime: number
   size: number
 }
+
+export declare function extractMetadata(path: string): TrackMetadata
+export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void
+export declare function getSubtitleTracks(path: string): Array<SubtitleTrack>
+export declare function writeTags(path: string, tags: TagInput): void
+export declare function probeHardwareCodecs(): HardwareCodecSupport
+export declare function extractSubtitleStream(path: string, streamIndex: number): string
+export declare function analyzeAudio(path: string): AudioAnalysis
+export declare function computeReplayGain(paths: Array<string>): Array<ReplayGainResult>
+export declare function generateWaveform(path: string): Array<number>
+export declare function generateWaveformFingerprint(path: string): string
+export declare function generateFingerprint(path: string): FingerprintResult
 export declare function scanFolders(folders: Array<string>): Array<ScannedFile>
