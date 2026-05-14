@@ -45,6 +45,7 @@ import { SubtitleCue, parseSRT } from '@/lib/utils';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
 import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
+import { MediaFile } from '@/types/media';
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -136,7 +137,7 @@ const VideoPlayer: React.FC = () => {
     currentFile,
     setCurrentTime: updateCurrentTime,
     setDuration: updateDuration,
-    playbackEngine,
+    playbackEngine: pe,
   } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -394,17 +395,17 @@ const VideoPlayer: React.FC = () => {
   };
 
   const toggleLoop = () => {
-    playbackEngine.abLoop.toggle();
-    setIsLooping(playbackEngine.abLoop.isActive);
+    pe.abLoop.toggle();
+    setIsLooping(pe.abLoop.isActive);
   };
 
   const setPointA = () => {
-    playbackEngine.abLoop.setA(currentTime);
-    setIsLooping(playbackEngine.abLoop.isActive);
+    pe.abLoop.setA(currentTime);
+    setIsLooping(pe.abLoop.isActive);
   };
   const setPointB = () => {
-    playbackEngine.abLoop.setB(currentTime);
-    setIsLooping(playbackEngine.abLoop.isActive);
+    pe.abLoop.setB(currentTime);
+    setIsLooping(pe.abLoop.isActive);
   };
 
   const handleSubtitleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -470,7 +471,6 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const engine = playbackEngine;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;
@@ -478,10 +478,10 @@ const VideoPlayer: React.FC = () => {
       updateCurrentTime(time);
 
       // Handle A-B Loop
-      if (engine && engine.abLoop) {
-        engine.abLoop.check(time, (seekTo: number) => {
-          video.currentTime = seekTo;
-        });
+      if (pe.abLoop.isActive && pe.abLoop.pointA !== null && pe.abLoop.pointB !== null) {
+        if (time >= pe.abLoop.pointB) {
+          video.currentTime = pe.abLoop.pointA;
+        }
       }
 
       // Handle Subtitles
@@ -505,7 +505,7 @@ const VideoPlayer: React.FC = () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [playbackEngine, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
+  }, [pe, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">
@@ -873,9 +873,7 @@ const VideoPlayer: React.FC = () => {
                           onClick={setPointA}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            playbackEngine.abLoop.pointA !== null
-                              ? 'text-purple-400'
-                              : 'text-white/40',
+                            pe.abLoop.pointA !== null ? 'text-purple-400' : 'text-white/40',
                           )}
                         >
                           A
@@ -884,19 +882,14 @@ const VideoPlayer: React.FC = () => {
                           onClick={setPointB}
                           className={cn(
                             'rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                            playbackEngine.abLoop.pointB !== null
-                              ? 'text-purple-400'
-                              : 'text-white/40',
+                            pe.abLoop.pointB !== null ? 'text-purple-400' : 'text-white/40',
                           )}
                         >
                           B
                         </button>
                         <button
                           onClick={toggleLoop}
-                          disabled={
-                            playbackEngine.abLoop.pointA === null ||
-                            playbackEngine.abLoop.pointB === null
-                          }
+                          disabled={pe.abLoop.pointA === null || pe.abLoop.pointB === null}
                           className={cn(
                             'rounded-full p-1.5 transition-all',
                             isLooping ? 'text-purple-400' : 'text-white/60 disabled:opacity-30',
@@ -986,7 +979,7 @@ const VideoPlayer: React.FC = () => {
                         onClick={() => {
                           if (!currentFile) return;
                           const link = document.createElement('a');
-                          link.href = currentFile.file;
+                          link.href = currentFile.file ?? '';
                           link.download = `${currentFile.title}.mp4`;
                           link.click();
                         }}
@@ -1016,11 +1009,11 @@ const VideoPlayer: React.FC = () => {
           </div>
 
           {/* Loading Spinner */}
-          {!videoRef.current?.readyState && (
+          {!videoRef.current?.readyState || videoRef.current?.readyState < 2 ? (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white sm:h-12 sm:w-12" />
             </div>
-          )}
+          ) : null}
 
           {/* Gesture Indicators */}
           {gestureControl && (
@@ -1072,7 +1065,7 @@ const VideoPlayer: React.FC = () => {
               </div>
             )}
 
-            {Object.values(hwDecodeSupported).some(v => v) && (
+            {Object.values(hwDecodeSupported).some((v) => v) && (
               <div className="flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-1 text-xs text-green-400 backdrop-blur-sm sm:px-3">
                 <Zap size={10} />
                 <span className="hidden sm:inline">HW Decode</span>

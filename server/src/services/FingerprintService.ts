@@ -1,84 +1,44 @@
+import { Database } from 'better-sqlite3';
+import fetch from 'node-fetch';
 import { createRequire } from 'node:module';
-import db from '../db';
 
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as {
-  generateFingerprint: (path: string) => { fingerprint: string; duration: number };
-};
-
-interface AcoustIDResult {
-  title: string;
-  artist: string;
-  album?: string;
-  year?: number;
-  mbid: string;
-}
-
-interface AcoustIDResponse {
-  status: string;
-  results: {
-    recordings?: {
-      id: string;
-      title: string;
-      artists?: { name: string }[];
-      releases?: {
-        title: string;
-        date?: { year: number };
-      }[];
-    }[];
-  }[];
-}
+const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
 
 export class FingerprintService {
-  private static ACOUSTID_API_KEY = process.env.ACOUSTID_API_KEY || '8SdaK5z89M'; // Free demo key or user provided
+  private static ACOUSTID_CLIENT_KEY = process.env.ACOUSTID_CLIENT_KEY || '8XaZ6ST0';
 
-  static async identifyTrack(filePath: string): Promise<AcoustIDResult | null> {
-    try {
-      // 1. Generate fingerprint using Rust native module
-      const { fingerprint, duration } = native.generateFingerprint(filePath);
+  static async identifyTrack(path: string, db: Database) {
+    const { fingerprint, duration } = native.generateFingerprint(path);
 
-      // 2. Check local cache
-      const cached = db
-        .prepare('SELECT result FROM fingerprint_cache WHERE fingerprint = ?')
-        .get(fingerprint) as { result: string } | undefined;
-      if (cached) return JSON.parse(cached.result) as AcoustIDResult;
+    // Check cache
+    const cached = db.prepare('SELECT result FROM fingerprint_cache WHERE fingerprint = ?').get(fingerprint) as { result: string };
+    if (cached) return JSON.parse(cached.result);
 
-      // 3. Query AcoustID API
-      const url = `https://api.acoustid.org/v2/lookup?client=${this.ACOUSTID_API_KEY}&fingerprint=${fingerprint}&duration=${Math.round(duration)}&meta=recordings+releases+tracks`;
-      const response = await fetch(url);
+    const url = `https://api.acoustid.org/v2/lookup?client=${this.ACOUSTID_CLIENT_KEY}&fingerprint=${fingerprint}&duration=${Math.floor(duration)}&meta=recordings+releases+tracks+compress`;
+    const res = await fetch(url);
+    const data = await res.json() as any;
 
-      if (!response.ok) throw new Error('AcoustID API request failed');
+    if (data.status === 'ok' && data.results.length > 0) {
+      const topResult = data.results[0].recordings?.[0];
+      if (topResult) {
+        const metadata = {
+          title: topResult.title,
+          artist: topResult.artists?.[0]?.name,
+          album: topResult.releases?.[0]?.title,
+          year: topResult.releases?.[0]?.date?.year,
+          mbid: topResult.id
+        };
 
-      const data = (await response.json()) as AcoustIDResponse;
-      const result = this.parseAcoustID(data);
+        db.prepare(`
+          INSERT INTO fingerprint_cache (fingerprint, result, fetched_at)
+          VALUES (?, ?, ?)
+        `).run(fingerprint, JSON.stringify(metadata), Math.floor(Date.now() / 1000));
 
-      // 4. Cache result
-      if (result) {
-        db.prepare(
-          'INSERT OR REPLACE INTO fingerprint_cache (fingerprint, result, fetched_at) VALUES (?, ?, ?)',
-        ).run(fingerprint, JSON.stringify(result), Date.now());
+        return metadata;
       }
-
-      return result;
-    } catch (error) {
-      console.error('Fingerprinting failed:', error);
-      return null;
     }
-  }
 
-  private static parseAcoustID(data: AcoustIDResponse): AcoustIDResult | null {
-    if (data.status !== 'ok' || !data.results || data.results.length === 0) return null;
-
-    const bestResult = data.results[0];
-    const recording = bestResult.recordings?.[0];
-    if (!recording) return null;
-
-    return {
-      title: recording.title,
-      artist: recording.artists?.[0]?.name || 'Unknown Artist',
-      album: recording.releases?.[0]?.title,
-      year: recording.releases?.[0]?.date?.year,
-      mbid: recording.id,
-    };
+    return null;
   }
 }

@@ -689,33 +689,33 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         <TooltipProvider>
           {collapsed ? (
             <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <SidebarItem
-                    icon={<Settings size={20} />}
-                    label=""
-                    active={view === 'settings'}
-                    to="/settings"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">{t('Settings')}</TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <SidebarItem
+                      icon={<Settings size={20} />}
+                      label=""
+                      active={view === 'settings'}
+                      to="/settings"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">{t('Settings')}</TooltipContent>
+              </Tooltip>
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <SidebarItem
-                        icon={<Mic size={20} />}
-                        label=""
-                        active={location.pathname === '/podcasts'}
-                        to="/podcasts"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Podcasts</TooltipContent>
-                </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <SidebarItem
+                      icon={<Mic size={20} />}
+                      label=""
+                      active={location.pathname === '/podcasts'}
+                      to="/podcasts"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">Podcasts</TooltipContent>
+              </Tooltip>
             </>
           ) : (
             <SidebarItem

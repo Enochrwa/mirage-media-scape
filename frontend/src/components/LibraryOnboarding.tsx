@@ -96,7 +96,8 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
         <div className="max-w-md space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight">Reconnect Library</h2>
           <p className="text-sm text-muted-foreground">
-            Your previously selected library folders need re-authorization to be accessed in this session.
+            Your previously selected library folders need re-authorization to be accessed in this
+            session.
           </p>
         </div>
         <Button
@@ -105,7 +106,7 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
           disabled={busy !== null}
           onClick={() => void handleReconnect()}
         >
-          {busy === 'reconnect' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          {busy === 'reconnect' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Reconnect Library
         </Button>
       </div>
@@ -161,17 +162,17 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
             {selectedFolders.map((folder, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 text-left"
+                className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-left"
               >
-                <Folder className="w-5 h-5 text-primary" />
-                <span className="flex-1 font-medium text-sm truncate">{folder}</span>
-                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <Folder className="h-5 w-5 text-primary" />
+                <span className="flex-1 truncate text-sm font-medium">{folder}</span>
+                <CheckCircle2 className="h-4 w-4 text-primary" />
               </div>
             ))}
           </div>
           <div className="flex flex-col gap-3">
             <Button size="lg" disabled={busy !== null} onClick={() => void startScan()}>
-              {busy === 'folder' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {busy === 'folder' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Begin Scan
             </Button>
             <Button

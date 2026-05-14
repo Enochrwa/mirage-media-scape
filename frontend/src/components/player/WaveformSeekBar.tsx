@@ -8,10 +8,17 @@ interface WaveformSeekBarProps {
 }
 
 export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) => {
-  const { currentTime, duration, playbackEngine, currentFile } = usePlayerStore();
-  const isStream = currentFile?.file.includes('stream') || !duration || duration === Infinity;
+  const {
+    currentTime,
+    duration,
+    currentFile,
+    playbackEngine: pe,
+    abLoop: engineABLoop,
+  } = usePlayerStore();
+  const isStream =
+    (currentFile?.file ?? '').includes('stream') || !duration || duration === Infinity;
   const [hoverTime, setHoverTime] = useState<number | null>(null);
-  const [abLoop, setABLoop] = useState({
+  const [localABLoop, setLocalABLoop] = useState({
     pointA: null as number | null,
     pointB: null as number | null,
     isActive: false,
@@ -33,16 +40,17 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
   useEffect(() => {
     const checkLoop = setInterval(() => {
-      if (playbackEngine?.abLoop) {
-        setABLoop({
-          pointA: playbackEngine.abLoop.pointA,
-          pointB: playbackEngine.abLoop.pointB,
-          isActive: playbackEngine.abLoop.isActive,
+      const { abLoop: engineAbLoop } = usePlayerStore.getState();
+      if (engineAbLoop) {
+        setLocalABLoop({
+          pointA: engineAbLoop.pointA,
+          pointB: engineAbLoop.pointB,
+          isActive: engineAbLoop.isActive,
         });
       }
     }, 100);
     return () => clearInterval(checkLoop);
-  }, [playbackEngine]);
+  }, []);
 
   useEffect(() => {
     if (currentFile?.metadata_json) {
@@ -66,31 +74,30 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
       switch (e.key) {
         case '[':
-          playbackEngine.abLoop.setA(currentTime);
+          pe.abLoop.setA(currentTime);
           break;
         case ']':
-          playbackEngine.abLoop.setB(currentTime);
+          pe.abLoop.setB(currentTime);
           break;
         case '\\':
-          playbackEngine.abLoop.toggle();
+          pe.abLoop.toggle();
           break;
         case 'ArrowLeft':
-          playbackEngine.resume();
-          playbackEngine.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 5)));
+          pe.resume();
+          pe.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 5)));
           break;
         case 'ArrowRight':
-          playbackEngine.resume();
-          playbackEngine.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 5)));
+          pe.resume();
+          pe.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 5)));
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTime, playbackEngine, duration]);
+  }, [currentTime, duration, pe]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -129,20 +136,20 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     }
 
     // A/B Loop Shading
-    if (abLoop.pointA !== null && abLoop.pointB !== null) {
-      const xA = (abLoop.pointA / duration) * width;
-      const xB = (abLoop.pointB / duration) * width;
+    if (localABLoop.pointA !== null && localABLoop.pointB !== null) {
+      const xA = (localABLoop.pointA / duration) * width;
+      const xB = (localABLoop.pointB / duration) * width;
       ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
       ctx.fillRect(xA, 0, xB - xA, height);
     }
 
     // Chapter markers
-    chapters.forEach(chapter => {
+    chapters.forEach((chapter) => {
       const x = (chapter.time / duration) * width;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.fillRect(x - 1, 0, 2, height);
     });
-  }, [peaks, currentTime, duration, hoverTime, abLoop, chapters]);
+  }, [peaks, currentTime, duration, hoverTime, localABLoop, chapters]);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
@@ -157,8 +164,8 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     // Check if clicking near A or B markers
     const clickThreshold = 0.02; // 2% of width
     const progressPos = currentTime / duration;
-    const aPos = abLoop.pointA !== null ? abLoop.pointA / duration : -1;
-    const bPos = abLoop.pointB !== null ? abLoop.pointB / duration : -1;
+    const aPos = localABLoop.pointA !== null ? localABLoop.pointA / duration : -1;
+    const bPos = localABLoop.pointB !== null ? localABLoop.pointB / duration : -1;
 
     if (Math.abs(position - aPos) < clickThreshold) {
       setDragMarker('A');
@@ -166,7 +173,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       setDragMarker('B');
     } else {
       setDragMarker('progress');
-      playbackEngine.seek(targetTime);
+      pe.seek(targetTime);
     }
     setIsDragging(true);
   };
@@ -183,14 +190,14 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
     if (isDragging && dragMarker) {
       if (dragMarker === 'A') {
-        playbackEngine.abLoop.setA(targetTime);
+        pe.abLoop.setA(targetTime);
       } else if (dragMarker === 'B') {
-        playbackEngine.abLoop.setB(targetTime);
+        pe.abLoop.setB(targetTime);
       } else if (dragMarker === 'progress') {
         const now = Date.now();
         if (now - lastPreviewTime.current > 300) {
-           playbackEngine.preview(targetTime);
-           lastPreviewTime.current = now;
+          pe.preview(targetTime);
+          lastPreviewTime.current = now;
         }
       }
     }
@@ -209,16 +216,16 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex justify-between text-xs font-mono text-muted-foreground">
+      <div className="flex justify-between font-mono text-xs text-muted-foreground">
         <span>{formatTime(currentTime)}</span>
         <div className="flex items-center gap-2">
           {isStream && (
-            <div className="flex items-center gap-1 bg-red-500/20 text-red-500 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <div className="flex animate-pulse items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-500">
+              <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
               LIVE
             </div>
           )}
-          <span className="text-foreground font-bold">
+          <span className="font-bold text-foreground">
             {hoverTime !== null ? formatTime(hoverTime) : ''}
           </span>
         </div>
@@ -227,10 +234,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
       <div
         ref={containerRef}
-        className={cn(
-          'relative h-16 w-full group',
-          isStream ? 'cursor-default' : 'cursor-pointer',
-        )}
+        className={cn('group relative h-16 w-full', isStream ? 'cursor-default' : 'cursor-pointer')}
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -244,29 +248,29 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* Scrubber Handle */}
         {!isStream && (
           <div
-            className="absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-75 pointer-events-none"
+            className="pointer-events-none absolute bottom-0 top-0 w-1 bg-white shadow-lg transition-all duration-75"
             style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
           />
         )}
 
         {/* A/B Markers */}
-        {abLoop.pointA !== null && (
+        {localABLoop.pointA !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
             style={{
-                left: `${(abLoop.pointA / duration) * 100}%`,
-                transform: 'translateX(-50%)',
-                borderTopColor: '#00FFFF'
+              left: `${(localABLoop.pointA / duration) * 100}%`,
+              transform: 'translateX(-50%)',
+              borderTopColor: '#00FFFF',
             }}
           />
         )}
-        {abLoop.pointB !== null && (
+        {localABLoop.pointB !== null && (
           <div
-            className="absolute -top-1 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent cursor-ew-resize z-20"
+            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
             style={{
-                left: `${(abLoop.pointB / duration) * 100}%`,
-                transform: 'translateX(-50%)',
-                borderTopColor: '#FF8C00'
+              left: `${(localABLoop.pointB / duration) * 100}%`,
+              transform: 'translateX(-50%)',
+              borderTopColor: '#FF8C00',
             }}
           />
         )}

@@ -18,6 +18,7 @@ interface TopTrack {
   title: string;
   artist: string;
   play_count: number;
+  file?: string;
 }
 
 interface HistoryEntry {
@@ -26,6 +27,7 @@ interface HistoryEntry {
   artist?: string | null;
   cover_cache_path?: string | null;
   started_at: string;
+  file?: string;
 }
 
 interface HeatmapEntry {
@@ -37,22 +39,24 @@ interface HeatmapEntry {
 const Heatmap: React.FC<{ data: HeatmapEntry[] }> = ({ data }) => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
 
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[600px] space-y-2">
         <div className="flex">
-            <div className="w-10" />
-            {hours.map(h => (
-                <div key={h} className="flex-1 text-[8px] text-zinc-500 text-center">{h}</div>
-            ))}
+          <div className="w-10" />
+          {hours.map((h) => (
+            <div key={h} className="flex-1 text-center text-[8px] text-zinc-500">
+              {h}
+            </div>
+          ))}
         </div>
         {days.map((day, di) => (
           <div key={day} className="flex items-center gap-1">
             <div className="w-10 text-[10px] font-bold text-zinc-400">{day}</div>
-            {hours.map(hour => {
-              const entry = data.find(d => parseInt(d.day) === di && parseInt(d.hour) === hour);
+            {hours.map((hour) => {
+              const entry = data.find((d) => parseInt(d.day) === di && parseInt(d.hour) === hour);
               const count = entry?.count || 0;
               const intensity = count / maxCount;
               return (
@@ -176,7 +180,19 @@ const StatsPage = () => {
                 <div
                   key={track.id}
                   className="group flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                  onClick={() => playFile(track as unknown as MediaFile)}
+                  onClick={() => {
+                    const mf: MediaFile = {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist ?? undefined,
+                      file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
+                      type: 'audio',
+                      cover: track.cover_cache_path
+                        ? `${API_BASE}/api/tracks/cover/${track.id}`
+                        : undefined,
+                    };
+                    playFile(mf);
+                  }}
                 >
                   <span className="w-6 text-xl font-bold text-zinc-600">{i + 1}</span>
                   <img
@@ -208,7 +224,19 @@ const StatsPage = () => {
                 <div
                   key={`${track.id}-${track.started_at}`}
                   className="flex cursor-pointer items-center gap-4 rounded-lg bg-white/5 p-3 transition-colors hover:bg-white/10"
-                  onClick={() => playFile(track as unknown as MediaFile)}
+                  onClick={() => {
+                    const mf: MediaFile = {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist ?? undefined,
+                      file: track.file ?? `${API_BASE}/api/tracks/stream?path=${track.id}`,
+                      type: 'audio',
+                      cover: track.cover_cache_path
+                        ? `${API_BASE}/api/tracks/cover/${track.id}`
+                        : undefined,
+                    };
+                    playFile(mf);
+                  }}
                 >
                   <img
                     src={track.cover_cache_path ?? '/placeholder.svg'}

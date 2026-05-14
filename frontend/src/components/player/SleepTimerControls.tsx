@@ -6,25 +6,26 @@ import { Input } from '@/components/ui/input';
 import { Moon, X } from 'lucide-react';
 
 export const SleepTimerControls: React.FC = () => {
-  const { playbackEngine } = usePlayerStore();
-  const [state, setState] = useState(playbackEngine?.sleepTimer?.getState());
+  const { playbackEngine: pe, currentFile } = usePlayerStore();
+  const sleepTimer = pe?.sleepTimer;
+  const [state, setState] = useState(sleepTimer?.getState?.());
   const [customMinutes, setCustomMinutes] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setState(playbackEngine?.sleepTimer?.getState());
+      setState(sleepTimer?.getState?.());
     }, 1000);
     return () => clearInterval(interval);
-  }, [playbackEngine]);
+  }, [sleepTimer]);
 
   const setTimer = (mins: number) => {
-    playbackEngine?.sleepTimer?.set(mins);
-    setState(playbackEngine?.sleepTimer?.getState());
+    sleepTimer?.set(mins);
+    setState(sleepTimer?.getState?.());
   };
 
   const cancelTimer = () => {
-    playbackEngine?.sleepTimer?.clear();
-    setState(playbackEngine?.sleepTimer?.getState());
+    sleepTimer?.clear();
+    setState(sleepTimer?.getState?.());
   };
 
   const formatTime = (seconds: number) => {
@@ -39,7 +40,7 @@ export const SleepTimerControls: React.FC = () => {
         <Button variant="ghost" size="icon" className="relative">
           <Moon className="h-5 w-5" />
           {state?.active && (
-            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] px-1 rounded-full">
+            <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
               {Math.ceil(state.remainingSeconds / 60)}
             </span>
           )}
@@ -55,7 +56,21 @@ export const SleepTimerControls: React.FC = () => {
                 {mins} min
               </Button>
             ))}
-            <Button variant="outline" size="sm" onClick={() => playbackEngine?.sleepTimer?.setEndOfTrack(window as unknown as { addEventListener: (type: string, listener: () => void, options?: unknown) => void })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                pe?.sleepTimer?.setEndOfTrack(
+                  window as unknown as {
+                    addEventListener: (
+                      type: string,
+                      listener: () => void,
+                      options?: unknown,
+                    ) => void;
+                  },
+                )
+              }
+            >
               End of Track
             </Button>
           </div>
@@ -67,14 +82,18 @@ export const SleepTimerControls: React.FC = () => {
               value={customMinutes}
               onChange={(e) => setCustomMinutes(e.target.value)}
             />
-            <Button size="sm" onClick={() => setTimer(parseInt(customMinutes))}>Set</Button>
+            <Button size="sm" onClick={() => setTimer(parseInt(customMinutes))}>
+              Set
+            </Button>
           </div>
 
           {state?.active && (
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm font-mono">{formatTime(state.remainingSeconds)} remaining</span>
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="font-mono text-sm">
+                {formatTime(state.remainingSeconds)} remaining
+              </span>
               <Button variant="ghost" size="sm" onClick={cancelTimer}>
-                <X className="h-4 w-4 mr-1" /> Cancel
+                <X className="mr-1 h-4 w-4" /> Cancel
               </Button>
             </div>
           )}

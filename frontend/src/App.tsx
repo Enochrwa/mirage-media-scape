@@ -43,12 +43,12 @@ const App = () => {
     window.addEventListener('offline', onOffline);
 
     if ('serviceWorker' in navigator) {
-       navigator.serviceWorker.register('/sw.js');
+      navigator.serviceWorker.register('/sw.js');
     }
 
     return () => {
-       window.removeEventListener('online', onOnline);
-       window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
   }, [initLibrary]);
 
@@ -60,7 +60,7 @@ const App = () => {
 
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      switch(e.key.toLowerCase()) {
+      switch (e.key.toLowerCase()) {
         case ' ':
           e.preventDefault();
           player.togglePlayback();
@@ -73,7 +73,7 @@ const App = () => {
           break;
         case 'f':
           if (player.currentFile?.type === 'video') {
-             // Handle fullscreen
+            // Handle fullscreen
           }
           break;
         case 'm':
@@ -91,11 +91,11 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           {isOffline && (
-             <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-600 text-white text-center py-1 text-xs font-bold animate-in slide-in-from-top">
-                <div className="flex items-center justify-center gap-2">
-                   <WifiOff size={14} /> You're offline — local library available
-                </div>
-             </div>
+            <div className="fixed left-0 right-0 top-0 z-[100] bg-amber-600 py-1 text-center text-xs font-bold text-white animate-in slide-in-from-top">
+              <div className="flex items-center justify-center gap-2">
+                <WifiOff size={14} /> You're offline — local library available
+              </div>
+            </div>
           )}
           <Toaster />
           <Sonner />

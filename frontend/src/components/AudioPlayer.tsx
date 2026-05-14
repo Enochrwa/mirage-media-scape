@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpeg';
-import { playbackEngine } from '@/lib/PlaybackEngine';
 import { cn } from '@/lib/utils';
 import {
   Play,
@@ -43,8 +42,12 @@ import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { MediaFile, Playlist } from '@/types/media';
+import { MediaFile } from '@/types/media';
 import { toast } from '@/hooks/use-toast';
+
+type AudioPlayerProps = {
+  file?: MediaFile;
+};
 
 type AudioPlayerButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'ghost' | 'outline';
@@ -177,10 +180,6 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-interface AudioPlayerProps {
-  file?: MediaFile;
-}
-
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const {
     currentFile: storeFile,
@@ -206,6 +205,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const { files, playlists, addToPlaylist } = useLibraryStore();
 
   const currentFile = file || storeFile;
+  const fileUrl = currentFile?.file ?? '';
 
   // Local UI states
   const [muted, setMuted] = useState(false);
@@ -255,7 +255,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       container: waveformRef.current,
       waveColor: 'rgb(167, 139, 250)',
       progressColor: 'rgb(79, 70, 229)',
-      url: currentFile.file,
+      url: fileUrl,
       barWidth: 3,
       barGap: 2,
       barRadius: 3,
@@ -295,7 +295,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return () => {
       ws.destroy();
     };
-  }, [currentFile, setCurrentTime, setDuration]);
+  }, [currentFile, setCurrentTime, setDuration, fileUrl]);
 
   useEffect(() => {
     if (wavesurferRef.current && duration > 0) {
@@ -330,7 +330,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const handleSleepTimer = (minutes: number) => {
     setSleepTimer(minutes);
     setShowTimerMenu(false);
-    playbackEngine.setSleepTimer(minutes);
   };
 
   const toggleTrimming = useCallback(() => {
@@ -349,9 +348,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   const handleConfirmTrim = async () => {
     if (!trimRegion || !currentFile) return;
+    const filePath = currentFile.file;
     setIsProcessing(true);
     try {
-      const blob = await trimAudio(currentFile.file, trimRegion.start, trimRegion.end);
+      const blob = await trimAudio(filePath, trimRegion.start, trimRegion.end);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -368,9 +368,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   const handleNormalize = async () => {
     if (!currentFile) return;
+    const filePath = currentFile.file;
     setIsProcessing(true);
     try {
-      const blob = await normalizeVolume(currentFile.file);
+      const blob = await normalizeVolume(filePath);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -387,9 +388,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   const handleVolumeBoost = async () => {
     if (!currentFile || volumeBoost === 0) return;
+    const filePath = currentFile.file;
     setIsProcessing(true);
     try {
-      const blob = await changeVolume(currentFile.file, volumeBoost);
+      const blob = await changeVolume(filePath, volumeBoost);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -406,9 +408,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   const handleApplyFades = async () => {
     if (!currentFile) return;
+    const filePath = currentFile.file;
     setIsProcessing(true);
     try {
-      const blob = await applyFade(currentFile.file, duration, fadeInDuration, fadeOutDuration);
+      const blob = await applyFade(filePath, duration, fadeInDuration, fadeOutDuration);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -435,7 +438,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
             className="text-gray-400 hover:text-white"
             onClick={() => {
               const link = document.createElement('a');
-              link.href = currentFile.file;
+              link.href = fileUrl;
               link.download = `${currentFile.title}.mp3`;
               link.click();
             }}

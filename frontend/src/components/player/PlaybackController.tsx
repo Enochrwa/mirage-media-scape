@@ -26,7 +26,6 @@ import { WaveformSeekBar } from './WaveformSeekBar';
 import { useState, useEffect } from 'react';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { resourceMonitor, ResourceState } from '@/lib/ResourceMonitor';
-import { EqualizerControls } from './EqualizerControls';
 
 export function PlaybackController() {
   const [showEQ, setShowEQ] = useState(false);
@@ -44,15 +43,26 @@ export function PlaybackController() {
   };
 
   const toggleABLoop = () => {
-    playbackEngine.abLoop.toggle();
+    const {
+      abLoop: { toggle },
+    } = usePlayerStore.getState();
+    toggle();
   };
 
   const setLoopA = () => {
-    playbackEngine.abLoop.setA(playbackEngine.currentTime);
+    const {
+      abLoop: { setA },
+      currentTime,
+    } = usePlayerStore.getState();
+    setA(currentTime);
   };
 
   const setLoopB = () => {
-    playbackEngine.abLoop.setB(playbackEngine.currentTime);
+    const {
+      abLoop: { setB },
+      currentTime,
+    } = usePlayerStore.getState();
+    setB(currentTime);
   };
 
   useEffect(() => {

@@ -5,24 +5,26 @@ import { PodcastService } from '../services/PodcastService';
 const router = Router();
 const podcastService = new PodcastService(db);
 
+router.get('/', (req, res) => {
+  const subs = db.prepare("SELECT * FROM podcast_subscriptions").all();
+  res.json({ data: subs });
+});
+
 router.post('/subscribe', async (req, res) => {
   const { url } = req.body;
-  try {
-    const id = await podcastService.subscribe(url);
-    res.json({ id });
-  } catch (_e) {
-    res.status(500).json({ error: 'Failed to subscribe' });
-  }
+  const id = await podcastService.subscribe(url);
+  res.json({ data: { id } });
 });
 
-router.get('/subscriptions', async (req, res) => {
-  const subs = await podcastService.getSubscriptions();
-  res.json(subs);
+router.get('/:id/episodes', (req, res) => {
+  const episodes = db.prepare("SELECT * FROM podcast_episodes WHERE podcast_id = ?").all(req.params.id);
+  res.json({ data: episodes });
 });
 
-router.get('/:id/episodes', async (req, res) => {
-  const episodes = await podcastService.getEpisodes(req.params.id);
-  res.json(episodes);
+router.patch('/episodes/:id/progress', (req, res) => {
+  const { seconds } = req.body;
+  podcastService.updateProgress(req.params.id, seconds);
+  res.json({ data: { success: true } });
 });
 
 export default router;

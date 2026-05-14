@@ -79,7 +79,7 @@ const Playlists = () => {
 
   const [smartDefinition, setSmartDefinition] = useState({
     matchMode: 'all' as 'all' | 'any',
-    conditions: [{ field: 'artist', operator: 'contains', value: '' }]
+    conditions: [{ field: 'artist', operator: 'contains', value: '' }],
   });
 
   const handleCreatePlaylist = () => {
@@ -98,8 +98,8 @@ const Playlists = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newPlaylistName.trim(),
-          definition: JSON.stringify(smartDefinition)
-        })
+          definition: JSON.stringify(smartDefinition),
+        }),
       });
       if (res.ok) {
         setNewPlaylistName('');
@@ -118,7 +118,11 @@ const Playlists = () => {
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <h1 className="text-3xl font-bold tracking-tight">Your Playlists</h1>
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10" onClick={() => setIsSmartModalOpen(true)}>
+              <Button
+                variant="outline"
+                className="gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                onClick={() => setIsSmartModalOpen(true)}
+              >
                 <Sparkles className="h-4 w-4" /> New Smart Playlist
               </Button>
               <Button className="gap-2" onClick={() => setIsModalOpen(true)}>
@@ -127,7 +131,7 @@ const Playlists = () => {
             </div>
           </div>
 
-          {(playlists.length > 0 || smartPlaylists.length > 0) ? (
+          {playlists.length > 0 || smartPlaylists.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {smartPlaylists.map((playlist) => (
                 <PlaylistCard key={playlist.id} playlist={playlist} />
@@ -138,13 +142,13 @@ const Playlists = () => {
             </div>
           ) : (
             <div className="py-16 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <ListMusic className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h2 className="mb-2 text-xl font-semibold">No Playlists Yet</h2>
-            <p className="mb-4 text-muted-foreground">
-              Create your first playlist to organize your media
-            </p>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <ListMusic className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h2 className="mb-2 text-xl font-semibold">No Playlists Yet</h2>
+              <p className="mb-4 text-muted-foreground">
+                Create your first playlist to organize your media
+              </p>
               <Button className="gap-2" onClick={() => setIsModalOpen(true)}>
                 <Plus className="h-4 w-4" /> Create Playlist
               </Button>
@@ -160,7 +164,9 @@ const Playlists = () => {
               <Sparkles className="h-5 w-5 text-purple-400" />
               Create Smart Playlist
             </DialogTitle>
-            <DialogDescription>Tracks will be added automatically based on these rules.</DialogDescription>
+            <DialogDescription>
+              Tracks will be added automatically based on these rules.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Input
@@ -173,7 +179,9 @@ const Playlists = () => {
               <span>Match</span>
               <Select
                 value={smartDefinition.matchMode}
-                onValueChange={(v: 'all' | 'any') => setSmartDefinition(prev => ({ ...prev, matchMode: v }))}
+                onValueChange={(v: 'all' | 'any') =>
+                  setSmartDefinition((prev) => ({ ...prev, matchMode: v }))
+                }
               >
                 <SelectTrigger className="w-24">
                   <SelectValue />
@@ -193,7 +201,7 @@ const Playlists = () => {
                   onValueChange={(v) => {
                     const newConds = [...smartDefinition.conditions];
                     newConds[i].field = v;
-                    setSmartDefinition(prev => ({ ...prev, conditions: newConds }));
+                    setSmartDefinition((prev) => ({ ...prev, conditions: newConds }));
                   }}
                 >
                   <SelectTrigger className="w-32">
@@ -213,7 +221,7 @@ const Playlists = () => {
                   onValueChange={(v) => {
                     const newConds = [...smartDefinition.conditions];
                     newConds[i].operator = v;
-                    setSmartDefinition(prev => ({ ...prev, conditions: newConds }));
+                    setSmartDefinition((prev) => ({ ...prev, conditions: newConds }));
                   }}
                 >
                   <SelectTrigger className="w-32">
@@ -233,15 +241,22 @@ const Playlists = () => {
                   onChange={(e) => {
                     const newConds = [...smartDefinition.conditions];
                     newConds[i].value = e.target.value;
-                    setSmartDefinition(prev => ({ ...prev, conditions: newConds }));
+                    setSmartDefinition((prev) => ({ ...prev, conditions: newConds }));
                   }}
                 />
               </div>
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSmartModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateSmartPlaylist} className="bg-purple-600 hover:bg-purple-700 text-white">Create Smart Playlist</Button>
+            <Button variant="outline" onClick={() => setIsSmartModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateSmartPlaylist}
+              className="bg-purple-600 text-white hover:bg-purple-700"
+            >
+              Create Smart Playlist
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

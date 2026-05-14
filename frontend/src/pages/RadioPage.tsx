@@ -18,7 +18,9 @@ interface RadioStation {
 
 const RadioPage = () => {
   const { playFile } = usePlayerStore();
-  const [activeTab, setActiveTab] = useState<'internet' | 'mood' | 'artist' | 'similar'>('internet');
+  const [activeTab, setActiveTab] = useState<'internet' | 'mood' | 'artist' | 'similar'>(
+    'internet',
+  );
   const [stations, setStations] = useState<RadioStation[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,7 +63,9 @@ const RadioPage = () => {
       <div className="space-y-8">
         <div>
           <h1 className="mb-2 text-4xl font-bold tracking-tight text-white">Radio</h1>
-          <p className="text-zinc-400">Discover new music based on internet stations, moods, or artists.</p>
+          <p className="text-zinc-400">
+            Discover new music based on internet stations, moods, or artists.
+          </p>
         </div>
 
         <div className="flex gap-4 border-b border-white/10">
@@ -71,7 +75,9 @@ const RadioPage = () => {
               onClick={() => setActiveTab(tab)}
               className={cn(
                 'pb-2 text-sm font-medium transition-colors',
-                activeTab === tab ? 'border-b-2 border-purple-500 text-white' : 'text-zinc-500 hover:text-white'
+                activeTab === tab
+                  ? 'border-b-2 border-purple-500 text-white'
+                  : 'text-zinc-500 hover:text-white',
               )}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -80,7 +86,7 @@ const RadioPage = () => {
         </div>
 
         {activeTab === 'internet' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-6 duration-300 animate-in fade-in">
             <div className="flex max-w-md gap-2">
               <Input
                 placeholder="Search by station name..."
@@ -103,7 +109,11 @@ const RadioPage = () => {
                   <div className="flex items-center gap-4">
                     <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5">
                       {station.favicon ? (
-                        <img src={station.favicon} className="h-full w-full object-contain" alt="" />
+                        <img
+                          src={station.favicon}
+                          className="h-full w-full object-contain"
+                          alt=""
+                        />
                       ) : (
                         <Radio className="text-zinc-700" size={24} />
                       )}
@@ -128,13 +138,13 @@ const RadioPage = () => {
         )}
 
         {activeTab === 'mood' && (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
+          <div className="grid grid-cols-2 gap-4 duration-300 animate-in fade-in sm:grid-cols-3 md:grid-cols-4">
             {moods.map((mood) => (
               <Card
                 key={mood.id}
-                className="flex flex-col items-center justify-center gap-4 border-white/5 bg-zinc-900/50 p-8 transition-colors hover:border-purple-500/50 cursor-pointer group"
+                className="group flex cursor-pointer flex-col items-center justify-center gap-4 border-white/5 bg-zinc-900/50 p-8 transition-colors hover:border-purple-500/50"
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-500/20 text-purple-500 group-hover:scale-110 transition-transform">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-500/20 text-purple-500 transition-transform group-hover:scale-110">
                   {mood.icon}
                 </div>
                 <span className="font-bold text-white">{mood.label}</span>
@@ -144,10 +154,12 @@ const RadioPage = () => {
         )}
 
         {(activeTab === 'artist' || activeTab === 'similar') && (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-500 animate-in fade-in duration-300">
+          <div className="flex flex-col items-center justify-center py-20 text-zinc-500 duration-300 animate-in fade-in">
             <Radio size={48} className="mb-4 opacity-20" />
             <p>Start a radio from your favorite {activeTab === 'artist' ? 'artist' : 'track'}.</p>
-            <p className="text-sm">Search and select {activeTab === 'artist' ? 'an artist' : 'a track'} to begin.</p>
+            <p className="text-sm">
+              Search and select {activeTab === 'artist' ? 'an artist' : 'a track'} to begin.
+            </p>
           </div>
         )}
       </div>

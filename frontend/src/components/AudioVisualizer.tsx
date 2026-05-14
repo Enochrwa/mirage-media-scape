@@ -43,13 +43,13 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
     // State for particles and peaks
     interface Particle {
-       x: number;
-       y: number;
-       vx: number;
-       vy: number;
-       life: number;
-       maxLife: number;
-       hue: number;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      life: number;
+      maxLife: number;
+      hue: number;
     }
     let particles: Particle[] = [];
     let lastBeat = 0;
@@ -111,7 +111,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           else {
             // Smooth curves
             const nextX = x + sliceWidth;
-            const nextV = timeData[i+1] / 128.0 || 1;
+            const nextV = timeData[i + 1] / 128.0 || 1;
             const nextY = (nextV * height) / 2;
             const cpX = (x + nextX) / 2;
             ctx.quadraticCurveTo(x, y, cpX, (y + nextY) / 2);
@@ -172,14 +172,14 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
               vy: (Math.random() - 0.5) * 12,
               life: 1.0,
               maxLife: 1.0,
-              hue: Math.random() * 360
+              hue: Math.random() * 360,
             });
           }
         }
 
-        particles = particles.filter(p => p.life > 0);
+        particles = particles.filter((p) => p.life > 0);
         ctx.globalCompositeOperation = 'lighter';
-        particles.forEach(p => {
+        particles.forEach((p) => {
           p.x += p.vx;
           p.y += p.vy;
           p.vx *= 0.96;
@@ -193,10 +193,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           ctx.fill();
 
           // Connecting lines
-          particles.forEach(other => {
+          particles.forEach((other) => {
             const dx = p.x - other.x;
             const dy = p.y - other.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
+            const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < 60) {
               ctx.strokeStyle = `hsla(${p.hue}, 70%, 55%, ${alpha * 0.2})`;
               ctx.lineWidth = 0.5;
@@ -234,7 +234,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
         // Bottom: Bars flipped
         const barsCount = bufferLength / 4;
-        const barWidth = (width / barsCount);
+        const barWidth = width / barsCount;
         for (let i = 0; i < barsCount; i++) {
           const value = freqData[i];
           const barHeight = (value / 255) * (height / 2);
@@ -256,7 +256,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      className={cn("w-full h-full pointer-events-none", className)}
+      className={cn('pointer-events-none h-full w-full', className)}
       width={1000}
       height={600}
     />

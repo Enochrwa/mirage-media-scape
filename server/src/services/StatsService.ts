@@ -1,147 +1,74 @@
-import db from '../db';
+import { Database } from 'better-sqlite3';
 
 export class StatsService {
-  static recordPlayStart(trackId: string): number {
-    const result = db
-      .prepare(
-        `
-            INSERT INTO play_events (track_id, started_at)
-            VALUES (?, ?)
-        `,
-      )
-      .run(trackId, Date.now());
-    return result.lastInsertRowid as number;
-  }
+  constructor(private db: Database) {}
 
-  static recordPlayEnd(eventId: number, position: number, completed: boolean) {
-    db.prepare(
-      `
-            UPDATE play_events
-            SET ended_at = ?, position = ?, completed = ?
-            WHERE id = ?
-        `,
-    ).run(Date.now(), position, completed ? 1 : 0, eventId);
-
-    // Update track play count
-    if (completed || position > 30) {
-      // Count as a play if completed or >30s
-      db.prepare(
-        `
-                UPDATE tracks
-                SET play_count = IFNULL(play_count, 0) + 1,
-                    last_played = ?
-                WHERE id = (SELECT track_id FROM play_events WHERE id = ?)
-            `,
-      ).run(Date.now(), eventId);
+  getTopTracks(period: '7d' | '30d' | '90d' | 'all', limit: number = 10) {
+    let timeFilter = '';
+    if (period !== 'all') {
+      const days = parseInt(period);
+      const since = Math.floor(Date.now() / 1000) - (days * 86400);
+      timeFilter = `AND started_at > ${since}`;
     }
+
+    return this.db.prepare(`
+      SELECT t.*, SUM(p.seconds_played) as total_time, COUNT(p.id) as play_count
+      FROM tracks t
+      JOIN play_events p ON t.id = p.track_id
+      WHERE p.completed = 1 ${timeFilter}
+      GROUP BY t.id
+      ORDER BY total_time DESC
+      LIMIT ?
+    `).all(limit);
   }
 
-  static getTopTracks(limit: number = 10) {
-    return db
-      .prepare(
-        `
-            SELECT t.*, COUNT(e.id) as play_count
-            FROM tracks t
-            JOIN play_events e ON t.id = e.track_id
-            WHERE e.completed = 1 OR e.position > 30
-            GROUP BY t.id
-            ORDER BY play_count DESC
-            LIMIT ?
-        `,
-      )
-      .all(limit);
+  getTopArtists(period: '7d' | '30d' | '90d' | 'all', limit: number = 10) {
+    let timeFilter = '';
+    if (period !== 'all') {
+      const days = parseInt(period);
+      const since = Math.floor(Date.now() / 1000) - (days * 86400);
+      timeFilter = `AND started_at > ${since}`;
+    }
+
+    return this.db.prepare(`
+      SELECT t.artist, SUM(p.seconds_played) as total_time, COUNT(p.id) as play_count
+      FROM tracks t
+      JOIN play_events p ON t.id = p.track_id
+      WHERE p.completed = 1 ${timeFilter}
+      GROUP BY t.artist
+      ORDER BY total_time DESC
+      LIMIT ?
+    `).all(limit);
   }
 
-  static getHistory(limit: number = 50) {
-    return db
-      .prepare(
-        `
-            SELECT t.*, e.started_at
-            FROM tracks t
-            JOIN play_events e ON t.id = e.track_id
-            ORDER BY e.started_at DESC
-            LIMIT ?
-        `,
-      )
-      .all(limit);
+  getHeatmap() {
+    return this.db.prepare(`
+      SELECT strftime('%w', datetime(started_at,'unixepoch')) as dow,
+             strftime('%H', datetime(started_at,'unixepoch')) as hour,
+             COUNT(*) as count
+      FROM play_events
+      GROUP BY dow, hour
+    `).all();
   }
 
-  static getStats() {
-    const totalPlays = db
-      .prepare('SELECT COUNT(*) as count FROM play_events WHERE completed = 1 OR position > 30')
-      .get() as { count: number } | undefined;
-    const totalTime = db.prepare('SELECT SUM(position) as time FROM play_events').get() as
-      | { time: number | null }
-      | undefined;
-    const topArtist = db
-      .prepare(
-        `
-            SELECT artist, COUNT(*) as count
-            FROM tracks t
-            JOIN play_events e ON t.id = e.track_id
-            GROUP BY artist
-            ORDER BY count DESC
-            LIMIT 1
-        `,
-      )
-      .get() as { artist: string | null; count: number } | undefined;
-
-    return {
-      totalPlays: totalPlays?.count ?? 0,
-      totalTimeSeconds: totalTime?.time ?? 0,
-      topArtist: topArtist?.artist ?? 'None',
-    };
+  getTotalTime() {
+    const row = this.db.prepare("SELECT SUM(seconds_played) as total FROM play_events").get() as { total: number };
+    return row?.total || 0;
   }
 
-  static getHeatmap() {
-    return db
-      .prepare(
-        `
-            SELECT
-                strftime('%w', datetime(started_at/1000, 'unixepoch')) as day,
-                strftime('%H', datetime(started_at/1000, 'unixepoch')) as hour,
-                COUNT(*) as count
-            FROM play_events
-            GROUP BY day, hour
-        `,
-      )
-      .all();
-  }
+  getYearRecap(year: number) {
+    const start = Math.floor(new Date(`${year}-01-01`).getTime() / 1000);
+    const end = Math.floor(new Date(`${year}-12-31T23:59:59`).getTime() / 1000);
 
-  static getYearRecap(year: number) {
-    const start = new Date(year, 0, 1).getTime();
-    const end = new Date(year + 1, 0, 1).getTime();
+    const topTrack = this.db.prepare(`
+      SELECT t.*, COUNT(p.id) as count
+      FROM tracks t JOIN play_events p ON t.id = p.track_id
+      WHERE p.started_at BETWEEN ? AND ?
+      GROUP BY t.id ORDER BY count DESC LIMIT 1
+    `).get(start, end);
 
-    return {
-      totalTimeSeconds: db
-        .prepare('SELECT SUM(position) as total FROM play_events WHERE started_at BETWEEN ? AND ?')
-        .get(start, end),
-      topTrack: db
-        .prepare(
-          `
-                SELECT t.*, COUNT(e.id) as plays
-                FROM tracks t
-                JOIN play_events e ON t.id = e.track_id
-                WHERE e.started_at BETWEEN ? AND ?
-                GROUP BY t.id
-                ORDER BY plays DESC
-                LIMIT 1
-            `,
-        )
-        .get(start, end),
-      topArtist: db
-        .prepare(
-          `
-                SELECT artist, COUNT(*) as plays
-                FROM tracks t
-                JOIN play_events e ON t.id = e.track_id
-                WHERE e.started_at BETWEEN ? AND ?
-                GROUP BY artist
-                ORDER BY plays DESC
-                LIMIT 1
-            `,
-        )
-        .get(start, end),
-    };
+    const totalHours = Math.floor(this.getTotalTime() / 3600);
+
+    return { topTrack, totalHours };
   }
 }

@@ -34,7 +34,9 @@ export class SleepTimer {
     }, fadeStartMs);
   }
 
-  setEndOfTrack(onEndedEmitter: { addEventListener: (type: string, listener: () => void, options?: unknown) => void }): void {
+  setEndOfTrack(onEndedEmitter: {
+    addEventListener: (type: string, listener: () => void, options?: unknown) => void;
+  }): void {
     this.clear();
     this.mode = 'endOfTrack';
     const onEnded = () => {

@@ -56,7 +56,7 @@ export class LyricsService {
           const wCentiseconds = parseInt(wordMatch[3].padEnd(3, '0').slice(0, 3));
           words.push({
             time: wMinutes * 60 + wSeconds + wCentiseconds / 1000,
-            text: wordMatch[4]
+            text: wordMatch[4],
           });
         }
 

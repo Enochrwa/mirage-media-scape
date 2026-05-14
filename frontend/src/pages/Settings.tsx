@@ -23,7 +23,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Globe, Moon, Sun, User, Bell, Shield, Download, Save, Zap, Volume2, Database, Upload, FileJson, Trash2, Plus, X } from 'lucide-react';
+import {
+  Globe,
+  Moon,
+  Sun,
+  User,
+  Bell,
+  Shield,
+  Download,
+  Save,
+  Zap,
+  Volume2,
+  Database,
+  Upload,
+  FileJson,
+  Trash2,
+  Plus,
+  X,
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { Badge } from '@/components/ui/badge';
@@ -43,16 +60,25 @@ const Settings = () => {
   const [crossfade, setCrossfade] = useState(2);
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState('default');
-  const [extensions, setExtensions] = useState(['mp3', 'flac', 'wav', 'm4a', 'ogg', 'mp4', 'mkv', 'avi']);
+  const [extensions, setExtensions] = useState([
+    'mp3',
+    'flac',
+    'wav',
+    'm4a',
+    'ogg',
+    'mp4',
+    'mkv',
+    'avi',
+  ]);
   const [newExt, setNewExt] = useState('');
 
   useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      setOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
     });
     navigator.mediaDevices.ondevicechange = () => {
-      navigator.mediaDevices.enumerateDevices().then(devices => {
-         setOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
       });
     };
   }, []);
@@ -79,7 +105,7 @@ const Settings = () => {
     <MainLayout>
       <div className="animate-fade-in space-y-6">
         <div>
-          <h1 className="mb-1 text-4xl font-bold tracking-tight uppercase">Settings</h1>
+          <h1 className="mb-1 text-4xl font-bold uppercase tracking-tight">Settings</h1>
           <p className="text-muted-foreground">Customize your zovyra experience.</p>
         </div>
 
@@ -105,11 +131,13 @@ const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-8">
                 <div className="flex items-center justify-between">
-                   <div className="space-y-1">
-                      <Label className="text-base">Bass Enhancer</Label>
-                      <p className="text-sm text-muted-foreground">Harmonic exciter for warmer low-end</p>
-                   </div>
-                   <Switch
+                  <div className="space-y-1">
+                    <Label className="text-base">Bass Enhancer</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Harmonic exciter for warmer low-end
+                    </p>
+                  </div>
+                  <Switch
                     checked={bassEnhancer}
                     onCheckedChange={(v) => {
                       setBassEnhancer(v);
@@ -119,11 +147,13 @@ const Settings = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                   <div className="space-y-1">
-                      <Label className="text-base">Night Mode</Label>
-                      <p className="text-sm text-muted-foreground">Dynamic range compression for quiet listening</p>
-                   </div>
-                   <Switch
+                  <div className="space-y-1">
+                    <Label className="text-base">Night Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Dynamic range compression for quiet listening
+                    </p>
+                  </div>
+                  <Switch
                     checked={nightMode}
                     onCheckedChange={(v) => {
                       setNightMode(v);
@@ -133,38 +163,43 @@ const Settings = () => {
                 </div>
 
                 <div className="space-y-4">
-                   <div className="flex justify-between">
-                      <Label className="text-base">Crossfade Duration</Label>
-                      <span className="font-mono text-primary">{crossfade}s</span>
-                   </div>
-                   <Slider
+                  <div className="flex justify-between">
+                    <Label className="text-base">Crossfade Duration</Label>
+                    <span className="font-mono text-primary">{crossfade}s</span>
+                  </div>
+                  <Slider
                     value={[crossfade]}
                     onValueChange={(v) => setCrossfade(v[0])}
                     max={12}
                     step={1}
-                   />
+                  />
                 </div>
 
                 <div className="space-y-3">
-                   <Label className="text-base">Audio Output Device</Label>
-                   <Select value={selectedDevice} onValueChange={(v) => {
+                  <Label className="text-base">Audio Output Device</Label>
+                  <Select
+                    value={selectedDevice}
+                    onValueChange={(v) => {
                       setSelectedDevice(v);
                       // @ts-expect-error - setSinkId is experimental
                       if (playbackEngine.ctx.setSinkId) playbackEngine.ctx.setSinkId(v);
-                   }}>
-                      <SelectTrigger>
-                         <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                         {outputDevices.map(d => (
-                            <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || 'Unknown Device'}</SelectItem>
-                         ))}
-                      </SelectContent>
-                   </Select>
-                   {/* @ts-expect-error - setSinkId is experimental */}
-                   {!playbackEngine.ctx.setSinkId && (
-                      <p className="text-[10px] text-amber-500">(Not supported in this browser)</p>
-                   )}
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {outputDevices.map((d) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId}>
+                          {d.label || 'Unknown Device'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* @ts-expect-error - setSinkId is experimental */}
+                  {!playbackEngine.ctx.setSinkId && (
+                    <p className="text-[10px] text-amber-500">(Not supported in this browser)</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -341,60 +376,87 @@ const Settings = () => {
 
           <TabsContent value="library" className="space-y-6">
             <Card>
-               <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> Library Scan Settings</CardTitle>
-               </CardHeader>
-               <CardContent className="space-y-6">
-                  <div className="space-y-3">
-                     <Label>File extensions to scan</Label>
-                     <div className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                        {extensions.map(ext => (
-                           <Badge key={ext} variant="secondary" className="gap-1 pr-1">
-                              .{ext}
-                              <button onClick={() => setExtensions(extensions.filter(e => e !== ext))} className="hover:text-red-400">
-                                 <X size={12} />
-                              </button>
-                           </Badge>
-                        ))}
-                        <div className="flex items-center gap-1 ml-2">
-                           <Input
-                             value={newExt}
-                             onChange={e => setNewExt(e.target.value)}
-                             onKeyDown={e => { if (e.key === 'Enter') { setExtensions([...extensions, newExt]); setNewExt(''); } }}
-                             placeholder="add..."
-                             className="h-6 w-20 text-xs bg-transparent border-none p-0 focus-visible:ring-0"
-                           />
-                           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setExtensions([...extensions, newExt]); setNewExt(''); }}>
-                              <Plus size={14} />
-                           </Button>
-                        </div>
-                     </div>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" /> Library Scan Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <Label>File extensions to scan</Label>
+                  <div className="flex flex-wrap gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                    {extensions.map((ext) => (
+                      <Badge key={ext} variant="secondary" className="gap-1 pr-1">
+                        .{ext}
+                        <button
+                          onClick={() => setExtensions(extensions.filter((e) => e !== ext))}
+                          className="hover:text-red-400"
+                        >
+                          <X size={12} />
+                        </button>
+                      </Badge>
+                    ))}
+                    <div className="ml-2 flex items-center gap-1">
+                      <Input
+                        value={newExt}
+                        onChange={(e) => setNewExt(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setExtensions([...extensions, newExt]);
+                            setNewExt('');
+                          }
+                        }}
+                        placeholder="add..."
+                        className="h-6 w-20 border-none bg-transparent p-0 text-xs focus-visible:ring-0"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setExtensions([...extensions, newExt]);
+                          setNewExt('');
+                        }}
+                      >
+                        <Plus size={14} />
+                      </Button>
+                    </div>
                   </div>
-               </CardContent>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="advanced" className="space-y-6">
             <Card>
-               <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><FileJson className="h-5 w-5" /> Data Management</CardTitle>
-               </CardHeader>
-               <CardContent className="grid grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5" onClick={handleExport}>
-                     <Download className="h-6 w-6 text-purple-400" />
-                     <div className="text-center">
-                        <p className="font-bold">Export All Data</p>
-                        <p className="text-[10px] text-zinc-500">Metadata, ratings, and stats</p>
-                     </div>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5">
-                     <Upload className="h-6 w-6 text-blue-400" />
-                     <div className="text-center">
-                        <p className="font-bold">Import Data</p>
-                        <p className="text-[10px] text-zinc-500">Restore from JSON backup</p>
-                     </div>
-                  </Button>
-               </CardContent>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileJson className="h-5 w-5" /> Data Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5"
+                  onClick={handleExport}
+                >
+                  <Download className="h-6 w-6 text-purple-400" />
+                  <div className="text-center">
+                    <p className="font-bold">Export All Data</p>
+                    <p className="text-[10px] text-zinc-500">Metadata, ratings, and stats</p>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-2 border-white/10 hover:bg-white/5"
+                >
+                  <Upload className="h-6 w-6 text-blue-400" />
+                  <div className="text-center">
+                    <p className="font-bold">Import Data</p>
+                    <p className="text-[10px] text-zinc-500">Restore from JSON backup</p>
+                  </div>
+                </Button>
+              </CardContent>
             </Card>
           </TabsContent>
 

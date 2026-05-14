@@ -102,7 +102,7 @@ const SubtitleManager: React.FC = () => {
           style={{ bottom: `${8 + settings.offset}%` }}
         >
           <span
-            className="rounded border border-white/10 px-3 py-1 shadow-lg whitespace-pre-wrap"
+            className="whitespace-pre-wrap rounded border border-white/10 px-3 py-1 shadow-lg"
             style={{
               fontSize: `${settings.fontSize}px`,
               color: settings.color,
@@ -121,22 +121,31 @@ const SubtitleManager: React.FC = () => {
               <Captions className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900 text-white w-64">
+          <DropdownMenuContent align="end" className="w-64 border-zinc-800 bg-zinc-900 text-white">
             <DropdownMenuItem onClick={() => setCues([])}>None</DropdownMenuItem>
-            <div className="border-t border-zinc-800 my-1" />
-            <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase">Embedded Tracks</div>
+            <div className="my-1 border-t border-zinc-800" />
+            <div className="px-2 py-1.5 text-xs font-semibold uppercase text-zinc-500">
+              Embedded Tracks
+            </div>
             {tracks.map((track) => (
               <DropdownMenuItem key={track.index} onClick={() => selectTrack(track.index)}>
                 {track.title || track.language || `Track ${track.index}`} ({track.codec})
               </DropdownMenuItem>
             ))}
-            <div className="border-t border-zinc-800 my-1" />
-            <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500 uppercase">External</div>
+            <div className="my-1 border-t border-zinc-800" />
+            <div className="px-2 py-1.5 text-xs font-semibold uppercase text-zinc-500">
+              External
+            </div>
             <DropdownMenuItem className="cursor-pointer" asChild>
-              <label className="flex items-center gap-2 w-full">
+              <label className="flex w-full items-center gap-2">
                 <Upload className="h-4 w-4" />
                 <span>Load Subtitle File...</span>
-                <input type="file" accept=".srt,.vtt,.ass,.ssa,.sbv" className="hidden" onChange={handleFileUpload} />
+                <input
+                  type="file"
+                  accept=".srt,.vtt,.ass,.ssa,.sbv"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
               </label>
             </DropdownMenuItem>
           </DropdownMenuContent>

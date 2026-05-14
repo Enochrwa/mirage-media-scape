@@ -25,7 +25,7 @@ class PhaseVocoderProcessor extends AudioWorkletProcessor {
         defaultValue: 1.0,
         minValue: 0.5,
         maxValue: 4.0,
-      }
+      },
     ];
   }
 
@@ -43,8 +43,8 @@ class PhaseVocoderProcessor extends AudioWorkletProcessor {
     // OLA works by repeating or skipping blocks of audio.
 
     for (let i = 0; i < input.length; i++) {
-        this.inputBuffer[this.inputWritePtr] = input[i];
-        this.inputWritePtr = (this.inputWritePtr + 1) % this.inputBuffer.length;
+      this.inputBuffer[this.inputWritePtr] = input[i];
+      this.inputWritePtr = (this.inputWritePtr + 1) % this.inputBuffer.length;
     }
 
     // Read from buffer with speed adjustment
@@ -52,9 +52,9 @@ class PhaseVocoderProcessor extends AudioWorkletProcessor {
     let readPtr = this.outputReadPtr;
 
     for (let i = 0; i < output.length; i++) {
-        const index = Math.floor(readPtr) % this.inputBuffer.length;
-        output[i] = this.inputBuffer[index];
-        readPtr += readStep;
+      const index = Math.floor(readPtr) % this.inputBuffer.length;
+      output[i] = this.inputBuffer[index];
+      readPtr += readStep;
     }
 
     this.outputReadPtr = readPtr % this.inputBuffer.length;

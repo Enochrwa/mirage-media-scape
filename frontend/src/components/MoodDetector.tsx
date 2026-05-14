@@ -52,19 +52,32 @@ export const MoodDetector: React.FC = () => {
   return (
     <div className="space-y-6">
       {suggestion && (
-        <Card className="flex items-center justify-between border-purple-500/50 bg-purple-500/10 p-4 animate-in slide-in-from-top duration-500">
+        <Card className="flex items-center justify-between border-purple-500/50 bg-purple-500/10 p-4 duration-500 animate-in slide-in-from-top">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-purple-500 p-2 text-white">
               <Smile size={20} />
             </div>
             <div>
-              <p className="text-sm font-bold text-white">Good {new Date().getHours() < 12 ? 'morning' : 'day'}!</p>
-              <p className="text-xs text-zinc-400">Ready for some <span className="text-purple-400 font-semibold">{suggestion}</span> tracks?</p>
+              <p className="text-sm font-bold text-white">
+                Good {new Date().getHours() < 12 ? 'morning' : 'day'}!
+              </p>
+              <p className="text-xs text-zinc-400">
+                Ready for some <span className="font-semibold text-purple-400">{suggestion}</span>{' '}
+                tracks?
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="ghost" onClick={dismiss}>Dismiss</Button>
-            <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => handleMoodSelect(suggestion)}>Start</Button>
+            <Button size="sm" variant="ghost" onClick={dismiss}>
+              Dismiss
+            </Button>
+            <Button
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => handleMoodSelect(suggestion)}
+            >
+              Start
+            </Button>
           </div>
         </Card>
       )}
@@ -76,10 +89,12 @@ export const MoodDetector: React.FC = () => {
             onClick={() => handleMoodSelect(mood.id)}
             className="group flex cursor-pointer items-center gap-3 border-white/5 bg-zinc-900/50 p-4 transition-all hover:border-white/20 hover:bg-zinc-800"
           >
-            <div className={cn("transition-transform group-hover:scale-110", mood.color)}>
+            <div className={cn('transition-transform group-hover:scale-110', mood.color)}>
               {mood.icon}
             </div>
-            <span className="text-sm font-medium text-zinc-300 group-hover:text-white">{mood.label}</span>
+            <span className="text-sm font-medium text-zinc-300 group-hover:text-white">
+              {mood.label}
+            </span>
           </Card>
         ))}
       </div>
