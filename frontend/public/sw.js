@@ -18,6 +18,9 @@ self.addEventListener('fetch', (event) => {
         return (
           res ||
           fetch(event.request).then((response) => {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
             return response;
@@ -30,7 +33,18 @@ self.addEventListener('fetch', (event) => {
 
   // API - Network first
   if (url.pathname.startsWith('/api')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return caches.match(event.request);
+          }
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request)),
+    );
     return;
   }
 

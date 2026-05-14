@@ -14,7 +14,8 @@ export function ArtistProfile() {
   const [history, setHistory] = useState<{ month: string; minutes: number }[]>([]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/stats/artist/${name}/history`)
+    if (!name) return;
+    fetch(`${API_BASE}/api/stats/artist/${encodeURIComponent(name)}/history`)
       .then((res) => res.json())
       .then(setHistory);
   }, [name]);

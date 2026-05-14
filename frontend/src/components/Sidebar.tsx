@@ -267,16 +267,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     {playlist.name}
                   </Button>
                 ))}
-                {smartPlaylists.map((playlist) => (
-                  <Button
-                    key={playlist.id}
-                    variant="ghost"
-                    className="w-full justify-start px-3 font-normal text-purple-400 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  >
-                    <Sparkles size={14} className="mr-2" />
-                    {playlist.name}
-                  </Button>
-                ))}
               </div>
             </div>
           </div>
@@ -415,6 +405,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="right">Internet Radio</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<Mic size={20} />}
+                        label=""
+                        active={location.pathname === '/podcasts'}
+                        to="/podcasts"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Podcasts</TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
@@ -676,6 +680,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                     variant="ghost"
                     className="w-full justify-start px-3 font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
+                    {playlist.name}
+                  </Button>
+                ))}
+                {smartPlaylists.map((playlist) => (
+                  <Button
+                    key={playlist.id}
+                    variant="ghost"
+                    className="w-full justify-start px-3 font-normal text-purple-400 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <Sparkles size={14} className="mr-2" />
                     {playlist.name}
                   </Button>
                 ))}

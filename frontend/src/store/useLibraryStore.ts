@@ -243,13 +243,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     } catch (e) {
       console.error('Failed to fetch tracks', e);
     }
-  },
+},
 
   fetchSmartPlaylists: async () => {
     try {
       const response = await fetch(`${API_BASE}/api/playlists/smart`);
       if (response.ok) {
-        const data = (await response.json()) as Playlist[];
+        const json = await response.json();
+        const data = json.data as Playlist[];
         set({ smartPlaylists: data });
       }
     } catch (error) {

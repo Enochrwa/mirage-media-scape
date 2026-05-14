@@ -35,15 +35,59 @@ router.get('/top-artists', (req, res) => {
 });
 
 router.get('/heatmap', (req, res) => {
-  res.json({ data: statsService.getHeatmap() });
-});
+   res.json({ data: statsService.getHeatmap() });
+ });
 
-router.get('/total-time', (req, res) => {
-  res.json({ data: { totalSeconds: statsService.getTotalTime() } });
-});
+ router.get('/history', (req, res) => {
+   const history = db
+     .prepare(
+       `SELECT pe.id, pe.started_at, pe.seconds_played, pe.completed, pe.skipped,
+               t.id as track_id, t.title, t.artist, t.cover_cache_path, t.file_path
+        FROM play_events pe
+        JOIN tracks t ON pe.track_id = t.id
+        ORDER BY pe.started_at DESC
+        LIMIT 50`
+     )
+     .all();
+   res.json({ data: history });
+ });
+
+ router.get('/summary', (req, res) => {
+   const totalPlays = db.prepare('SELECT COUNT(*) as count FROM play_events WHERE completed = 1').get() as { count: number };
+   const totalTime = statsService.getTotalTime();
+   const topArtist = db
+     .prepare(
+       `SELECT t.artist, SUM(pe.seconds_played) as total_time
+        FROM play_events pe
+        JOIN tracks t ON pe.track_id = t.id
+        WHERE pe.completed = 1
+        GROUP BY t.artist
+        ORDER BY total_time DESC
+        LIMIT 1`
+     )
+     .get() as { artist: string } | undefined;
+   res.json({ data: { totalPlays: totalPlays.count, totalTimeSeconds: totalTime, topArtist: topArtist?.artist ?? null } });
+ });
 
 router.get('/recap/:year', (req, res) => {
-  res.json({ data: statsService.getYearRecap(Number(req.params.year)) });
-});
+   res.json({ data: statsService.getYearRecap(Number(req.params.year)) });
+ });
 
-export default router;
+ router.get('/artist/:name/history', (req, res) => {
+   const name = req.params.name;
+   const history = db
+     .prepare(
+       `SELECT strftime('%Y-%m', pe.started_at) as month,
+               SUM(pe.seconds_played) as minutes
+        FROM play_events pe
+        JOIN tracks t ON pe.track_id = t.id
+        WHERE pe.completed = 1 AND t.artist = ?
+        GROUP BY month
+        ORDER BY month DESC
+        LIMIT 12`,
+     )
+     .all(name);
+   res.json({ data: history });
+ });
+
+ export default router;

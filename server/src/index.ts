@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -22,17 +23,24 @@ import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/Libr
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const httpServer = createServer(app);
 
 // CORS configuration from environment
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'];
 
 const io = new Server(httpServer, {
-  cors: { origin: corsOrigins, credentials: true },
-});
+   cors: {
+     origin: corsOrigins,
+     credentials: true,
+     methods: ['GET', 'POST'],
+   },
+ });
 
 scannerService.setIo(io);
 setLibraryWatcherIo(io);

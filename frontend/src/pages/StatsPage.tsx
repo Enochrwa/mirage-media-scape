@@ -92,10 +92,22 @@ const StatsPage = () => {
           fetch(`${API_BASE}/api/stats/heatmap`),
         ]);
 
-        if (topRes.ok) setTopTracks((await topRes.json()) as TopTrack[]);
-        if (historyRes.ok) setHistory((await historyRes.json()) as HistoryEntry[]);
-        if (summaryRes.ok) setSummary((await summaryRes.json()) as StatsSummary);
-        if (heatmapRes.ok) setHeatmap((await heatmapRes.json()) as HeatmapEntry[]);
+        if (topRes.ok) {
+          const json = await topRes.json();
+          setTopTracks((json.data || json) as TopTrack[]);
+        }
+        if (historyRes.ok) {
+          const json = await historyRes.json();
+          setHistory((json.data || json) as HistoryEntry[]);
+        }
+        if (summaryRes.ok) {
+          const json = await summaryRes.json();
+          setSummary((json.data || json) as StatsSummary);
+        }
+        if (heatmapRes.ok) {
+          const json = await heatmapRes.json();
+          setHeatmap((json.data || json) as HeatmapEntry[]);
+        }
       } catch (e) {
         console.error('Failed to fetch stats', e);
       }
