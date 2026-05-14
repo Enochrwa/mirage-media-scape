@@ -1,5 +1,5 @@
 const { parentPort, workerData } = require('worker_threads');
-const native = require('../../zovyra-native.node');
+const native = require('../../../native/index.js');
 
 try {
   const peaks = native.generateWaveform(workerData.filePath);

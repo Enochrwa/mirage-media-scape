@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import type { TrackMetadata, AudioAnalysis } from '../../zovyra-native';
 
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
+const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
 
 const { dbPath, folders, coversDir } = workerData;
 const db = new Database(dbPath);
@@ -18,7 +18,7 @@ if (!fs.existsSync(coversDir)) {
 
 async function scan() {
   let scanned = 0;
-  let newTracks: any[] = [];
+  let newTracks: Array<Record<string, unknown>> = [];
 
   const allFiles = native.scanFolders(folders);
   const total = allFiles.length;
@@ -57,23 +57,41 @@ async function scan() {
         thumbnailPath = path.join(coversDir, `${id}_thumb.jpg`);
         try {
           native.generateThumbnail(filePath, metadata.duration * 0.25, thumbnailPath);
-        } catch (e) {
+        } catch (_e) {
           thumbnailPath = null;
         }
       }
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT OR REPLACE INTO tracks (
           id, file_path, file_type, title, artist, album, album_artist,
           year, genre, track_number, disc_number, duration,
           sample_rate, bitrate, channels, cover_cache_path, thumbnail_path,
           last_modified, file_size, added_at, missing
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `).run(
-        id, filePath, fileType, metadata.title, metadata.artist, metadata.album, metadata.albumArtist,
-        metadata.year, metadata.genre, metadata.trackNumber, metadata.discNumber, metadata.duration,
-        metadata.sampleRate, metadata.bitRate, metadata.channels, coverCachePath, thumbnailPath,
-        mtime, fileSize, Date.now()
+      `,
+      ).run(
+        id,
+        filePath,
+        fileType,
+        metadata.title,
+        metadata.artist,
+        metadata.album,
+        metadata.albumArtist,
+        metadata.year,
+        metadata.genre,
+        metadata.trackNumber,
+        metadata.discNumber,
+        metadata.duration,
+        metadata.sampleRate,
+        metadata.bitRate,
+        metadata.channels,
+        coverCachePath,
+        thumbnailPath,
+        mtime,
+        fileSize,
+        Date.now(),
       );
 
       const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
@@ -88,13 +106,16 @@ async function scan() {
       if (scanned % 10 === 0) {
         parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned, total });
       }
-    } catch (error) {
-      console.error(`Failed to process ${filePath}:`, error);
+    } catch (_error) {
+      console.error(`Failed to process ${filePath}:`, _error);
     }
   }
 
   // Mark missing files
-  const dbTracks = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0').all() as { id: string, file_path: string }[];
+  const dbTracks = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0').all() as {
+    id: string;
+    file_path: string;
+  }[];
   for (const track of dbTracks) {
     if (!fs.existsSync(track.file_path)) {
       db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?').run(track.id);
@@ -109,19 +130,32 @@ async function scan() {
 
   // Background analysis
   setImmediate(async () => {
-    const unanalyzed = db.prepare('SELECT id, file_path FROM tracks WHERE bpm IS NULL AND file_type = "audio" AND missing = 0').all() as { id: string, file_path: string }[];
+    const unanalyzed = db
+      .prepare(
+        'SELECT id, file_path FROM tracks WHERE bpm IS NULL AND file_type = "audio" AND missing = 0',
+      )
+      .all() as { id: string; file_path: string }[];
     for (const track of unanalyzed) {
       try {
         const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE tracks SET
             bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?
           WHERE id = ?
-        `).run(analysis.bpm, analysis.key, analysis.camelotKey, analysis.energy, analysis.loudness, track.id);
+        `,
+        ).run(
+          analysis.bpm,
+          analysis.key,
+          analysis.camelotKey,
+          analysis.energy,
+          analysis.loudness,
+          track.id,
+        );
         // Add small delay to avoid CPU spike
-        await new Promise(r => setTimeout(r, 50));
-      } catch (e) {
-        console.error(`Analysis failed for ${track.file_path}`, e);
+        await new Promise((r) => setTimeout(r, 50));
+      } catch (_e) {
+        console.error(`Analysis failed for ${track.file_path}`, _e);
       }
     }
   });

@@ -7,9 +7,11 @@ import axios from 'axios';
 const router = Router();
 const radioService = new RadioService(db);
 
+type RadioStation = Record<string, unknown>;
+
 router.get('/stations', async (req, res) => {
-  const { q, tag, country, limit = 20 } = req.query;
-  let stations: any[] = [];
+  const { q, tag, limit = 20 } = req.query;
+  let stations: RadioStation[] = [];
   if (q) {
     stations = await radioService.search(q as string, Number(limit));
   } else if (tag) {
@@ -35,7 +37,7 @@ router.get('/stream', async (req, res) => {
 
     res.setHeader('Content-Type', (response.headers['content-type'] as string) || 'audio/mpeg');
     response.data.pipe(res);
-  } catch (e) {
+  } catch (_e) {
     res.status(500).send('Proxy error');
   }
 });

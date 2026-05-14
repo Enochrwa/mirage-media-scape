@@ -4,7 +4,7 @@ import { FingerprintService } from '../services/FingerprintService';
 import { createRequire } from 'node:module';
 
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
+const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
 
 const router = Router();
 
@@ -25,7 +25,7 @@ router.post('/write-tags', async (req, res) => {
 });
 
 router.get('/sync/devices', (req, res) => {
-  const devices = db.prepare("SELECT DISTINCT device_id FROM sync_log").all();
+  const devices = db.prepare('SELECT DISTINCT device_id FROM sync_log').all();
   res.json({ data: devices });
 });
 

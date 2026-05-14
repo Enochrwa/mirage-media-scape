@@ -6,6 +6,8 @@ import { PlaybackEventService } from '../services/PlaybackEventService';
 const router = Router();
 const statsService = new StatsService(db);
 
+type StatsPeriod = '7d' | '30d' | '90d' | 'all';
+
 router.post('/event/start', (req, res) => {
   const { trackId, source, deviceId } = req.body;
   const eventId = PlaybackEventService.startEvent(trackId, source, deviceId);
@@ -20,13 +22,15 @@ router.post('/event/end', (req, res) => {
 
 router.get('/top-tracks', (req, res) => {
   const { period = 'all', limit = 10 } = req.query;
-  const tracks = statsService.getTopTracks(period as any, Number(limit));
+  const periodValue = typeof period === 'string' && ['7d', '30d', '90d', 'all'].includes(period) ? period as StatsPeriod : 'all';
+  const tracks = statsService.getTopTracks(periodValue, Number(limit));
   res.json({ data: tracks });
 });
 
 router.get('/top-artists', (req, res) => {
   const { period = 'all', limit = 10 } = req.query;
-  const artists = statsService.getTopArtists(period as any, Number(limit));
+  const periodValue = typeof period === 'string' && ['7d', '30d', '90d', 'all'].includes(period) ? period as StatsPeriod : 'all';
+  const artists = statsService.getTopArtists(periodValue, Number(limit));
   res.json({ data: artists });
 });
 

@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { SubtitleService } from '../services/SubtitleService';
+import { SubtitleService, SubtitleCue } from '../services/SubtitleService';
 import { createRequire } from 'node:module';
 
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
+const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
 
 const router = Router();
 
@@ -31,7 +31,7 @@ router.get('/extract', (req, res) => {
 
 router.post('/parse', (req, res) => {
   const { content, format } = req.body;
-  let cues: any[] = [];
+  let cues: SubtitleCue[] = [];
   if (format === 'srt') cues = SubtitleService.parseSRT(content);
   else if (format === 'vtt') cues = SubtitleService.parseVTT(content);
   else if (format === 'ass') cues = SubtitleService.parseASS(content);

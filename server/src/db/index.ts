@@ -23,6 +23,11 @@ db.exec(`
       path TEXT PRIMARY KEY, added_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
       file_path TEXT NOT NULL UNIQUE,

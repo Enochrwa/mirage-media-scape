@@ -2,8 +2,33 @@ import { Database } from 'better-sqlite3';
 import fetch from 'node-fetch';
 import { createRequire } from 'node:module';
 
+interface AcoustidRelease {
+  title?: string;
+  date?: { year?: number };
+}
+
+interface AcoustidArtist {
+  name?: string;
+}
+
+interface AcoustidRecording {
+  title?: string;
+  artists?: AcoustidArtist[];
+  releases?: AcoustidRelease[];
+  id?: string;
+}
+
+interface AcoustidResult {
+  recordings?: AcoustidRecording[];
+}
+
+interface AcoustidResponse {
+  status?: string;
+  results?: AcoustidResult[];
+}
+
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
+const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
 
 export class FingerprintService {
   private static ACOUSTID_CLIENT_KEY = process.env.ACOUSTID_CLIENT_KEY || '8XaZ6ST0';
@@ -12,14 +37,16 @@ export class FingerprintService {
     const { fingerprint, duration } = native.generateFingerprint(path);
 
     // Check cache
-    const cached = db.prepare('SELECT result FROM fingerprint_cache WHERE fingerprint = ?').get(fingerprint) as { result: string };
+    const cached = db
+      .prepare('SELECT result FROM fingerprint_cache WHERE fingerprint = ?')
+      .get(fingerprint) as { result: string };
     if (cached) return JSON.parse(cached.result);
 
     const url = `https://api.acoustid.org/v2/lookup?client=${this.ACOUSTID_CLIENT_KEY}&fingerprint=${fingerprint}&duration=${Math.floor(duration)}&meta=recordings+releases+tracks+compress`;
     const res = await fetch(url);
-    const data = await res.json() as any;
+    const data = (await res.json()) as AcoustidResponse;
 
-    if (data.status === 'ok' && data.results.length > 0) {
+    if (data.status === 'ok' && data.results?.length > 0) {
       const topResult = data.results[0].recordings?.[0];
       if (topResult) {
         const metadata = {
@@ -27,13 +54,15 @@ export class FingerprintService {
           artist: topResult.artists?.[0]?.name,
           album: topResult.releases?.[0]?.title,
           year: topResult.releases?.[0]?.date?.year,
-          mbid: topResult.id
+          mbid: topResult.id,
         };
 
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO fingerprint_cache (fingerprint, result, fetched_at)
           VALUES (?, ?, ?)
-        `).run(fingerprint, JSON.stringify(metadata), Math.floor(Date.now() / 1000));
+        `,
+        ).run(fingerprint, JSON.stringify(metadata), Math.floor(Date.now() / 1000));
 
         return metadata;
       }

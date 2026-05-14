@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { Track } from '../types/database';
 
 const requireNative = createRequire(__filename);
-const native = requireNative('../../zovyra-native.node') as typeof import('../../zovyra-native');
+const native = requireNative('../../../native/index.js') as typeof import('../../zovyra-native');
 
 export class DuplicateFinderService {
   constructor(private db: Database.Database) {}
