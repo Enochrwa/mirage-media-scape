@@ -29,12 +29,14 @@ import { AlbumView } from './pages/AlbumView';
 import { WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useCapability } from './platform/PlatformContext';
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const initLibrary = useLibraryStore((state) => state.init);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const canSyncInBackground = useCapability('canSyncInBackground');
 
   useEffect(() => {
     initLibrary();
@@ -43,7 +45,7 @@ const App = () => {
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
 
-    if ('serviceWorker' in navigator) {
+    if (canSyncInBackground && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');
     }
 
@@ -51,13 +53,12 @@ const App = () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [initLibrary]);
+  }, [initLibrary, canSyncInBackground]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Global shortcuts
       const player = usePlayerStore.getState();
-      const library = useLibraryStore.getState();
 
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -135,7 +136,6 @@ const App = () => {
                  <Route path="/duplicates" element={<DuplicateManagerPage />} />
                  <Route path="/radio" element={<RadioPage />} />
                  <Route path="/podcasts" element={<PodcastsPage />} />
-                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                  <Route path="*" element={<NotFound />} />
                </Routes>
              </BrowserRouter>

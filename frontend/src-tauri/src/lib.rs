@@ -5,6 +5,8 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+pub mod commands;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let play_pause_shortcut = Shortcut::new(None, Code::MediaPlayPause);
@@ -26,6 +28,14 @@ pub fn run() {
                 }
             })
             .build())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_os::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::platform::probe_platform,
+            commands::platform::update_media_metadata,
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -46,7 +56,7 @@ pub fn run() {
                 &[&show_i, &play_i, &next_i, &prev_i, &quit_i],
             )?;
 
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {

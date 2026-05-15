@@ -1,6 +1,8 @@
 import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
 import { MediaFile } from '@/types/media';
+import { getPlatform } from '../platform';
+import { getMediaKeyService } from '../services/mediaKeys';
 
 // ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
 // Source
@@ -38,6 +40,8 @@ export class PlaybackEngine {
   private currentEventId: string | null = null;
   private playbackStartTime: number = 0;
   public sleepTimer: SleepTimer | null = null;
+  private capabilities = getPlatform();
+  private mediaKeys = getMediaKeyService();
 
   private _abLoop: {
     pointA: number | null;
@@ -51,6 +55,11 @@ export class PlaybackEngine {
   }
 
   private initContext() {
+    if (!this.capabilities.supportsWebAudioAPI) {
+      console.warn('Web Audio API not supported on this platform');
+      return;
+    }
+
     const AudioContextClass =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -78,11 +87,28 @@ export class PlaybackEngine {
     this.chains = [this.createChain(), this.createChain()];
 
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
+
+    this.mediaKeys.setActionHandlers({
+      play: () => this.play(),
+      pause: () => this.pause(),
+      next: () => {
+        /* Next logic usually in a store/controller */
+      },
+      previous: () => {
+        /* Previous logic */
+      },
+      seek: (time) => this.seek(time),
+    });
   }
 
   private createChain(): TrackChain {
     const el = new Audio();
     el.crossOrigin = 'anonymous';
+
+    if (this.capabilities.canUseHardwareDecoding) {
+      el.setAttribute('x-webkit-airplay', 'allow');
+    }
+
     const source = this.ctx.createMediaElementSource(el);
 
     // Stats tracking: monitor media element events
@@ -145,25 +171,8 @@ export class PlaybackEngine {
       this.chains[(index + 1) % 2].fade.gain.setValueAtTime(0, this.ctx.currentTime);
     }
 
-    this.setupMediaSession(file);
-  }
-
-  private setupMediaSession(file: MediaFile) {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: file.title,
-        artist: file.artist,
-        album: file.album,
-        artwork: file.cover
-          ? [
-              {
-                src: file.cover,
-                sizes: '512x512',
-                type: 'image/jpeg',
-              },
-            ]
-          : [],
-      });
+    if (this.capabilities.canControlMediaKeys) {
+      this.mediaKeys.updateMetadata(file);
     }
   }
 

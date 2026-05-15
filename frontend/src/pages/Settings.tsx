@@ -46,6 +46,7 @@ import { playbackEngine } from '@/lib/PlaybackEngine';
 import { Badge } from '@/components/ui/badge';
 import { useEffect } from 'react';
 import { API_BASE } from '@/lib/utils';
+import { useCapability } from '@/platform/PlatformContext';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -71,16 +72,19 @@ const Settings = () => {
     'avi',
   ]);
   const [newExt, setNewExt] = useState('');
+  const canSendNativeNotifications = useCapability('canSendNativeNotifications');
 
   useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
-    });
-    navigator.mediaDevices.ondevicechange = () => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
       navigator.mediaDevices.enumerateDevices().then((devices) => {
         setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
       });
-    };
+      navigator.mediaDevices.ondevicechange = () => {
+        navigator.mediaDevices.enumerateDevices().then((devices) => {
+          setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
+        });
+      };
+    }
   }, []);
 
   const handleExport = async () => {
@@ -363,11 +367,15 @@ const Settings = () => {
                         Receive notifications about new uploads and features
                       </p>
                     </div>
-                    <Switch
-                      id="notifications"
-                      checked={notifications}
-                      onCheckedChange={setNotifications}
-                    />
+                    {canSendNativeNotifications ? (
+                      <Switch
+                        id="notifications"
+                        checked={notifications}
+                        onCheckedChange={setNotifications}
+                      />
+                    ) : (
+                      <Badge variant="outline">Not supported</Badge>
+                    )}
                   </div>
                 </div>
               </CardContent>

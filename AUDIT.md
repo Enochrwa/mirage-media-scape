@@ -1,5 +1,20 @@
 # ZOVYRA Codebase Audit (Phase 0)
 
+## Build Environment Blockers
+
+The following system libraries are missing in the current sandbox environment, preventing `cargo check` or `cargo build` from completing in `frontend/src-tauri` and `native/`. These should be installed in the target deployment/development environment.
+
+- **glib-2.0**: Required by `tauri` and its plugins.
+  - *Install (Ubuntu/Debian):* `sudo apt-get install libglib2.0-dev`
+- **gobject-2.0**: Required by `tauri` and its plugins.
+  - *Install (Ubuntu/Debian):* `sudo apt-get install libglib2.0-dev` (part of the same package)
+- **libavutil, libavcodec, libavformat, etc. (FFmpeg)**: Required by `zovyra-native` (via `ffmpeg-next`).
+  - *Install (Ubuntu/Debian):* `sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev`
+- **pkg-config**: Required to locate the above libraries during build.
+  - *Install (Ubuntu/Debian):* `sudo apt-get install pkg-config`
+
+---
+
 ## Step 0.1 — Full File Inventory
 
 ### native/src/
@@ -120,7 +135,7 @@
 - `write_tags`: **Missing**.
 - `get_subtitle_tracks`: Exists.
 - `extract_subtitle_stream`: Exists.
-- `probe_hardware_codecs`: **Missing**.
+- `probe_hardware_codecs`: Exists in `decoding.rs`.
 - `compute_replay_gain`: **Missing**.
 
 ## Step 0.4 — Audio Graph Audit
@@ -172,7 +187,7 @@ Actual Delta:
 | Waveform Fingerprint | ✅ Complete | Rust implementation exists | `native/src/lib.rs` |
 | Tag Writing | ❌ Missing | Not implemented in Rust | |
 | Subtitle Extraction | ✅ Complete | Rust implementation exists | `native/src/lib.rs` |
-| Hardware Probe | ❌ Missing | Not implemented in Rust | |
+| Hardware Probe | ✅ Complete | Implemented in `decoding.rs` | |
 | ReplayGain Scan | ❌ Missing | Not implemented in Rust | |
 | Playback Events | 🟡 Partial | DB missing columns, Service incomplete | `server/src/services/StatsService.ts` |
 | Recommendations | 🟡 Partial | Service exists but needs logic update | `server/src/services/RecommendationService.ts` |
@@ -184,11 +199,11 @@ Actual Delta:
 | AI DJ Service | 🟡 Partial | Templates and MusicBrainz bio needed | `server/src/services/AIDJService.ts` |
 | Stats Service | 🟡 Partial | Recap and heatmap logic needed | `server/src/services/StatsService.ts` |
 | Sync / Remote | 🟡 Partial | Basic implementation exists | `server/src/services/LocalSyncServer.ts` |
-| Playback Engine | ⚠️ Wrong layer | Currently uses AudioBuffer, needs HTMLMediaElement | `frontend/src/lib/PlaybackEngine.ts` |
+| Playback Engine | ✅ Complete | Refactored to use HTMLMediaElement and Platform API | `frontend/src/lib/PlaybackEngine.ts` |
 | UI Components | 🟡 Partial | Most components exist but need logic audit | `frontend/src/components/` |
 
 ## Step 0.8 — Conflict and Risk List
-- **Playback Source Conflict**: Existing `PlaybackEngine` is built around `AudioBufferSourceNode`. Switching to `HTMLMediaElement` is a major refactor that affects crossfading, EQ, and analysis.
+- **Playback Source Conflict**: Existing `PlaybackEngine` is built around `AudioBufferSourceNode`. Switching to `HTMLMediaElement` is a major refactor that affects crossfading, EQ, and analysis. (RESOLVED in Platform Refactor)
 - **Audio Analysis Algorithm**: The spec requires manual implementation of spectral flux and chromagram in Rust. Current implementation uses `stratum-dsp`.
 - **Database Schema**: Existing schema in `server/src/db/index.ts` is missing many columns and tables required by the spec.
 - **Type Duplication**: `Track` and other core types are defined in multiple places.
