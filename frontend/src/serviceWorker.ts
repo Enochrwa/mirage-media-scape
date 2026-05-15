@@ -7,27 +7,29 @@ const ASSETS_TO_CACHE = [
   '/icons/icon-512.png',
 ];
 
-self.addEventListener('install', (event: any) => {
-  event.waitUntil(
+self.addEventListener('install', (event: Event) => {
+  const extendableEvent = event as ExtendableEvent;
+  extendableEvent.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
-    })
+    }),
   );
 });
 
-self.addEventListener('fetch', (event: any) => {
+self.addEventListener('fetch', (event: Event) => {
+  const fetchEvent = event as FetchEvent;
   // Cache-first for audio files, network-first for API
-  const url = new URL(event.request.url);
+  const url = new URL(fetchEvent.request.url);
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+    fetchEvent.respondWith(
+      fetch(fetchEvent.request).catch(() => caches.match(fetchEvent.request) as Promise<Response>),
     );
   } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
+    fetchEvent.respondWith(
+      caches.match(fetchEvent.request).then((response) => {
+        return response || fetch(fetchEvent.request);
+      }),
     );
   }
 });

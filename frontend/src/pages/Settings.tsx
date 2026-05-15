@@ -46,7 +46,7 @@ import { playbackEngine } from '@/lib/PlaybackEngine';
 import { Badge } from '@/components/ui/badge';
 import { useEffect } from 'react';
 import { API_BASE } from '@/lib/utils';
-import { useCapability } from '@/platform/PlatformContext';
+import { useCapability } from '@/platform';
 
 const Settings = () => {
   const { i18n } = useTranslation();

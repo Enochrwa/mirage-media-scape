@@ -1,9 +1,9 @@
-import type { IMediaKeyService } from './IMediaKeyService'
-import { MediaFile } from '@/types/media'
+import type { IMediaKeyService } from './IMediaKeyService';
+import { MediaFile } from '@/types/media';
 
 export class WebMediaKeyService implements IMediaKeyService {
   async updateMetadata(file: MediaFile): Promise<void> {
-    if (!('mediaSession' in navigator)) return
+    if (!('mediaSession' in navigator)) return;
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: file.title,
@@ -18,28 +18,28 @@ export class WebMediaKeyService implements IMediaKeyService {
             },
           ]
         : [],
-    })
+    });
   }
 
   async setActionHandlers(handlers: {
-    play: () => void
-    pause: () => void
-    next: () => void
-    previous: () => void
-    seek?: (time: number) => void
+    play: () => void;
+    pause: () => void;
+    next: () => void;
+    previous: () => void;
+    seek?: (time: number) => void;
   }): Promise<void> {
-    if (!('mediaSession' in navigator)) return
+    if (!('mediaSession' in navigator)) return;
 
-    navigator.mediaSession.setActionHandler('play', handlers.play)
-    navigator.mediaSession.setActionHandler('pause', handlers.pause)
-    navigator.mediaSession.setActionHandler('nexttrack', handlers.next)
-    navigator.mediaSession.setActionHandler('previoustrack', handlers.previous)
+    navigator.mediaSession.setActionHandler('play', handlers.play);
+    navigator.mediaSession.setActionHandler('pause', handlers.pause);
+    navigator.mediaSession.setActionHandler('nexttrack', handlers.next);
+    navigator.mediaSession.setActionHandler('previoustrack', handlers.previous);
     if (handlers.seek) {
       navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime !== undefined) {
-          handlers.seek!(details.seekTime)
+          handlers.seek!(details.seekTime);
         }
-      })
+      });
     }
   }
 }

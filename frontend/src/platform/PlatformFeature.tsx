@@ -1,11 +1,11 @@
-import React from 'react'
-import { usePlatform } from './PlatformContext'
-import type { PlatformCapabilities } from './capabilities'
+import React from 'react';
+import { usePlatform } from './usePlatform';
+import type { PlatformCapabilities } from './capabilities';
 
 interface PlatformFeatureProps {
-  requires: keyof PlatformCapabilities
-  fallback?: React.ReactNode
-  children: React.ReactNode
+  requires: keyof PlatformCapabilities;
+  fallback?: React.ReactNode;
+  children: React.ReactNode;
 }
 
 /**
@@ -22,6 +22,6 @@ interface PlatformFeatureProps {
  *   </PlatformFeature>
  */
 export function PlatformFeature({ requires, fallback = null, children }: PlatformFeatureProps) {
-  const capabilities = usePlatform()
-  return <>{capabilities[requires] ? children : fallback}</>
+  const capabilities = usePlatform();
+  return <>{capabilities[requires] ? children : fallback}</>;
 }

@@ -1,4 +1,4 @@
 export interface ITrayService {
-  updateStatus(isPlaying: boolean): Promise<void>
-  showMiniPlayer(): Promise<void>
+  updateStatus(isPlaying: boolean): Promise<void>;
+  showMiniPlayer(): Promise<void>;
 }

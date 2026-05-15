@@ -1,4 +1,4 @@
-import type { ITrayService } from './ITrayService'
+import type { ITrayService } from './ITrayService';
 
 export class WebTrayService implements ITrayService {
   async updateStatus(_isPlaying: boolean): Promise<void> {
@@ -7,6 +7,6 @@ export class WebTrayService implements ITrayService {
 
   async showMiniPlayer(): Promise<void> {
     // Show floating overlay in UI
-    window.dispatchEvent(new CustomEvent('zovyra-show-miniplayer'))
+    window.dispatchEvent(new CustomEvent('zovyra-show-miniplayer'));
   }
 }

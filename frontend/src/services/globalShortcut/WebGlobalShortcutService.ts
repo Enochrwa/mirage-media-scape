@@ -1,4 +1,4 @@
-import type { IGlobalShortcutService } from './IGlobalShortcutService'
+import type { IGlobalShortcutService } from './IGlobalShortcutService';
 
 export class WebGlobalShortcutService implements IGlobalShortcutService {
   async register(_shortcut: string, _handler: () => void): Promise<void> {
@@ -6,6 +6,5 @@ export class WebGlobalShortcutService implements IGlobalShortcutService {
     // App.tsx handles window-level keydown events.
   }
 
-  async unregister(_shortcut: string): Promise<void> {
-  }
+  async unregister(_shortcut: string): Promise<void> {}
 }

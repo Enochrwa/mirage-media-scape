@@ -243,7 +243,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     } catch (e) {
       console.error('Failed to fetch tracks', e);
     }
-},
+  },
 
   fetchSmartPlaylists: async () => {
     try {

@@ -29,7 +29,7 @@ import { AlbumView } from './pages/AlbumView';
 import { WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useCapability } from './platform/PlatformContext';
+import { useCapability } from './platform';
 
 const queryClient = new QueryClient();
 
@@ -88,62 +88,62 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-   return (
-     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-       <QueryClientProvider client={queryClient}>
-         <TooltipProvider>
-           {isOffline && (
-             <div className="fixed left-0 right-0 top-0 z-[100] bg-amber-600 py-1 text-center text-xs font-bold text-white animate-in slide-in-from-top">
-               <div className="flex items-center justify-center gap-2">
-                 <WifiOff size={14} /> You're offline — local library available
-               </div>
-             </div>
-           )}
-           <Toaster />
-           <Sonner />
-           <ErrorBoundary>
-             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-               <Routes>
-                 <Route
-                   path="/"
-                   element={
-                     <ZovyraLayout>
-                       <ArtistProfile />
-                     </ZovyraLayout>
-                   }
-                 />
-                 <Route
-                   path="/artist"
-                   element={
-                     <ZovyraLayout>
-                       <ArtistProfile />
-                     </ZovyraLayout>
-                   }
-                 />
-                 <Route path="/home" element={<Home />} />
-                 <Route path="/library" element={<Library />} />
-                 <Route path="/music" element={<Music />} />
-                 <Route path="/videos" element={<Videos />} />
-                 <Route path="/upload" element={<Upload />} />
-                 <Route path="/playlists" element={<Playlists />} />
-                 <Route path="/favorites" element={<Favorites />} />
-                 <Route path="/settings" element={<Settings />} />
-                 <Route path="/dashboard" element={<Dashboard />} />
-                 <Route path="/stats" element={<StatsPage />} />
-                 <Route path="/album/:id" element={<AlbumView />} />
-                 <Route path="/artist/:name" element={<ArtistProfile />} />
-                 <Route path="/remote" element={<RemotePage />} />
-                 <Route path="/duplicates" element={<DuplicateManagerPage />} />
-                 <Route path="/radio" element={<RadioPage />} />
-                 <Route path="/podcasts" element={<PodcastsPage />} />
-                 <Route path="*" element={<NotFound />} />
-               </Routes>
-             </BrowserRouter>
-           </ErrorBoundary>
-         </TooltipProvider>
-       </QueryClientProvider>
-     </ThemeProvider>
-   );
+  return (
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          {isOffline && (
+            <div className="fixed left-0 right-0 top-0 z-[100] bg-amber-600 py-1 text-center text-xs font-bold text-white animate-in slide-in-from-top">
+              <div className="flex items-center justify-center gap-2">
+                <WifiOff size={14} /> You're offline — local library available
+              </div>
+            </div>
+          )}
+          <Toaster />
+          <Sonner />
+          <ErrorBoundary>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <ZovyraLayout>
+                      <ArtistProfile />
+                    </ZovyraLayout>
+                  }
+                />
+                <Route
+                  path="/artist"
+                  element={
+                    <ZovyraLayout>
+                      <ArtistProfile />
+                    </ZovyraLayout>
+                  }
+                />
+                <Route path="/home" element={<Home />} />
+                <Route path="/library" element={<Library />} />
+                <Route path="/music" element={<Music />} />
+                <Route path="/videos" element={<Videos />} />
+                <Route path="/upload" element={<Upload />} />
+                <Route path="/playlists" element={<Playlists />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/stats" element={<StatsPage />} />
+                <Route path="/album/:id" element={<AlbumView />} />
+                <Route path="/artist/:name" element={<ArtistProfile />} />
+                <Route path="/remote" element={<RemotePage />} />
+                <Route path="/duplicates" element={<DuplicateManagerPage />} />
+                <Route path="/radio" element={<RadioPage />} />
+                <Route path="/podcasts" element={<PodcastsPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </ErrorBoundary>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
+  );
 };
 
 export default App;

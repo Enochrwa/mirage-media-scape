@@ -5,8 +5,8 @@ import { detectMobileCapabilities } from './detectors/mobile'
 
 function resolveHost(): 'web' | 'desktop' | 'mobile' {
   if (typeof window === 'undefined') return 'web'
-  if ('__TAURI__' in window) return 'desktop'      // Tauri injects this
-  if ('zovyraMobile' in window) return 'mobile'    // Capacitor/RN marker
+  if ('__TAURI__' in window) return 'desktop' // Tauri injects this
+  if ('zovyraMobile' in window) return 'mobile' // Capacitor/RN marker
   return 'web'
 }
 
@@ -19,8 +19,14 @@ let _cached: PlatformCapabilities | null = null
 export function getPlatform(): PlatformCapabilities {
   if (!_cached) {
     const host = resolveHost()
-    if (host === 'web')    { _cached = detectWebCapabilities();    return _cached }
-    if (host === 'mobile') { _cached = detectMobileCapabilities(); return _cached }
+    if (host === 'web') {
+      _cached = detectWebCapabilities()
+      return _cached
+    }
+    if (host === 'mobile') {
+      _cached = detectMobileCapabilities()
+      return _cached
+    }
     throw new Error('[Zovyra Platform] await initPlatform() before getPlatform() on desktop')
   }
   return _cached
@@ -53,3 +59,7 @@ export async function initPlatform(): Promise<PlatformCapabilities> {
 }
 
 export type { PlatformCapabilities }
+export * from './PlatformContext'
+export * from './PlatformProvider'
+export * from './usePlatform'
+export * from './PlatformFeature'
