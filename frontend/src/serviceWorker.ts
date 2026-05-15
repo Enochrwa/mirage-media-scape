@@ -12,7 +12,7 @@ self.addEventListener('install', (event: Event) => {
   extendableEvent.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
-    }),
+    })
   );
 });
 
@@ -23,13 +23,13 @@ self.addEventListener('fetch', (event: Event) => {
 
   if (url.pathname.startsWith('/api/')) {
     fetchEvent.respondWith(
-      fetch(fetchEvent.request).catch(() => caches.match(fetchEvent.request) as Promise<Response>),
+      fetch(fetchEvent.request).catch(() => caches.match(fetchEvent.request) as Promise<Response>)
     );
   } else {
     fetchEvent.respondWith(
       caches.match(fetchEvent.request).then((response) => {
         return response || fetch(fetchEvent.request);
-      }),
+      })
     );
   }
 });
