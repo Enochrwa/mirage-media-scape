@@ -3,6 +3,8 @@ import { MediaFile, Playlist } from '@/types/media';
 import { API_BASE } from '@/lib/utils';
 import { io, Socket } from 'socket.io-client';
 import { openDB, IDBPDatabase } from 'idb';
+import { getPlatform } from '../platform';
+import { MobileMediaService } from '../services/mobileMedia/MobileMediaService';
 
 export interface IncomingTrack {
   id: string;
@@ -138,32 +140,92 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     });
     set({ db: idb });
 
-    // Load handles and check permissions
-    const handles = (await idb.getAll(HANDLES_STORE)) as FileSystemDirectoryHandle[];
-    let needsPermission = false;
-    if (handles.length > 0) {
-      for (const handle of handles) {
-        if (
-          (await (
-            handle as unknown as { queryPermission: (o: { mode: string }) => Promise<string> }
-          ).queryPermission({
-            mode: 'read',
-          })) !== 'granted'
-        ) {
-          needsPermission = true;
-          break;
+    const { host } = getPlatform();
+
+    if (host === 'web') {
+      // Load handles and check permissions
+      const handles = (await idb.getAll(HANDLES_STORE)) as FileSystemDirectoryHandle[];
+      let needsPermission = false;
+      if (handles.length > 0) {
+        for (const handle of handles) {
+          if (
+            (await (
+              handle as unknown as { queryPermission: (o: { mode: string }) => Promise<string> }
+            ).queryPermission({
+              mode: 'read',
+            })) !== 'granted'
+          ) {
+            needsPermission = true;
+            break;
+          }
         }
-      }
-      set({ folderHandles: handles, needsPermission });
-      if (!needsPermission) {
-        // Automatically start background refresh if permission is granted
-        void get().fetchTracks();
+        set({ folderHandles: handles, needsPermission });
+        if (!needsPermission) {
+          // Automatically start background refresh if permission is granted
+          void get().fetchTracks();
+        }
       }
     }
 
     const cachedTracks = (await idb.getAll(STORE_NAME)) as MediaFile[];
     if (cachedTracks.length > 0) {
       set({ files: cachedTracks });
+    }
+
+    if (host === 'desktop') {
+      // Step B: Check when last scan ran
+      try {
+        const statsRes = await fetch(`${API_BASE}/api/scanner/stats`);
+        const { data } = await statsRes.json();
+        const lastScanAge = Date.now() - (data?.lastScanAt ?? 0);
+        const ONE_HOUR = 60 * 60 * 1000;
+
+        if (lastScanAge > ONE_HOUR || data?.totalTracks === 0) {
+          // Trigger background auto-scan — don't block UI
+          fetch(`${API_BASE}/api/scanner/auto-scan-defaults`, { method: 'POST' }).catch(
+            console.error,
+          );
+        }
+      } catch (e) {
+        // Server offline — cached library still shows
+        console.warn('[Desktop] Could not check scan status', e);
+      }
+    } else if (host === 'mobile') {
+      // Query device OS media database directly
+      // No server scan. No waiting.
+      set({ scanProgress: { scanned: 0, total: 0, percentage: 0 } });
+
+      const granted = await MobileMediaService.requestPermissions();
+      if (granted) {
+        const deviceMedia = await MobileMediaService.getAll();
+        if (deviceMedia.length > 0) {
+          set({ files: deviceMedia, scanProgress: null });
+          // Persist to IDB so subsequent launches are instant
+          if (idb) await persistTracksToIdb(idb, deviceMedia);
+        } else {
+          set({ scanProgress: null });
+        }
+
+        // VLC-style auto-refresh on app resume
+        const { App } = await import('@capacitor/app');
+        App.addListener('appStateChange', async ({ isActive }) => {
+          if (isActive) {
+            // App came to foreground — silently refresh media list
+            const granted = await MobileMediaService.requestPermissions();
+            if (granted) {
+              const fresh = await MobileMediaService.getAll();
+              if (fresh.length > 0) {
+                set({ files: fresh });
+                if (idb) await persistTracksToIdb(idb, fresh);
+              }
+            }
+          }
+        });
+      } else {
+        set({ scanProgress: null });
+        // Show permission denied state in UI
+        set({ needsPermission: true });
+      }
     }
 
     let socket = get().socket;
