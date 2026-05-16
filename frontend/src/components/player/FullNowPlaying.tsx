@@ -31,6 +31,10 @@ import { cn, API_BASE } from '@/lib/utils';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { WaveformSeekBar } from './WaveformSeekBar';
 import { type MediaFile } from '@/types/media';
+import { CompressorControls } from './CompressorControls';
+import { EqualizerControls } from './EqualizerControls';
+import SpatialAudioControls from '../SpatialAudioControls';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export const FullNowPlaying: React.FC = () => {
   const {
@@ -155,9 +159,20 @@ export const FullNowPlaying: React.FC = () => {
             <Button variant="ghost" size="icon" className="hover:text-primary" title="Lyrics">
               <ListMusic size={20} />
             </Button>
-            <Button variant="ghost" size="icon" className="hover:text-primary" title="Visualizer">
-              <Palette size={20} />
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:text-primary" title="Audio Effects">
+                  <Palette size={20} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] border-white/10 bg-zinc-900 p-0" side="top">
+                <div className="max-h-[60vh] overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                  <EqualizerControls onClose={() => {}} />
+                  <CompressorControls />
+                  <SpatialAudioControls />
+                </div>
+              </PopoverContent>
+            </Popover>
             <div className="relative">
               <Button
                 variant="ghost"

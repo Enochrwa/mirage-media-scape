@@ -72,6 +72,43 @@ const store = create<PlayerState>((set, get) => ({
 
     queueManager.load();
     get().restoreSession();
+
+    // Restore EQ settings
+    const savedEQ = localStorage.getItem('ZOVYRA_eq_bands');
+    if (savedEQ) {
+      try {
+        const bands = JSON.parse(savedEQ);
+        bands.forEach((g: number, i: number) => playbackEngine.setEQBand(i, g));
+      } catch (e) {
+        console.error('Failed to restore EQ bands', e);
+      }
+    }
+
+    // Restore Compressor settings
+    const savedCompressor = localStorage.getItem('ZOVYRA_compressor_settings');
+    if (savedCompressor) {
+      try {
+        const { params, enabled } = JSON.parse(savedCompressor);
+        playbackEngine.setCompressorParams({ ...params, enabled });
+      } catch (e) {
+        console.error('Failed to restore compressor settings', e);
+      }
+    }
+
+    // Restore Spatial/Widening settings
+    const savedSpatial = localStorage.getItem('ZOVYRA_spatial_settings');
+    if (savedSpatial) {
+      try {
+        const s = JSON.parse(savedSpatial);
+        playbackEngine.setSpatialAudioEnabled(s.enabled);
+        playbackEngine.setSpatialMonoMerge(s.monoMerge || false);
+        playbackEngine.setStereoWidth(s.stereoWidth ?? 1.0);
+        playbackEngine.setSpatialPosition(s.pos.x, s.pos.y, s.pos.z);
+      } catch (e) {
+        console.error('Failed to restore spatial settings', e);
+      }
+    }
+
     queueManager.setOnQueueExhausted(async () => {
       const current = get().currentFile;
       if (!current) return;

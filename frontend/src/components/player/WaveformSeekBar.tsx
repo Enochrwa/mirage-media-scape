@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { cn } from '@/lib/utils';
+import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 
 interface WaveformSeekBarProps {
   trackId?: string;
@@ -20,17 +21,26 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
   const [chapters, setChapters] = useState<{ time: number; title: string }[]>([]);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lowPowerMode = useLowPowerMode();
 
   const peaks = useMemo(() => {
-    if (!currentFile?.waveform_data) return [];
+    if (!currentFile?.waveform_data) return null;
     try {
-      return JSON.parse(currentFile.waveform_data) as number[];
+      const allPeaks = JSON.parse(currentFile.waveform_data) as number[];
+      const targetCount = lowPowerMode ? 250 : 300;
+
+      // Resample to targetCount
+      const resampled: number[] = [];
+      for (let i = 0; i < targetCount; i++) {
+        const idx = Math.floor((i / targetCount) * allPeaks.length);
+        resampled.push(allPeaks[idx]);
+      }
+      return resampled;
     } catch (e) {
-      return [];
+      return null;
     }
-  }, [currentFile?.waveform_data]);
+  }, [currentFile?.waveform_data, lowPowerMode]);
 
   useEffect(() => {
     const checkLoop = setInterval(() => {
@@ -93,61 +103,6 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentTime, duration, pe]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const { width, height } = canvas;
-    ctx.clearRect(0, 0, width, height);
-
-    const progress = currentTime / duration;
-    const hoverProgress = hoverTime !== null ? hoverTime / duration : null;
-
-    if (peaks.length === 0) {
-      // Fallback thin progress bar
-      ctx.fillStyle = 'rgba(139, 92, 246, 0.2)';
-      ctx.fillRect(0, height / 2 - 2, width, 4);
-      ctx.fillStyle = '#8B5CF6';
-      ctx.fillRect(0, height / 2 - 2, width * progress, 4);
-    } else {
-      const barWidth = width / peaks.length;
-      peaks.forEach((peak, i) => {
-        const x = i * barWidth;
-        const barHeight = peak * height * 0.8;
-        const barProgress = i / peaks.length;
-
-        const isPlayed = barProgress <= progress;
-        const isHovered = hoverProgress !== null && barProgress <= hoverProgress;
-
-        if (isPlayed) ctx.fillStyle = '#8B5CF6';
-        else if (isHovered) ctx.fillStyle = 'rgba(139, 92, 246, 0.4)';
-        else ctx.fillStyle = 'rgba(139, 92, 246, 0.2)';
-
-        ctx.fillRect(x, (height - barHeight) / 2, barWidth - 1, barHeight);
-      });
-    }
-
-    // A/B Loop Shading
-    if (localABLoop.pointA !== null && localABLoop.pointB !== null) {
-      const xA = (localABLoop.pointA / duration) * width;
-      const xB = (localABLoop.pointB / duration) * width;
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
-      ctx.fillRect(xA, 0, xB - xA, height);
-    } else if (localABLoop.pointA !== null) {
-      const xA = (localABLoop.pointA / duration) * width;
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-      ctx.fillRect(xA, 0, 2, height);
-    }
-
-    // Chapter markers
-    chapters.forEach((chapter) => {
-      const x = (chapter.time / duration) * width;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.fillRect(x - 1, 0, 2, height);
-    });
-  }, [peaks, currentTime, duration, hoverTime, localABLoop, chapters]);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
@@ -213,6 +168,77 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const hoverProgress = (hoverTime !== null && duration > 0) ? hoverTime / duration : null;
+
+  const renderWaveform = () => {
+    if (!peaks) {
+      return (
+        <div className="relative h-1 w-full bg-white/10 overflow-hidden rounded-full">
+          <div
+            className="absolute left-0 top-0 h-full bg-purple-500"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      );
+    }
+
+    const width = 1000;
+    const height = 64;
+    const barWidth = width / peaks.length;
+
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-full w-full">
+        {peaks.map((peak, i) => {
+          const x = i * barWidth;
+          const barHeight = peak * height * 0.8;
+          const barProgress = i / peaks.length;
+          const isPlayed = barProgress <= progress;
+          const isHovered = hoverProgress !== null && barProgress <= hoverProgress;
+
+          let color = 'rgba(139, 92, 246, 0.2)';
+          if (isPlayed) color = '#8B5CF6';
+          else if (isHovered) color = 'rgba(139, 92, 246, 0.4)';
+
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={(height - barHeight) / 2}
+              width={barWidth - 1}
+              height={barHeight}
+              fill={color}
+              rx={1}
+            />
+          );
+        })}
+
+        {/* A/B Loop Shading */}
+        {localABLoop.pointA !== null && localABLoop.pointB !== null && (
+          <rect
+            x={(localABLoop.pointA / duration) * width}
+            y={0}
+            width={((localABLoop.pointB - localABLoop.pointA) / duration) * width}
+            height={height}
+            fill="rgba(0, 255, 255, 0.12)"
+          />
+        )}
+
+        {/* Chapter Markers */}
+        {chapters.map((chapter, i) => (
+          <rect
+            key={i}
+            x={(chapter.time / duration) * width - 0.5}
+            y={0}
+            width={1}
+            height={height}
+            fill="rgba(255, 255, 255, 0.3)"
+          />
+        ))}
+      </svg>
+    );
+  };
+
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex justify-between font-mono text-xs text-muted-foreground">
@@ -233,7 +259,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
       <div
         ref={containerRef}
-        className={cn('group relative h-16 w-full', isStream ? 'cursor-default' : 'cursor-pointer')}
+        className={cn('group relative h-16 w-full select-none', isStream ? 'cursor-default' : 'cursor-pointer')}
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -242,36 +268,40 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
           handleMouseUp();
         }}
       >
-        <canvas ref={canvasRef} width={1000} height={64} className="h-full w-full" />
+        {renderWaveform()}
 
         {/* Scrubber Handle */}
         {!isStream && (
           <div
-            className="pointer-events-none absolute bottom-0 top-0 w-1 bg-white shadow-lg transition-all duration-75"
+            className="pointer-events-none absolute bottom-0 top-0 w-1 bg-white shadow-lg transition-all duration-75 z-10"
             style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
           />
         )}
 
-        {/* A/B Markers */}
+        {/* A/B Markers (Draggable SVG Overlays) */}
         {localABLoop.pointA !== null && (
           <div
-            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
+            className="absolute -top-1 z-20 h-full w-6 flex justify-center cursor-ew-resize group/markerA"
             style={{
               left: `${(localABLoop.pointA / duration) * 100}%`,
               transform: 'translateX(-50%)',
-              borderTopColor: '#00FFFF',
             }}
-          />
+          >
+            <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-[#00FFFF] drop-shadow-sm" />
+            <div className="absolute top-0 bottom-0 w-[2px] bg-[#00FFFF] opacity-40 group-hover/markerA:opacity-100" />
+          </div>
         )}
         {localABLoop.pointB !== null && (
           <div
-            className="absolute -top-1 z-20 h-0 w-0 cursor-ew-resize border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent"
+            className="absolute -top-1 z-20 h-full w-6 flex justify-center cursor-ew-resize group/markerB"
             style={{
               left: `${(localABLoop.pointB / duration) * 100}%`,
               transform: 'translateX(-50%)',
-              borderTopColor: '#FF8C00',
             }}
-          />
+          >
+            <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-[#FF8C00] drop-shadow-sm" />
+            <div className="absolute top-0 bottom-0 w-[2px] bg-[#FF8C00] opacity-40 group-hover/markerB:opacity-100" />
+          </div>
         )}
       </div>
     </div>

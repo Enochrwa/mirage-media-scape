@@ -283,6 +283,12 @@ const tablesInfo = {
     'encoder_padding',
     'waveform_data',
     'metadata_json',
+    'analysis_version',
+    'bpm',
+    'key',
+    'camelot_key',
+    'energy',
+    'loudness',
   ],
   playlists: ['crossfade_duration_override'],
 };

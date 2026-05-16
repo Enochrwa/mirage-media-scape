@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { RecommendationService } from '../services/RecommendationService.js';
 import { FingerprintService } from '../services/FingerprintService.js';
 import { DuplicateFinderService } from '../services/DuplicateFinderService.js';
+import { analysisService } from '../services/AnalysisService.js';
 
 // ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -321,4 +322,43 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
       console.error(`Waveform worker exited with code ${code}`);
     }
   });
+};
+
+export const updateTrackMetadata = (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const { title, artist, album, bpm, key, camelot_key } = req.body;
+
+  try {
+    const result = db
+      .prepare(
+        `UPDATE tracks SET
+          title = COALESCE(?, title),
+          artist = COALESCE(?, artist),
+          album = COALESCE(?, album),
+          bpm = COALESCE(?, bpm),
+          key = COALESCE(?, key),
+          camelot_key = COALESCE(?, camelot_key),
+          updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(title, artist, album, bpm, key, camelot_key, Date.now(), id);
+
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Track not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const reanalyzeTrack = async (req: Request, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const analysis = await analysisService.analyzeSingleTrack(id);
+    res.json(analysis);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
 };

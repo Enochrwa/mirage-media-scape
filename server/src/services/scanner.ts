@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import db from '../db/index.js';
 import native from '../utils/native-loader.js';
 import { getDatabasePath } from '../utils/db-utils.js';
+import { analysisService } from './AnalysisService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +52,7 @@ export class ScannerService {
         }
         if (msg.type === 'SCAN_COMPLETE') {
           this.isScanning = false;
+          analysisService.startBackgroundAnalysis().catch(console.error);
           resolve();
         }
       });

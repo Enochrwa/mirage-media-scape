@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration, formatVideoClock, cn } from '@/lib/utils';
+import { TrackInfoModal } from './tracks/TrackInfoModal';
 
 interface LibraryGridProps {
   files: MediaFile[];
@@ -74,6 +75,7 @@ const GridCell = memo(function GridCell({
   const trackId = file?.id;
   const isSelected = trackId ? selection.has(trackId) : false;
   const inSelectionMode = selection.size > 0;
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     setImgLoaded(false);
@@ -236,7 +238,10 @@ const GridCell = memo(function GridCell({
               <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                 Show in File Explorer
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Get Info</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                setShowInfo(true);
+              }}>Get Info</DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={(e) => {
@@ -250,6 +255,16 @@ const GridCell = memo(function GridCell({
           </DropdownMenu>
         </div>
       </Card>
+      {showInfo && file && (
+        <TrackInfoModal
+          track={file}
+          open={showInfo}
+          onOpenChange={setShowInfo}
+          onSave={(updated) => {
+            Object.assign(file, updated);
+          }}
+        />
+      )}
     </div>
   );
 });

@@ -9,12 +9,15 @@ import dotenv from 'dotenv';
 
 import tracksRouter from './routes/tracks.js';
 import scannerRouter, { scannerService } from './routes/scanner.js';
+import { analysisService } from './services/AnalysisService.js';
 import playlistsRouter from './routes/playlists.js';
 import statsRouter from './routes/stats.js';
 import radioRouter from './routes/radio.js';
 import subtitlesRouter from './routes/subtitles.js';
 import aidjRouter from './routes/ai-dj.js';
 import podcastsRouter from './routes/podcasts.js';
+import eqPresetsRouter from './routes/eq-presets.js';
+import settingsRouter from './routes/settings.js';
 import downloadsRouter from './routes/downloads.js';
 import maintenanceRouter from './routes/maintenance.js';
 
@@ -44,6 +47,7 @@ const io = new Server(httpServer, {
  });
 
 scannerService.setIo(io);
+analysisService.setIo(io);
 setLibraryWatcherIo(io);
 refreshLibraryWatcherPaths();
 
@@ -74,6 +78,8 @@ app.use('/api/radio', radioRouter);
 app.use('/api/subtitles', subtitlesRouter);
 app.use('/api/ai-dj', aidjRouter);
 app.use('/api/podcasts', podcastsRouter);
+app.use('/api/eq-presets', eqPresetsRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/api/downloads', downloadsRouter);
 app.use('/api/maintenance', maintenanceRouter);
 

@@ -13,6 +13,8 @@ import {
   getAlbumDetails,
   updateTrackRating,
   getTrackWaveform,
+  updateTrackMetadata,
+  reanalyzeTrack,
 } from '../controllers/tracksController.js';
 import db from '../db/index.js';
 import { RecommendationService } from '../services/RecommendationService.js';
@@ -55,6 +57,12 @@ router.get('/:id', getTrackById);
 
 /** PATCH /api/tracks/:id/rating */
 router.patch('/:id/rating', updateTrackRating);
+
+/** PATCH /api/tracks/:id/metadata */
+router.patch('/:id/metadata', updateTrackMetadata);
+
+/** POST /api/tracks/:id/reanalyze */
+router.post('/:id/reanalyze', reanalyzeTrack);
 
 /** GET /api/tracks/:id/cover */
 router.get('/:id/cover', getTrackCover);
