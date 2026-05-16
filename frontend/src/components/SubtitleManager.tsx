@@ -92,18 +92,22 @@ const SubtitleManager: React.FC = () => {
 
   useEffect(() => {
     const time = currentTime * 1000;
-    const cue = cues.find((c) => time >= (c.start + settings.offset) && time <= (c.end + settings.offset));
+    const cue = cues.find(
+      (c) => time >= c.start + settings.offset && time <= c.end + settings.offset,
+    );
     setActiveCue(cue || null);
-    const secCue = secondaryCues.find((c) => time >= (c.start + settings.offset) && time <= (c.end + settings.offset));
+    const secCue = secondaryCues.find(
+      (c) => time >= c.start + settings.offset && time <= c.end + settings.offset,
+    );
     setActiveSecondaryCue(secCue || null);
   }, [currentTime, cues, secondaryCues, settings.offset]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.shiftKey && e.key.toUpperCase() === 'Z') {
-        setSettings(prev => ({ ...prev, offset: prev.offset - 100 }));
+        setSettings((prev) => ({ ...prev, offset: prev.offset - 100 }));
       } else if (e.shiftKey && e.key.toUpperCase() === 'X') {
-        setSettings(prev => ({ ...prev, offset: prev.offset + 100 }));
+        setSettings((prev) => ({ ...prev, offset: prev.offset + 100 }));
       } else if (e.key.toLowerCase() === 'c') {
         if (cues.length > 0) setCues([]);
       }

@@ -49,6 +49,22 @@ import { MediaFile } from '@/types/media';
 import { client } from '@/api/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+interface AudioTrack {
+  stream_index: number;
+  language?: string;
+  codec_name?: string;
+  channels?: number;
+  sample_rate?: number;
+}
+
+interface Chapter {
+  id: number;
+  chapter_index: number;
+  title?: string;
+  start_time_ms: number;
+  end_time_ms?: number;
+}
+
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -178,9 +194,9 @@ const VideoPlayer: React.FC = () => {
   const [devicePreview, setDevicePreview] = useState('desktop');
   const [isMobile, setIsMobile] = useState(false);
   const [hwDecodeSupported, setHwDecodeSupported] = useState<Record<string, boolean>>({});
-  const [audioTracks, setAudioTracks] = useState<any[]>([]);
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
-  const [chapters, setChapters] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [showChapters, setShowChapters] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [hoverThumb, setHoverThumb] = useState<string | null>(null);
@@ -278,7 +294,7 @@ const VideoPlayer: React.FC = () => {
         setIsPinching(true);
         const dist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
+          e.touches[0].clientY - e.touches[1].clientY,
         );
         setPinchStartScale(dist);
       }
@@ -301,7 +317,7 @@ const VideoPlayer: React.FC = () => {
           const isLeftHalf = e.touches[0].clientX < window.innerWidth / 2;
           if (isLeftHalf) {
             const brightnessDelta = -(deltaY / window.innerHeight);
-            setBrightness(prev => Math.max(0.5, Math.min(2.0, prev + brightnessDelta)));
+            setBrightness((prev) => Math.max(0.5, Math.min(2.0, prev + brightnessDelta)));
           } else {
             const volumeDelta = -(deltaY / window.innerHeight);
             const newVolume = Math.max(0, Math.min(1, volume + volumeDelta));
@@ -312,10 +328,10 @@ const VideoPlayer: React.FC = () => {
       } else if (e.touches.length === 2) {
         const dist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
+          e.touches[0].clientY - e.touches[1].clientY,
         );
         const factor = dist / pinchStartScale;
-        setScale(prev => Math.max(1, Math.min(3, prev * factor)));
+        setScale((prev) => Math.max(1, Math.min(3, prev * factor)));
         setPinchStartScale(dist);
       }
     };
@@ -503,14 +519,14 @@ const VideoPlayer: React.FC = () => {
   const nextChapter = () => {
     if (!videoRef.current) return;
     const time = videoRef.current.currentTime * 1000;
-    const next = chapters.find(c => c.start_time_ms > time + 500);
+    const next = chapters.find((c) => c.start_time_ms > time + 500);
     if (next) videoRef.current.currentTime = next.start_time_ms / 1000;
   };
 
   const prevChapter = () => {
     if (!videoRef.current) return;
     const time = videoRef.current.currentTime * 1000;
-    const current = [...chapters].reverse().find(c => c.start_time_ms <= time);
+    const current = [...chapters].reverse().find((c) => c.start_time_ms <= time);
     if (current) {
       if (time > current.start_time_ms + 2000) {
         videoRef.current.currentTime = current.start_time_ms / 1000;
@@ -578,16 +594,16 @@ const VideoPlayer: React.FC = () => {
 
     // Load persisted settings
     if (currentFile.id) {
-      client.get(`/tracks/${currentFile.id}`).then(res => {
+      client.get(`/tracks/${currentFile.id}`).then((res) => {
         const track = res.data;
         if (track.aspect_ratio_override) setAspectRatio(track.aspect_ratio_override);
         if (track.rotation_degrees) setRotation(track.rotation_degrees);
         if (track.mirror_flip) setMirrorFlip(!!track.mirror_flip);
       });
-      client.get(`/tracks/${currentFile.id}/audio-streams`).then(res => {
+      client.get(`/tracks/${currentFile.id}/audio-streams`).then((res) => {
         setAudioTracks(res.data || []);
       });
-      client.get(`/tracks/${currentFile.id}/chapters`).then(res => {
+      client.get(`/tracks/${currentFile.id}/chapters`).then((res) => {
         setChapters(res.data || []);
       });
     }
@@ -600,7 +616,7 @@ const VideoPlayer: React.FC = () => {
         client.patch(`/tracks/${currentFile.id}/metadata`, {
           aspect_ratio_override: aspectRatio,
           rotation_degrees: rotation,
-          mirror_flip: mirrorFlip ? 1 : 0
+          mirror_flip: mirrorFlip ? 1 : 0,
         });
       }, 1000);
       return () => clearTimeout(timer);
@@ -614,7 +630,13 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const handleNavigateAway = () => {
       const autoPiP = localStorage.getItem('ZOVYRA_auto_pip') === 'true';
-      if (autoPiP && isPlaying && hasInteracted && videoRef.current && !document.pictureInPictureElement) {
+      if (
+        autoPiP &&
+        isPlaying &&
+        hasInteracted &&
+        videoRef.current &&
+        !document.pictureInPictureElement
+      ) {
         if (document.pictureInPictureEnabled) {
           videoRef.current.requestPictureInPicture().catch(console.error);
         }
@@ -712,9 +734,11 @@ const VideoPlayer: React.FC = () => {
             ref={videoRef}
             className={cn(
               'h-full w-full cursor-pointer transition-all duration-300',
-              (aspectRatio === 'fill' || aspectRatio === 'stretch' || aspectRatio === 'anamorphic') ? 'object-fill' :
-              aspectRatio === 'fit' ? 'object-contain' :
-              'object-cover',
+              aspectRatio === 'fill' || aspectRatio === 'stretch' || aspectRatio === 'anamorphic'
+                ? 'object-fill'
+                : aspectRatio === 'fit'
+                  ? 'object-contain'
+                  : 'object-cover',
             )}
             src={currentFile?.file}
             onClick={togglePlayback}
@@ -723,7 +747,14 @@ const VideoPlayer: React.FC = () => {
               filter: aiEnhancement
                 ? `contrast(${1.2 * contrast}) saturate(${1.3 * saturation}) brightness(${1.1 * brightness}) hue-rotate(${hue}deg)`
                 : `contrast(${contrast}) saturate(${saturation}) brightness(${brightness}) hue-rotate(${hue}deg)`,
-              aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === 'anamorphic' ? '2.39/1' : 'auto',
+              aspectRatio:
+                aspectRatio === '16:9'
+                  ? '16/9'
+                  : aspectRatio === '4:3'
+                    ? '4/3'
+                    : aspectRatio === 'anamorphic'
+                      ? '2.39/1'
+                      : 'auto',
             }}
           />
 
