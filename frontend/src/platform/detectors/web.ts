@@ -1,4 +1,4 @@
-import type { PlatformCapabilities } from '../capabilities';
+import type { PlatformCapabilities } from '../capabilities'
 
 export function detectWebCapabilities(): PlatformCapabilities {
   return {
@@ -10,16 +10,14 @@ export function detectWebCapabilities(): PlatformCapabilities {
 
     canUseHardwareDecoding: false,
     canPlayHDR: window.matchMedia?.('(dynamic-range: high)').matches ?? false,
-    supportsWebAudioAPI:
-      typeof AudioContext !== 'undefined' ||
-      typeof (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext !== 'undefined',
+    supportsWebAudioAPI: typeof AudioContext !== 'undefined'
+      || typeof (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext !== 'undefined',
     canPlayDRM: 'requestMediaKeySystemAccess' in navigator,
 
     canControlMediaKeys: 'mediaSession' in navigator,
     canShowSystemTray: false,
     canShowLockScreen: false,
-    canSendNativeNotifications: 'Notification' in window && Notification.permission === 'granted',
+    canSendNativeNotifications: 'Notification' in window, // True if API exists, even if not granted
 
     canCacheOffline: 'indexedDB' in window,
     canSyncInBackground: 'serviceWorker' in navigator,
@@ -30,5 +28,5 @@ export function detectWebCapabilities(): PlatformCapabilities {
 
     canUseNativeContextMenu: false,
     supportsHapticFeedback: 'vibrate' in navigator,
-  };
+  }
 }

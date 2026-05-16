@@ -8,7 +8,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 pub mod commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run() -> tauri::Result<()> {
     let play_pause_shortcut = Shortcut::new(None, Code::MediaPlayPause);
     let next_shortcut = Shortcut::new(None, Code::MediaTrackNext);
     let prev_shortcut = Shortcut::new(None, Code::MediaTrackPrevious);
@@ -100,5 +100,4 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
 }

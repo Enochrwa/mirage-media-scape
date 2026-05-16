@@ -1,6 +1,5 @@
 use serde::Serialize;
 use zovyra_native::decoding::probe_hardware_codecs;
-use zovyra_native::TrackMetadata;
 
 #[derive(Serialize)]
 pub struct HardwareCodecs {
@@ -42,8 +41,16 @@ pub async fn probe_platform() -> Result<PlatformProbeResult, String> {
 }
 
 #[tauri::command]
-pub async fn update_media_metadata(title: String, artist: String, album: String) -> Result<(), String> {
+pub async fn update_media_metadata(
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+) -> Result<(), String> {
     // In a real implementation, this would call native MPRIS/MediaRemote APIs via Rust
-    println!("Updating media metadata: {} - {} ({})", artist, title, album);
+    let t = title.unwrap_or_else(|| "Unknown Title".to_string());
+    let ar = artist.unwrap_or_else(|| "Unknown Artist".to_string());
+    let al = album.unwrap_or_else(|| "Unknown Album".to_string());
+
+    println!("Updating native media metadata: {} - {} ({})", ar, t, al);
     Ok(())
 }

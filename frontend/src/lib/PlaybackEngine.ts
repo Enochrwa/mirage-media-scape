@@ -1,8 +1,9 @@
 import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
 import { MediaFile } from '@/types/media';
-import { getPlatform } from '../platform';
-import { getMediaKeyService } from '../services/mediaKeys';
+import { getPlatform, PlatformCapabilities } from '../platform';
+import { getMediaKeyService, IMediaKeyService } from '../services/mediaKeys';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 // ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
 // Source
@@ -40,8 +41,8 @@ export class PlaybackEngine {
   private currentEventId: string | null = null;
   private playbackStartTime: number = 0;
   public sleepTimer: SleepTimer | null = null;
-  private capabilities = getPlatform();
-  private mediaKeys = getMediaKeyService();
+  private _capabilities: PlatformCapabilities | null = null;
+  private _mediaKeys: IMediaKeyService | null = null;
 
   private _abLoop: {
     pointA: number | null;
@@ -51,10 +52,20 @@ export class PlaybackEngine {
 
   constructor() {
     if (typeof window === 'undefined') return;
-    this.initContext();
+  }
+
+  private get capabilities() {
+    if (!this._capabilities) this._capabilities = getPlatform();
+    return this._capabilities;
+  }
+
+  private get mediaKeys() {
+    if (!this._mediaKeys) this._mediaKeys = getMediaKeyService();
+    return this._mediaKeys;
   }
 
   private initContext() {
+    if (this.ctx) return;
     if (!this.capabilities.supportsWebAudioAPI) {
       console.warn('Web Audio API not supported on this platform');
       return;
@@ -89,13 +100,13 @@ export class PlaybackEngine {
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
 
     this.mediaKeys.setActionHandlers({
-      play: () => this.play(),
-      pause: () => this.pause(),
+      play: () => this.togglePlayback(),
+      pause: () => this.togglePlayback(),
       next: () => {
-        /* Next logic usually in a store/controller */
+        usePlayerStore.getState().nextTrack();
       },
       previous: () => {
-        /* Previous logic */
+        usePlayerStore.getState().previousTrack();
       },
       seek: (time) => this.seek(time),
     });
@@ -146,6 +157,7 @@ export class PlaybackEngine {
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
+    this.initContext();
     // If this load is replacing the active track (not preloading), report previous track as skipped
     if (!startNext && this.currentEventId && this.currentTrackId) {
       await this.reportPlaybackEnd(false, true);
@@ -177,6 +189,7 @@ export class PlaybackEngine {
   }
 
   play() {
+    this.initContext();
     this.ctx.resume();
     this.chains[this.activeIndex].element.play();
     this.setState('PLAYING');
@@ -185,6 +198,14 @@ export class PlaybackEngine {
   pause() {
     this.chains[this.activeIndex].element.pause();
     this.setState('PAUSED');
+  }
+
+  togglePlayback() {
+    if (this.state === 'PLAYING') {
+      this.pause();
+    } else {
+      this.play();
+    }
   }
 
   resume() {
@@ -197,6 +218,7 @@ export class PlaybackEngine {
   }
 
   setVolume(v: number) {
+    this.initContext();
     this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
   }
 
@@ -240,6 +262,7 @@ export class PlaybackEngine {
   }
 
   preview(time: number) {
+    this.initContext();
     this.chains[this.activeIndex].element.currentTime = time;
     this.chains[this.activeIndex].element.play();
     setTimeout(() => {
@@ -282,10 +305,12 @@ export class PlaybackEngine {
   }
 
   get analyserNode() {
+    this.initContext();
     return this.analyser;
   }
 
   getAnalyser() {
+    this.initContext();
     return this.analyser;
   }
 
