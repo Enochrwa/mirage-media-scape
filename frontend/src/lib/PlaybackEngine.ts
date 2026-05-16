@@ -113,18 +113,6 @@ export class PlaybackEngine {
     this.chains = [this.createChain(), this.createChain()];
 
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
-
-    this.mediaKeys.setActionHandlers({
-      play: () => this.togglePlayback(),
-      pause: () => this.togglePlayback(),
-      next: () => {
-        usePlayerStore.getState().nextTrack();
-      },
-      previous: () => {
-        usePlayerStore.getState().previousTrack();
-      },
-      seek: (time) => this.seek(time),
-    });
   }
 
   private createChain(): TrackChain {
@@ -223,6 +211,13 @@ export class PlaybackEngine {
       chain.element = chain.audioElement;
       chain.source = chain.audioSource;
       chain.source.connect(chain.eq[0]);
+
+      // Re-attach listeners to audio element
+      chain.element.addEventListener('play', this.boundHandlePlay);
+      chain.element.addEventListener('pause', this.boundHandlePause);
+      chain.element.addEventListener('ended', this.boundHandleEnded);
+      chain.element.addEventListener('error', this.boundHandleError);
+      chain.element.addEventListener('timeupdate', this.boundHandleTimeUpdate);
     }
 
     this.currentTrackId = file.id;

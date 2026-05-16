@@ -204,11 +204,12 @@ const VideoPlayer: React.FC = () => {
     analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+    let animationFrameId: number;
 
     const draw = () => {
       if (!visualizerActive) return;
 
-      requestAnimationFrame(draw);
+      animationFrameId = requestAnimationFrame(draw);
       analyser.getByteFrequencyData(dataArray);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -233,7 +234,9 @@ const VideoPlayer: React.FC = () => {
 
     draw();
 
-    return () => {};
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   }, [visualizerActive, pe]);
 
   // Enhanced gesture controls
