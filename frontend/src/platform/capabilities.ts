@@ -9,6 +9,7 @@
 export interface PlatformCapabilities {
   // Host identity
   host: 'web' | 'desktop' | 'mobile';
+  platform: 'ios' | 'android' | 'web';
 
   // File system
   canAccessLocalFiles: boolean; // full FS access without picker

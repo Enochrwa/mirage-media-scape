@@ -18,6 +18,7 @@ export interface TauriProbeResult {
 export function detectDesktopCapabilities(probe: TauriProbeResult): PlatformCapabilities {
   return {
     host: 'desktop',
+    platform: 'web', // Desktop host identifies as web-platform in this simplified model
 
     canAccessLocalFiles: true,
     canWatchFileSystem: true, // @tauri-apps/plugin-fs watch

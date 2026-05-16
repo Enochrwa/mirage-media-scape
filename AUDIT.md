@@ -202,7 +202,22 @@ Actual Delta:
 | Playback Engine | ✅ Complete | Refactored to use HTMLMediaElement and Platform API | `frontend/src/lib/PlaybackEngine.ts` |
 | UI Components | 🟡 Partial | Most components exist but need logic audit | `frontend/src/components/` |
 
-## Step 0.8 — Conflict and Risk List
+## Step 0.8 — Capacitor Mobile Host (Native Blockers)
+
+The following configurations MUST be performed manually in the native projects or via Capacitor configuration. They cannot be implemented via TypeScript:
+
+### iOS Native Configuration
+- **Background Audio**: Requires `UIBackgroundModes: [audio]` in `ios/App/App/Info.plist`. Without this, audio will stop immediately when the screen locks or the app moves to the background.
+- **Offline Cache Strategy**: **Mandatory Rule**. IndexedDB is aggressively evicted by Safari on iOS. The `CapacitorOfflineCacheService` has been implemented to use `@capacitor/filesystem` writing exclusively to `Directory.Data` to ensure persistence.
+- **Haptics**: `navigator.vibrate` is blocked on iOS. The `CapacitorHapticsService` using `@capacitor/haptics` is the only supported path.
+
+### Android Native Configuration
+- **Background Audio**: Requires a foreground service with a persistent notification. While `@capacitor/background-runner` is installed, it is insufficient for lock screen media controls. A dedicated native Android module or a community media-player plugin is required for full lock-screen integration.
+
+### Cross-Platform Rules
+- **Vibration**: `navigator.vibrate` must NEVER be called on mobile hosts. Use `getHapticsService()` which resolves to the correct native implementation.
+
+## Step 0.9 — Conflict and Risk List
 - **Playback Source Conflict**: Existing `PlaybackEngine` is built around `AudioBufferSourceNode`. Switching to `HTMLMediaElement` is a major refactor that affects crossfading, EQ, and analysis. (RESOLVED in Platform Refactor)
 - **Audio Analysis Algorithm**: The spec requires manual implementation of spectral flux and chromagram in Rust. Current implementation uses `stratum-dsp`.
 - **Database Schema**: Existing schema in `server/src/db/index.ts` is missing many columns and tables required by the spec.

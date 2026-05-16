@@ -1,6 +1,6 @@
-import React from 'react'
-import { PlatformContext } from './PlatformContext'
-import type { PlatformCapabilities } from './capabilities'
+import React from 'react';
+import { PlatformContext } from './PlatformContext';
+import type { PlatformCapabilities } from './capabilities';
 
 /**
  * Wrap the app root with this provider AFTER awaiting initPlatform().
@@ -10,12 +10,8 @@ export function PlatformProvider({
   value,
   children,
 }: {
-  value: PlatformCapabilities
-  children: React.ReactNode
+  value: PlatformCapabilities;
+  children: React.ReactNode;
 }) {
-  return (
-    <PlatformContext.Provider value={value}>
-      {children}
-    </PlatformContext.Provider>
-  )
+  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
 }

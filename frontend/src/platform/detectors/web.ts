@@ -1,8 +1,9 @@
-import type { PlatformCapabilities } from '../capabilities'
+import type { PlatformCapabilities } from '../capabilities';
 
 export function detectWebCapabilities(): PlatformCapabilities {
   return {
     host: 'web',
+    platform: 'web',
 
     canAccessLocalFiles: false,
     canWatchFileSystem: false,
@@ -10,8 +11,10 @@ export function detectWebCapabilities(): PlatformCapabilities {
 
     canUseHardwareDecoding: false,
     canPlayHDR: window.matchMedia?.('(dynamic-range: high)').matches ?? false,
-    supportsWebAudioAPI: typeof AudioContext !== 'undefined'
-      || typeof (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext !== 'undefined',
+    supportsWebAudioAPI:
+      typeof AudioContext !== 'undefined' ||
+      typeof (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext !== 'undefined',
     canPlayDRM: 'requestMediaKeySystemAccess' in navigator,
 
     canControlMediaKeys: 'mediaSession' in navigator,
@@ -28,5 +31,5 @@ export function detectWebCapabilities(): PlatformCapabilities {
 
     canUseNativeContextMenu: false,
     supportsHapticFeedback: 'vibrate' in navigator,
-  }
+  };
 }

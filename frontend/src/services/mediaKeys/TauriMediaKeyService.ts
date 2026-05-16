@@ -1,7 +1,7 @@
-import type { IMediaKeyService } from './IMediaKeyService'
-import { MediaFile } from '@/types/media'
-import { listen } from '@tauri-apps/api/event'
-import { invoke } from '@tauri-apps/api/core'
+import type { IMediaKeyService } from './IMediaKeyService';
+import { MediaFile } from '@/types/media';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 export class TauriMediaKeyService implements IMediaKeyService {
   async updateMetadata(file: MediaFile): Promise<void> {
@@ -9,15 +9,15 @@ export class TauriMediaKeyService implements IMediaKeyService {
       title: file.title || 'Unknown Title',
       artist: file.artist || 'Unknown Artist',
       album: file.album || 'Unknown Album',
-    })
+    });
   }
 
   async setActionHandlers(handlers: {
-    play: () => void
-    pause: () => void
-    next: () => void
-    previous: () => void
-    seek?: (time: number) => void
+    play: () => void;
+    pause: () => void;
+    next: () => void;
+    previous: () => void;
+    seek?: (time: number) => void;
   }): Promise<void> {
     // Listen for events from Rust (tray or global shortcuts)
     await listen('tray-play-pause', () => {
@@ -25,13 +25,13 @@ export class TauriMediaKeyService implements IMediaKeyService {
       // For now we assume handlers.play/pause are provided and we can check state
       // but simpler is to have a single toggle handler.
       // Given the interface, we'll call play() and assume it handles resume
-      handlers.play()
-    })
+      handlers.play();
+    });
     await listen('tray-next', () => {
-      handlers.next()
-    })
+      handlers.next();
+    });
     await listen('tray-prev', () => {
-      handlers.previous()
-    })
+      handlers.previous();
+    });
   }
 }
