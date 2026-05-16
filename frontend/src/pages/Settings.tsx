@@ -49,6 +49,7 @@ import { useEffect } from 'react';
 import { API_BASE, cn } from '@/lib/utils';
 import { useCapability } from '@/platform';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -129,6 +130,7 @@ const Settings = () => {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="playback">Playback</TabsTrigger>
             <TabsTrigger value="video">Video</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="library">Library</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
@@ -143,7 +145,7 @@ const Settings = () => {
                   <Video className="h-5 w-5" />
                   Video Engine
                 </CardTitle>
-                <CardDescription>Hardware acceleration and playback behavior</CardDescription>
+                <CardDescription>Playback behavior and gestures</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -158,6 +160,27 @@ const Settings = () => {
                       localStorage.setItem('ZOVYRA_auto_pip', v.toString());
                     }}
                   />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="about" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>About Zovyra</CardTitle>
+                <CardDescription>System information and versioning</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Version</span>
+                    <span className="font-mono">1.0.0-sprint3</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Build</span>
+                    <span className="font-mono">2026-05-16</span>
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-white/5">
