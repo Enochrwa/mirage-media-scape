@@ -43,26 +43,17 @@ export function PlaybackController() {
   };
 
   const toggleABLoop = () => {
-    const {
-      abLoop: { toggle },
-    } = usePlayerStore.getState();
-    toggle();
+    playbackEngine.abLoop.toggle();
   };
 
   const setLoopA = () => {
-    const {
-      abLoop: { setA },
-      currentTime,
-    } = usePlayerStore.getState();
-    setA(currentTime);
+    const { currentTime } = usePlayerStore.getState();
+    playbackEngine.abLoop.setA(currentTime);
   };
 
   const setLoopB = () => {
-    const {
-      abLoop: { setB },
-      currentTime,
-    } = usePlayerStore.getState();
-    setB(currentTime);
+    const { currentTime } = usePlayerStore.getState();
+    playbackEngine.abLoop.setB(currentTime);
   };
 
   useEffect(() => {

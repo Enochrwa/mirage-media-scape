@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.esm.js';
-import { trimAudio, normalizeVolume, changeVolume, applyFade } from '@/lib/ffmpeg';
 import { cn } from '@/lib/utils';
 import {
   Play,
@@ -40,6 +39,7 @@ import {
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
+import { playbackEngine as pe } from '@/lib/PlaybackEngine';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { MediaFile } from '@/types/media';
@@ -200,6 +200,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     closePlayer,
     isPlayerFullscreen,
     setPlayerFullscreen,
+    currentEngineTrackId,
   } = usePlayerStore();
 
   const { files, playlists, addToPlaylist } = useLibraryStore();
@@ -247,6 +248,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   useEffect(() => {
     if (!waveformRef.current || !currentFile) return;
 
+    // Only initialize WaveSurfer when the engine has actually loaded the track
+    if (currentFile.id !== currentEngineTrackId) return;
+
     if (wavesurferRef.current) {
       wavesurferRef.current.destroy();
     }
@@ -255,7 +259,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
       container: waveformRef.current,
       waveColor: 'rgb(167, 139, 250)',
       progressColor: 'rgb(79, 70, 229)',
-      url: fileUrl,
+      media: pe.getActiveElement(),
+      backend: 'MediaElement',
       barWidth: 3,
       barGap: 2,
       barRadius: 3,
@@ -266,7 +271,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     });
 
     wavesurferRef.current = ws;
-    ws.setMuted(true); // Single source of truth is PlaybackEngine
 
     const wsRegions = ws.registerPlugin(RegionsPlugin.create());
     regionsRef.current = wsRegions;
@@ -295,7 +299,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return () => {
       ws.destroy();
     };
-  }, [currentFile, setCurrentTime, setDuration, fileUrl]);
+  }, [currentFile, setCurrentTime, setDuration, fileUrl, currentEngineTrackId]);
 
   useEffect(() => {
     if (wavesurferRef.current && duration > 0) {
@@ -347,83 +351,31 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   }, []);
 
   const handleConfirmTrim = async () => {
-    if (!trimRegion || !currentFile) return;
-    const filePath = currentFile.file;
-    setIsProcessing(true);
-    try {
-      const blob = await trimAudio(filePath, trimRegion.start, trimRegion.end);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `trimmed_${currentFile.title}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Trim successful!' });
-    } catch (e) {
-      toast({ title: 'Trim failed', variant: 'destructive' });
-    } finally {
-      setIsProcessing(false);
-    }
+    toast({
+      title: 'Audio processing',
+      description: 'This feature requires the desktop app with FFmpeg.',
+    });
   };
 
   const handleNormalize = async () => {
-    if (!currentFile) return;
-    const filePath = currentFile.file;
-    setIsProcessing(true);
-    try {
-      const blob = await normalizeVolume(filePath);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `normalized_${currentFile.title}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Normalization complete!' });
-    } catch (e) {
-      toast({ title: 'Normalization failed', variant: 'destructive' });
-    } finally {
-      setIsProcessing(false);
-    }
+    toast({
+      title: 'Audio processing',
+      description: 'This feature requires the desktop app with FFmpeg.',
+    });
   };
 
   const handleVolumeBoost = async () => {
-    if (!currentFile || volumeBoost === 0) return;
-    const filePath = currentFile.file;
-    setIsProcessing(true);
-    try {
-      const blob = await changeVolume(filePath, volumeBoost);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `boosted_${currentFile.title}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Volume boost applied!' });
-    } catch (e) {
-      toast({ title: 'Boost failed', variant: 'destructive' });
-    } finally {
-      setIsProcessing(false);
-    }
+    toast({
+      title: 'Audio processing',
+      description: 'This feature requires the desktop app with FFmpeg.',
+    });
   };
 
   const handleApplyFades = async () => {
-    if (!currentFile) return;
-    const filePath = currentFile.file;
-    setIsProcessing(true);
-    try {
-      const blob = await applyFade(filePath, duration, fadeInDuration, fadeOutDuration);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `faded_${currentFile.title}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Fades applied!' });
-    } catch (e) {
-      toast({ title: 'Fades failed', variant: 'destructive' });
-    } finally {
-      setIsProcessing(false);
-    }
+    toast({
+      title: 'Audio processing',
+      description: 'This feature requires the desktop app with FFmpeg.',
+    });
   };
 
   if (!currentFile) return null;

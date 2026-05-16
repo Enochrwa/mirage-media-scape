@@ -24,8 +24,8 @@ export interface PlayerState {
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
+  currentEngineTrackId: string | null;
   playbackEngine: typeof playbackEngine;
-  abLoop: ABLoop;
 
   // Actions
   init: () => void;
@@ -58,13 +58,16 @@ const store = create<PlayerState>((set, get) => ({
   isPlayerFullscreen: false,
   showMobilePlayer: false,
   aiDjEnabled: false,
+  currentEngineTrackId: null,
   playbackEngine,
-  abLoop: playbackEngine.abLoop,
 
   init: () => {
     queueManager.load();
     // Queue state is now managed entirely by QueueManager
     // Components can subscribe to queueManager changes via addListener
+    playbackEngine.setTimeUpdateCallback((time, duration) => {
+      set({ currentTime: time, duration });
+    });
   },
 
   playFile: async (file: MediaFile) => {
@@ -74,22 +77,26 @@ const store = create<PlayerState>((set, get) => ({
   },
 
   pausePlayback: () => {
+    if (!get().currentFile) return;
     playbackEngine.pause();
     set({ isPlaying: false });
   },
 
   resumePlayback: () => {
+    if (!get().currentFile) return;
     playbackEngine.play();
     set({ isPlaying: true });
   },
 
   togglePlayback: () => {
+    if (!get().currentFile) return;
     const { isPlaying } = get();
     if (isPlaying) get().pausePlayback();
     else get().resumePlayback();
   },
 
   seekTo: (time: number) => {
+    if (!get().currentFile) return;
     playbackEngine.seek(time);
     set({ currentTime: time });
   },
@@ -102,11 +109,22 @@ const store = create<PlayerState>((set, get) => ({
     const nextFile = await queueManager.smartNext();
     if (nextFile) {
       get().playFile(nextFile);
+    } else {
+      get().pausePlayback();
+      set({ currentFile: null });
     }
   },
 
   previousTrack: () => {
-    // Implement previous logic
+    // Implement basic previous logic
+    const { currentTime } = get();
+    if (currentTime > 3) {
+      playbackEngine.seek(0);
+    } else {
+      // In a real app, this would get the previous track from the queue
+      // For now, we just restart the current track
+      playbackEngine.seek(0);
+    }
   },
 
   setVolume: (v: number) => {

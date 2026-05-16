@@ -138,6 +138,7 @@ const VideoPlayer: React.FC = () => {
     setCurrentTime: updateCurrentTime,
     setDuration: updateDuration,
     playbackEngine: pe,
+    isPlaying: storeIsPlaying,
   } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -193,27 +194,22 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current || !visualizerActive) return;
 
-    const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
     if (!ctx) return;
 
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaElementSource(video);
-
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
+    const analyser = pe.getAnalyser();
 
     analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+    let animationFrameId: number;
 
     const draw = () => {
       if (!visualizerActive) return;
 
-      requestAnimationFrame(draw);
+      animationFrameId = requestAnimationFrame(draw);
       analyser.getByteFrequencyData(dataArray);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -239,9 +235,9 @@ const VideoPlayer: React.FC = () => {
     draw();
 
     return () => {
-      audioContext.close();
+      cancelAnimationFrame(animationFrameId);
     };
-  }, [visualizerActive]);
+  }, [visualizerActive, pe]);
 
   // Enhanced gesture controls
   useEffect(() => {
@@ -337,15 +333,7 @@ const VideoPlayer: React.FC = () => {
   }, [ambientLighting]);
 
   const togglePlayback = () => {
-    if (!videoRef.current) return;
-
-    if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      videoRef.current.play();
-      setIsPlaying(true);
-    }
+    usePlayerStore.getState().togglePlayback();
   };
 
   const handleVolumeClick = () => {
@@ -362,9 +350,7 @@ const VideoPlayer: React.FC = () => {
   const handleVolumeChange = (newVolume: number[]) => {
     const vol = newVolume[0];
     setVolume(vol);
-    if (videoRef.current) {
-      videoRef.current.volume = vol;
-    }
+    pe.setVolume(vol);
     if (vol > 0 && muted) {
       setMuted(false);
     } else if (vol === 0) {
@@ -375,9 +361,7 @@ const VideoPlayer: React.FC = () => {
   const handleProgressChange = (newValue: number[]) => {
     const time = newValue[0];
     setCurrentTime(time);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-    }
+    pe.seek(time);
   };
 
   const toggleFullscreen = async () => {
@@ -469,13 +453,22 @@ const VideoPlayer: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!videoRef.current || !currentFile) return;
+
+    pe.loadVideo(currentFile, videoRef.current);
+  }, [currentFile, pe]);
+
+  useEffect(() => {
+    setIsPlaying(storeIsPlaying);
+  }, [storeIsPlaying]);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;
       setCurrentTime(time);
-      updateCurrentTime(time);
 
       // Handle A-B Loop
       if (pe.abLoop.isActive && pe.abLoop.pointA !== null && pe.abLoop.pointB !== null) {
@@ -494,18 +487,15 @@ const VideoPlayer: React.FC = () => {
       setDuration(video.duration);
       updateDuration(video.duration);
     };
-    const handleEnded = () => setIsPlaying(false);
 
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    video.addEventListener('ended', handleEnded);
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      video.removeEventListener('ended', handleEnded);
     };
-  }, [pe, updateCurrentTime, updateDuration, subtitlesEnabled, cues]);
+  }, [pe, updateDuration, subtitlesEnabled, cues]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4">

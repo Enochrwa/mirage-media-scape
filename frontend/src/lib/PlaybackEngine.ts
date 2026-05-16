@@ -17,6 +17,8 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 //   → Destination
 
 interface TrackChain {
+  audioElement: HTMLAudioElement;
+  audioSource: MediaElementAudioSourceNode;
   element: HTMLMediaElement;
   source: MediaElementAudioSourceNode;
   eq: BiquadFilterNode[];
@@ -43,6 +45,19 @@ export class PlaybackEngine {
   public sleepTimer: SleepTimer | null = null;
   private _capabilities: PlatformCapabilities | null = null;
   private _mediaKeys: IMediaKeyService | null = null;
+  private _onTimeUpdate: ((time: number, duration: number) => void) | null = null;
+
+  private videoSourceNodes = new WeakMap<HTMLVideoElement, MediaElementAudioSourceNode>();
+  private lastVideoElement: HTMLVideoElement | null = null;
+
+  private boundHandlePlay = this.handlePlay.bind(this);
+  private boundHandlePause = this.handlePause.bind(this);
+  private boundHandleEnded = this.handleEnded.bind(this);
+  private boundHandleError = (e: Event) => this.handleError(e);
+  private boundHandleTimeUpdate = (e: Event) => {
+    const el = e.target as HTMLMediaElement;
+    this._onTimeUpdate?.(el.currentTime, el.duration || 0);
+  };
 
   private _abLoop: {
     pointA: number | null;
@@ -98,18 +113,6 @@ export class PlaybackEngine {
     this.chains = [this.createChain(), this.createChain()];
 
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
-
-    this.mediaKeys.setActionHandlers({
-      play: () => this.togglePlayback(),
-      pause: () => this.togglePlayback(),
-      next: () => {
-        usePlayerStore.getState().nextTrack();
-      },
-      previous: () => {
-        usePlayerStore.getState().previousTrack();
-      },
-      seek: (time) => this.seek(time),
-    });
   }
 
   private createChain(): TrackChain {
@@ -123,10 +126,11 @@ export class PlaybackEngine {
     const source = this.ctx.createMediaElementSource(el);
 
     // Stats tracking: monitor media element events
-    el.addEventListener('play', () => this.handlePlay());
-    el.addEventListener('pause', () => this.handlePause());
-    el.addEventListener('ended', () => this.handleEnded());
-    el.addEventListener('error', (e) => this.handleError(e));
+    el.addEventListener('play', this.boundHandlePlay);
+    el.addEventListener('pause', this.boundHandlePause);
+    el.addEventListener('ended', this.boundHandleEnded);
+    el.addEventListener('error', this.boundHandleError);
+    el.addEventListener('timeupdate', this.boundHandleTimeUpdate);
 
     // 1. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
@@ -153,7 +157,15 @@ export class PlaybackEngine {
     replayGain.connect(fade);
     fade.connect(this.analyser);
 
-    return { element: el, source, eq, replayGain, fade };
+    return {
+      audioElement: el,
+      audioSource: source,
+      element: el,
+      source,
+      eq,
+      replayGain,
+      fade,
+    };
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
@@ -163,10 +175,53 @@ export class PlaybackEngine {
       await this.reportPlaybackEnd(false, true);
     }
 
+    // If this is a video, we don't load it in the background Audio element.
+    // VideoPlayer.tsx will call loadVideo() which attaches the real element.
+    if (file.type === 'video' && !startNext) {
+      this.currentTrackId = file.id;
+      this.setState('LOADING');
+      return;
+    }
+
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
+    // Restore audio source if it was swapped by a video and this is an audio file
+    if (chain.element !== chain.audioElement && file.type !== 'video') {
+      chain.element.pause();
+      chain.element.removeEventListener('play', this.boundHandlePlay);
+      chain.element.removeEventListener('pause', this.boundHandlePause);
+      chain.element.removeEventListener('ended', this.boundHandleEnded);
+      chain.element.removeEventListener('error', this.boundHandleError);
+      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+
+      if (chain.element instanceof HTMLVideoElement) {
+        chain.element.src = '';
+        chain.element.load();
+        if (this.lastVideoElement === chain.element) {
+          this.lastVideoElement = null;
+        }
+      }
+
+      try {
+        chain.source.disconnect();
+      } catch (e) {
+        // Ignore disconnect error
+      }
+      chain.element = chain.audioElement;
+      chain.source = chain.audioSource;
+      chain.source.connect(chain.eq[0]);
+
+      // Re-attach listeners to audio element
+      chain.element.addEventListener('play', this.boundHandlePlay);
+      chain.element.addEventListener('pause', this.boundHandlePause);
+      chain.element.addEventListener('ended', this.boundHandleEnded);
+      chain.element.addEventListener('error', this.boundHandleError);
+      chain.element.addEventListener('timeupdate', this.boundHandleTimeUpdate);
+    }
+
     this.currentTrackId = file.id;
+    this.setState('LOADING');
     chain.element.src = file.file;
     chain.element.load();
 
@@ -174,7 +229,7 @@ export class PlaybackEngine {
       const gain = Math.pow(10, file.replay_gain_db / 20);
       chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
     } else {
-      chain.replayGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
     }
 
     if (!startNext) {
@@ -186,6 +241,95 @@ export class PlaybackEngine {
     if (this.capabilities.canControlMediaKeys) {
       this.mediaKeys.updateMetadata(file);
     }
+  }
+
+  async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
+    this.initContext();
+    const chain = this.chains[this.activeIndex];
+
+    // Cleanup old listeners if we are swapping elements
+    if (chain.element !== videoElement) {
+      chain.element.pause();
+      chain.element.removeEventListener('play', this.boundHandlePlay);
+      chain.element.removeEventListener('pause', this.boundHandlePause);
+      chain.element.removeEventListener('ended', this.boundHandleEnded);
+      chain.element.removeEventListener('error', this.boundHandleError);
+      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+
+      // Reset src to stop background activity if it's the audio element
+      if (chain.element === chain.audioElement) {
+        chain.element.src = '';
+        chain.element.load();
+      }
+    }
+
+    if (this.lastVideoElement && this.lastVideoElement !== videoElement) {
+      this.lastVideoElement.pause();
+      this.lastVideoElement.removeEventListener('play', this.boundHandlePlay);
+      this.lastVideoElement.removeEventListener('pause', this.boundHandlePause);
+      this.lastVideoElement.removeEventListener('ended', this.boundHandleEnded);
+      this.lastVideoElement.removeEventListener('error', this.boundHandleError);
+      this.lastVideoElement.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+      this.lastVideoElement.src = '';
+      this.lastVideoElement.load();
+    }
+
+    // Disconnect current source
+    try {
+      chain.source.disconnect();
+    } catch (e) {
+      // Ignore disconnect error
+    }
+
+    // Reuse or create source node for the video element
+    let videoSource = this.videoSourceNodes.get(videoElement);
+    if (!videoSource) {
+      videoSource = this.ctx.createMediaElementSource(videoElement);
+      this.videoSourceNodes.set(videoElement, videoSource);
+    }
+
+    chain.element = videoElement;
+    chain.source = videoSource;
+    chain.source.connect(chain.eq[0]);
+
+    // Attach listeners to video element (only if changed or first time)
+    if (this.lastVideoElement !== videoElement) {
+      videoElement.addEventListener('play', this.boundHandlePlay);
+      videoElement.addEventListener('pause', this.boundHandlePause);
+      videoElement.addEventListener('ended', this.boundHandleEnded);
+      videoElement.addEventListener('error', this.boundHandleError);
+      videoElement.addEventListener('timeupdate', this.boundHandleTimeUpdate);
+      this.lastVideoElement = videoElement;
+    }
+
+    // Set src and load
+    videoElement.src = file.file;
+    chain.element.load();
+
+    if (file.replay_gain_db) {
+      const gain = Math.pow(10, file.replay_gain_db / 20);
+      chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+    } else {
+      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    }
+
+    if (this.capabilities.canControlMediaKeys) {
+      this.mediaKeys.updateMetadata(file);
+    }
+
+    this.currentTrackId = file.id;
+
+    if (this.state === 'PLAYING') {
+      videoElement.play().catch((e) => console.error('Failed to resume video playback', e));
+    }
+  }
+
+  setTimeUpdateCallback(cb: (time: number, duration: number) => void) {
+    this._onTimeUpdate = cb;
+  }
+
+  getActiveElement() {
+    return this.chains[this.activeIndex].element;
   }
 
   play() {
@@ -301,7 +445,10 @@ export class PlaybackEngine {
 
   setState(s: PlaybackState) {
     this.state = s;
-    // Emit event or update store
+    usePlayerStore.setState({
+      isPlaying: s === 'PLAYING',
+      currentEngineTrackId: this.currentTrackId,
+    });
   }
 
   get analyserNode() {
@@ -316,6 +463,7 @@ export class PlaybackEngine {
 
   // Stats reporting handlers
   private async handlePlay() {
+    this.setState('PLAYING');
     if (!this.currentTrackId) return;
     // Only report start event if we don't have an active event
     if (!this.currentEventId) {
@@ -338,15 +486,19 @@ export class PlaybackEngine {
   }
 
   private async handlePause() {
+    this.setState('PAUSED');
     // Don't report end yet - could be resume. Stats event end is sent on track switch or ended.
     // This is handled by track change logic or explicit stop.
   }
 
   private async handleEnded() {
+    this.setState('ENDED');
     await this.reportPlaybackEnd(true, false);
+    window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
   }
 
   private async handleError(_e: Event) {
+    this.setState('ERROR');
     await this.reportPlaybackEnd(false, true);
   }
 
