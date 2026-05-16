@@ -13,7 +13,6 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     duration,
     currentFile,
     playbackEngine: pe,
-    abLoop: engineABLoop,
   } = usePlayerStore();
   const isStream =
     (currentFile?.file ?? '').includes('stream') || !duration || duration === Infinity;
@@ -40,7 +39,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
   useEffect(() => {
     const checkLoop = setInterval(() => {
-      const { abLoop: engineAbLoop } = usePlayerStore.getState();
+      const engineAbLoop = pe.abLoop;
       if (engineAbLoop) {
         setLocalABLoop({
           pointA: engineAbLoop.pointA,
@@ -50,7 +49,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       }
     }, 100);
     return () => clearInterval(checkLoop);
-  }, []);
+  }, [pe]);
 
   useEffect(() => {
     if (currentFile?.metadata_json) {

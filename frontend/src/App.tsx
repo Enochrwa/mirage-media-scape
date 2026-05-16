@@ -30,10 +30,12 @@ import { WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCapability } from './platform';
+import { useMediaSession } from './hooks/useMediaSession';
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  useMediaSession();
   const initLibrary = useLibraryStore((state) => state.init);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const canSyncInBackground = useCapability('canSyncInBackground');

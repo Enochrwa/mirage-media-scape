@@ -25,7 +25,6 @@ export interface PlayerState {
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
   playbackEngine: typeof playbackEngine;
-  abLoop: ABLoop;
 
   // Actions
   init: () => void;
@@ -59,12 +58,14 @@ const store = create<PlayerState>((set, get) => ({
   showMobilePlayer: false,
   aiDjEnabled: false,
   playbackEngine,
-  abLoop: playbackEngine.abLoop,
 
   init: () => {
     queueManager.load();
     // Queue state is now managed entirely by QueueManager
     // Components can subscribe to queueManager changes via addListener
+    playbackEngine.setTimeUpdateCallback((time, duration) => {
+      set({ currentTime: time, duration });
+    });
   },
 
   playFile: async (file: MediaFile) => {

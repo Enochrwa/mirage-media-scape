@@ -202,6 +202,36 @@ Actual Delta:
 | Playback Engine | ✅ Complete | Refactored to use HTMLMediaElement and Platform API | `frontend/src/lib/PlaybackEngine.ts` |
 | UI Components | 🟡 Partial | Most components exist but need logic audit | `frontend/src/components/` |
 
+## Native Configuration Required (Cannot be automated):
+
+### iOS
+- `UIBackgroundModes: [audio]` must be set in `ios/App/App/Info.plist`
+  Without this, audio stops when the screen locks.
+- IndexedDB NOT used for offline cache on iOS — CapacitorOfflineCacheService uses Directory.Data
+
+### Android
+- Background audio requires a foreground service with persistent notification
+- `@capacitor-community/background-runner` alone is insufficient for lock screen controls
+- A native Android module will be needed for full MPRIS-equivalent lock screen behavior
+
+### FFmpeg WASM
+- NEVER use @ffmpeg/ffmpeg in the browser
+- All FFmpeg operations go through the Node.js server → Rust native addon
+- frontend/src/lib/ffmpeg.ts has been deleted — callers show "requires desktop app" toast
+
+### Build Environment
+- `cargo check` fails in Jules environment due to missing: glib, libavcodec-dev, libavformat-dev
+- Install: `apt install libglib2.0-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`
+- All FFmpeg-dependent Rust functions (thumbnails, subtitles, waveform from video) are implemented
+  but will fail at runtime without these system libraries in the deployment environment
+
+## Stubbed Implementations
+- `probe_hardware_codecs` — returns hardcoded values. Real implementation requires:
+  Linux: check /dev/dri/renderD128 for VAAPI
+  macOS: check VideoToolbox via CMVideoFormatDescriptionCreate
+  Windows: check D3D11VA via DXGI
+- `dsp.rs` usage of `stratum-dsp` — Stratum-dsp is used but if it's missing, BPM/key analysis will fail at build time. BPM via spectral flux onset envelope using realfft and Key via 12-bin chromagram + Krumhansl-Schmuckler correlation are required.
+
 ## Step 0.8 — Capacitor Mobile Host (Native Blockers)
 
 The following configurations MUST be performed manually in the native projects or via Capacitor configuration. They cannot be implemented via TypeScript:

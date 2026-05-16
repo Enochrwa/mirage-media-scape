@@ -43,6 +43,7 @@ export class PlaybackEngine {
   public sleepTimer: SleepTimer | null = null;
   private _capabilities: PlatformCapabilities | null = null;
   private _mediaKeys: IMediaKeyService | null = null;
+  private _onTimeUpdate: ((time: number, duration: number) => void) | null = null;
 
   private _abLoop: {
     pointA: number | null;
@@ -127,6 +128,9 @@ export class PlaybackEngine {
     el.addEventListener('pause', () => this.handlePause());
     el.addEventListener('ended', () => this.handleEnded());
     el.addEventListener('error', (e) => this.handleError(e));
+    el.addEventListener('timeupdate', () => {
+      this._onTimeUpdate?.(el.currentTime, el.duration || 0);
+    });
 
     // 1. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
@@ -186,6 +190,53 @@ export class PlaybackEngine {
     if (this.capabilities.canControlMediaKeys) {
       this.mediaKeys.updateMetadata(file);
     }
+  }
+
+  async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
+    this.initContext();
+    const chain = this.chains[this.activeIndex];
+
+    // Disconnect old source if it exists
+    try {
+      chain.source.disconnect();
+    } catch {}
+
+    // Create new source from the video element
+    chain.element = videoElement;
+    chain.source = this.ctx.createMediaElementSource(videoElement);
+    chain.source.connect(chain.eq[0]);
+
+    // Attach listeners to video element
+    videoElement.addEventListener('play', () => this.handlePlay());
+    videoElement.addEventListener('pause', () => this.handlePause());
+    videoElement.addEventListener('ended', () => this.handleEnded());
+    videoElement.addEventListener('error', (e) => this.handleError(e));
+    videoElement.addEventListener('timeupdate', () => {
+      this._onTimeUpdate?.(videoElement.currentTime, videoElement.duration || 0);
+    });
+
+    // Set src and load
+    videoElement.src = file.file;
+    chain.element.load();
+
+    if (file.replay_gain_db) {
+      const gain = Math.pow(10, file.replay_gain_db / 20);
+      chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+    }
+
+    if (this.capabilities.canControlMediaKeys) {
+      this.mediaKeys.updateMetadata(file);
+    }
+
+    this.currentTrackId = file.id;
+  }
+
+  setTimeUpdateCallback(cb: (time: number, duration: number) => void) {
+    this._onTimeUpdate = cb;
+  }
+
+  getActiveElement() {
+    return this.chains[this.activeIndex].element;
   }
 
   play() {
