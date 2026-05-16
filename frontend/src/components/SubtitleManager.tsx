@@ -23,6 +23,8 @@ const SubtitleManager: React.FC = () => {
   const [tracks, setTracks] = useState<SubtitleTrack[]>([]);
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
+  const [secondaryCues, setSecondaryCues] = useState<SubtitleCue[]>([]);
+  const [activeSecondaryCue, setActiveSecondaryCue] = useState<SubtitleCue | null>(null);
 
   const [settings, setSettings] = useState({
     fontSize: 24,
@@ -66,7 +68,7 @@ const SubtitleManager: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, secondary = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -80,26 +82,63 @@ const SubtitleManager: React.FC = () => {
         body: JSON.stringify({ raw, format }),
       });
       if (res.ok) {
-        const { cues } = await res.json();
-        setCues(cues);
+        const { data } = await res.json();
+        if (secondary) setSecondaryCues(data);
+        else setCues(data);
       }
     };
     reader.readAsText(file);
   };
 
   useEffect(() => {
-    const cue = cues.find((c) => currentTime >= c.start && currentTime <= c.end);
+    const time = currentTime * 1000;
+    const cue = cues.find((c) => time >= (c.start + settings.offset) && time <= (c.end + settings.offset));
     setActiveCue(cue || null);
-  }, [currentTime, cues]);
+    const secCue = secondaryCues.find((c) => time >= (c.start + settings.offset) && time <= (c.end + settings.offset));
+    setActiveSecondaryCue(secCue || null);
+  }, [currentTime, cues, secondaryCues, settings.offset]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key.toUpperCase() === 'Z') {
+        setSettings(prev => ({ ...prev, offset: prev.offset - 100 }));
+      } else if (e.shiftKey && e.key.toUpperCase() === 'X') {
+        setSettings(prev => ({ ...prev, offset: prev.offset + 100 }));
+      } else if (e.key.toLowerCase() === 'c') {
+        if (cues.length > 0) setCues([]);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cues]);
 
   if (!currentFile || currentFile.type !== 'video') return null;
 
   return (
     <>
+      {activeSecondaryCue && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 text-center"
+          style={{ bottom: '23%' }}
+        >
+          <span
+            className="whitespace-pre-wrap rounded border border-white/10 px-3 py-1 shadow-lg"
+            style={{
+              fontSize: `${settings.fontSize * 0.8}px`,
+              color: settings.color,
+              backgroundColor: settings.backgroundColor,
+              opacity: 0.8,
+            }}
+          >
+            {activeSecondaryCue.text}
+          </span>
+        </div>
+      )}
+
       {activeCue && (
         <div
           className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 text-center"
-          style={{ bottom: `${8 + settings.offset}%` }}
+          style={{ bottom: '8%' }}
         >
           <span
             className="whitespace-pre-wrap rounded border border-white/10 px-3 py-1 shadow-lg"
@@ -139,12 +178,24 @@ const SubtitleManager: React.FC = () => {
             <DropdownMenuItem className="cursor-pointer" asChild>
               <label className="flex w-full items-center gap-2">
                 <Upload className="h-4 w-4" />
-                <span>Load Subtitle File...</span>
+                <span>Primary Subtitle...</span>
                 <input
                   type="file"
                   accept=".srt,.vtt,.ass,.ssa,.sbv"
                   className="hidden"
-                  onChange={handleFileUpload}
+                  onChange={(e) => handleFileUpload(e, false)}
+                />
+              </label>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer" asChild>
+              <label className="flex w-full items-center gap-2">
+                <Upload className="h-4 w-4" />
+                <span>Secondary Subtitle...</span>
+                <input
+                  type="file"
+                  accept=".srt,.vtt,.ass,.ssa,.sbv"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, true)}
                 />
               </label>
             </DropdownMenuItem>

@@ -10,6 +10,7 @@ import {
   getDuplicateCandidates,
   getTrackCover,
   getTrackThumbnail,
+  getTrackThumbnailAt,
   getAlbumDetails,
   updateTrackRating,
   getTrackWaveform,
@@ -69,6 +70,9 @@ router.get('/:id/cover', getTrackCover);
 
 /** GET /api/tracks/:id/thumbnail */
 router.get('/:id/thumbnail', getTrackThumbnail);
+
+/** GET /api/tracks/:id/thumbnail-at?at=... */
+router.get('/:id/thumbnail-at', getTrackThumbnailAt);
 
 /** GET /api/tracks/:id/waveform */
 router.get('/:id/waveform', getTrackWaveform);

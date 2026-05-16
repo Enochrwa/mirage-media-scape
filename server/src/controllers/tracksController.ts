@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import db from '../db/index.js';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import native from '../utils/native-loader.js';
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
 import { RecommendationService } from '../services/RecommendationService.js';
@@ -42,7 +44,7 @@ export const getAllTracks = (_req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const streamTrack = (req: Request, res: Response): void => {
-  const { path: filePath } = req.query;
+  const { path: filePath, audio_stream } = req.query;
   if (!filePath || typeof filePath !== 'string') {
     res.status(400).send('Path is required');
     return;
@@ -50,6 +52,33 @@ export const streamTrack = (req: Request, res: Response): void => {
 
   if (!fs.existsSync(filePath)) {
     res.status(404).send('File not found');
+    return;
+  }
+
+  // Handle remuxing if specific audio stream requested
+  if (audio_stream !== undefined) {
+    const streamIndex = parseInt(audio_stream as string, 10);
+    res.writeHead(200, {
+      'Content-Type': 'video/x-matroska',
+      'Transfer-Encoding': 'chunked',
+    });
+
+    const { spawn } = require('child_process');
+    const ffmpeg = spawn('ffmpeg', [
+      '-i', filePath,
+      '-map', '0:v:0',
+      '-map', `0:a:${streamIndex}`,
+      '-c', 'copy',
+      '-f', 'matroska',
+      'pipe:1'
+    ]);
+
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stderr.on('data', (data: Buffer) => {
+      // Optional: log ffmpeg progress
+    });
+
+    req.on('close', () => ffmpeg.kill());
     return;
   }
 
@@ -214,6 +243,49 @@ export const getTrackThumbnail = (req: Request, res: Response): void => {
   res.sendFile(path.resolve(row.thumbnail_path));
 };
 
+const thumbAtCache = new Map<string, Buffer>();
+const MAX_THUMB_CACHE = 100;
+
+export const getTrackThumbnailAt = (req: Request, res: Response): void => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const at = Math.floor(parseFloat(req.query.at as string) || 0);
+
+  const row = db
+    .prepare('SELECT file_path, last_modified, file_size FROM tracks WHERE id = ?')
+    .get(id) as { file_path: string, last_modified: number, file_size: number } | undefined;
+
+  if (!row) {
+    res.status(404).send('Track not found');
+    return;
+  }
+
+  const cacheKey = `${id}_${at}_${row.last_modified}_${row.file_size}`;
+  if (thumbAtCache.has(cacheKey)) {
+    res.set('Content-Type', 'image/jpeg');
+    res.send(thumbAtCache.get(cacheKey));
+    return;
+  }
+
+  const tempThumbPath = path.join(os.tmpdir(), `thumb_${id}_${at}.jpg`);
+  try {
+    native.generateThumbnail(row.file_path, at, tempThumbPath);
+    const buffer = fs.readFileSync(tempThumbPath);
+
+    if (thumbAtCache.size >= MAX_THUMB_CACHE) {
+      const firstKey = thumbAtCache.keys().next().value;
+      if (firstKey) thumbAtCache.delete(firstKey);
+    }
+    thumbAtCache.set(cacheKey, buffer);
+
+    res.set('Content-Type', 'image/jpeg');
+    res.send(buffer);
+
+    fs.unlinkSync(tempThumbPath);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Individual track / album
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,7 +394,10 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
 
 export const updateTrackMetadata = (req: Request, res: Response): void => {
   const { id } = req.params;
-  const { title, artist, album, bpm, key, camelot_key } = req.body;
+  const {
+    title, artist, album, bpm, key, camelot_key,
+    aspect_ratio_override, rotation_degrees, mirror_flip
+  } = req.body;
 
   try {
     const result = db
@@ -334,10 +409,17 @@ export const updateTrackMetadata = (req: Request, res: Response): void => {
           bpm = COALESCE(?, bpm),
           key = COALESCE(?, key),
           camelot_key = COALESCE(?, camelot_key),
+          aspect_ratio_override = COALESCE(?, aspect_ratio_override),
+          rotation_degrees = COALESCE(?, rotation_degrees),
+          mirror_flip = COALESCE(?, mirror_flip),
           updated_at = ?
          WHERE id = ?`,
       )
-      .run(title, artist, album, bpm, key, camelot_key, Date.now(), id);
+      .run(
+        title, artist, album, bpm, key, camelot_key,
+        aspect_ratio_override, rotation_degrees, mirror_flip,
+        Date.now(), id
+      );
 
     if (result.changes === 0) {
       res.status(404).json({ error: 'Track not found' });

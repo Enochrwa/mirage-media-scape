@@ -46,6 +46,8 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
 import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
 import { MediaFile } from '@/types/media';
+import { client } from '@/api/client';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -140,6 +142,8 @@ const VideoPlayer: React.FC = () => {
     playbackEngine: pe,
     isPlaying: storeIsPlaying,
   } = usePlayerStore();
+  const navigate = useNavigate();
+  const location = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -174,8 +178,25 @@ const VideoPlayer: React.FC = () => {
   const [devicePreview, setDevicePreview] = useState('desktop');
   const [isMobile, setIsMobile] = useState(false);
   const [hwDecodeSupported, setHwDecodeSupported] = useState<Record<string, boolean>>({});
+  const [audioTracks, setAudioTracks] = useState<any[]>([]);
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [showChapters, setShowChapters] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [hoverThumb, setHoverThumb] = useState<string | null>(null);
+  const [hoverTime, setHoverTime] = useState(0);
+  const [hoverPos, setHoverPos] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState('fit');
+  const [rotation, setRotation] = useState(0);
+  const [mirrorFlip, setMirrorFlip] = useState(false);
+  const [brightness, setBrightness] = useState(1.0);
+  const [contrast, setContrast] = useState(1.0);
+  const [saturation, setSaturation] = useState(1.0);
+  const [hue, setHue] = useState(0);
+  const [scale, setScale] = useState(1.0);
+  const [pinchStartScale, setPinchStartScale] = useState(1.0);
+  const [isPinching, setIsPinching] = useState(false);
 
-  // Detect mobile device
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -252,42 +273,80 @@ const VideoPlayer: React.FC = () => {
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
         startTime = currentTime;
+        setIsPinching(false);
+      } else if (e.touches.length === 2) {
+        setIsPinching(true);
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        setPinchStartScale(dist);
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
+      if (e.touches.length === 1 && !isPinching) {
         const deltaX = e.touches[0].clientX - startX;
         const deltaY = e.touches[0].clientY - startY;
 
-        // Horizontal swipe for seeking
+        // Horizontal swipe for seeking - visual feedback only
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-          const seekDelta = (deltaX / window.innerWidth) * 60; // 60 seconds max
+          const seekDelta = (deltaX / window.innerWidth) * 90; // 90 seconds max
           const newTime = Math.max(0, Math.min(duration, startTime + seekDelta));
           setCurrentTime(newTime);
-          if (videoRef.current) {
-            videoRef.current.currentTime = newTime;
-          }
         }
 
-        // Vertical swipe for volume
+        // Vertical swipe
         if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
-          const volumeDelta = -(deltaY / window.innerHeight);
-          const newVolume = Math.max(0, Math.min(1, volume + volumeDelta));
-          setVolume(newVolume);
+          const isLeftHalf = e.touches[0].clientX < window.innerWidth / 2;
+          if (isLeftHalf) {
+            const brightnessDelta = -(deltaY / window.innerHeight);
+            setBrightness(prev => Math.max(0.5, Math.min(2.0, prev + brightnessDelta)));
+          } else {
+            const volumeDelta = -(deltaY / window.innerHeight);
+            const newVolume = Math.max(0, Math.min(1, volume + volumeDelta));
+            setVolume(newVolume);
+            pe.setVolume(newVolume);
+          }
+        }
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = dist / pinchStartScale;
+        setScale(prev => Math.max(1, Math.min(3, prev * factor)));
+        setPinchStartScale(dist);
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (scale < 1.05) setScale(1);
+
+      // Commit horizontal seek on end
+      if (!isPinching && e.changedTouches.length === 1) {
+        const deltaX = e.changedTouches[0].clientX - startX;
+        const deltaY = e.changedTouches[0].clientY - startY;
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+          if (videoRef.current) {
+            videoRef.current.currentTime = currentTime;
+          }
         }
       }
+      if (e.touches.length === 0) setIsPinching(false);
     };
 
     const container = videoContainerRef.current;
     container.addEventListener('touchstart', handleTouchStart, { passive: true });
     container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       container.removeEventListener('touchstart', handleTouchStart);
       container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [gestureControl, volume, currentTime, duration]);
+  }, [gestureControl, volume, currentTime, duration, isPinching, pinchStartScale, scale, pe]);
 
   // Smart rewind feature
   const handleSmartRewind = useCallback(() => {
@@ -333,6 +392,7 @@ const VideoPlayer: React.FC = () => {
   }, [ambientLighting]);
 
   const togglePlayback = () => {
+    setHasInteracted(true);
     usePlayerStore.getState().togglePlayback();
   };
 
@@ -362,6 +422,19 @@ const VideoPlayer: React.FC = () => {
     const time = newValue[0];
     setCurrentTime(time);
     pe.seek(time);
+  };
+
+  const handleSeekMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = x / rect.width;
+    const time = percent * duration;
+    setHoverTime(time);
+    setHoverPos(x);
+
+    if (currentFile?.id) {
+      setHoverThumb(`${API_BASE}/api/tracks/${currentFile.id}/thumbnail-at?at=${Math.floor(time)}`);
+    }
   };
 
   const toggleFullscreen = async () => {
@@ -411,14 +484,60 @@ const VideoPlayer: React.FC = () => {
 
     try {
       if (isPiP) {
-        await document.exitPictureInPicture();
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        }
       } else {
-        await videoRef.current.requestPictureInPicture();
+        if (document.pictureInPictureEnabled) {
+          await videoRef.current.requestPictureInPicture();
+        } else {
+          setIsPiP(true);
+        }
       }
       setIsPiP(!isPiP);
     } catch (error) {
       console.error('PiP error:', error);
     }
+  };
+
+  const nextChapter = () => {
+    if (!videoRef.current) return;
+    const time = videoRef.current.currentTime * 1000;
+    const next = chapters.find(c => c.start_time_ms > time + 500);
+    if (next) videoRef.current.currentTime = next.start_time_ms / 1000;
+  };
+
+  const prevChapter = () => {
+    if (!videoRef.current) return;
+    const time = videoRef.current.currentTime * 1000;
+    const current = [...chapters].reverse().find(c => c.start_time_ms <= time);
+    if (current) {
+      if (time > current.start_time_ms + 2000) {
+        videoRef.current.currentTime = current.start_time_ms / 1000;
+      } else {
+        const idx = chapters.indexOf(current);
+        if (idx > 0) {
+          videoRef.current.currentTime = chapters[idx - 1].start_time_ms / 1000;
+        }
+      }
+    }
+  };
+
+  const switchAudioTrack = async (index: number) => {
+    if (!currentFile || !videoRef.current) return;
+    const time = videoRef.current.currentTime;
+    setSelectedAudioTrack(index);
+    const newSrc = `${currentFile.file}${currentFile.file?.includes('?') ? '&' : '?'}audio_stream=${index}`;
+    videoRef.current.src = newSrc;
+    videoRef.current.load();
+    const onCanPlay = () => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+        if (isPlaying) videoRef.current.play();
+      }
+      videoRef.current?.removeEventListener('canplay', onCanPlay);
+    };
+    videoRef.current.addEventListener('canplay', onCanPlay);
   };
 
   const handleMouseMove = () => {
@@ -456,11 +575,64 @@ const VideoPlayer: React.FC = () => {
     if (!videoRef.current || !currentFile) return;
 
     pe.loadVideo(currentFile, videoRef.current);
+
+    // Load persisted settings
+    if (currentFile.id) {
+      client.get(`/tracks/${currentFile.id}`).then(res => {
+        const track = res.data;
+        if (track.aspect_ratio_override) setAspectRatio(track.aspect_ratio_override);
+        if (track.rotation_degrees) setRotation(track.rotation_degrees);
+        if (track.mirror_flip) setMirrorFlip(!!track.mirror_flip);
+      });
+      client.get(`/tracks/${currentFile.id}/audio-streams`).then(res => {
+        setAudioTracks(res.data || []);
+      });
+      client.get(`/tracks/${currentFile.id}/chapters`).then(res => {
+        setChapters(res.data || []);
+      });
+    }
   }, [currentFile, pe]);
+
+  useEffect(() => {
+    if (currentFile?.id) {
+      // Debounce persistence
+      const timer = setTimeout(() => {
+        client.patch(`/tracks/${currentFile.id}/metadata`, {
+          aspect_ratio_override: aspectRatio,
+          rotation_degrees: rotation,
+          mirror_flip: mirrorFlip ? 1 : 0
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentFile?.id, aspectRatio, rotation, mirrorFlip]);
 
   useEffect(() => {
     setIsPlaying(storeIsPlaying);
   }, [storeIsPlaying]);
+
+  useEffect(() => {
+    const handleNavigateAway = () => {
+      const autoPiP = localStorage.getItem('ZOVYRA_auto_pip') === 'true';
+      if (autoPiP && isPlaying && hasInteracted && videoRef.current && !document.pictureInPictureElement) {
+        if (document.pictureInPictureEnabled) {
+          videoRef.current.requestPictureInPicture().catch(console.error);
+        }
+      }
+    };
+    return () => handleNavigateAway();
+  }, [location.pathname, isPlaying, hasInteracted]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && videoRef.current) {
+      navigator.mediaSession.setActionHandler('seekforward', () => {
+        if (videoRef.current) videoRef.current.currentTime += 10;
+      });
+      navigator.mediaSession.setActionHandler('seekbackward', () => {
+        if (videoRef.current) videoRef.current.currentTime -= 10;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -517,7 +689,8 @@ const VideoPlayer: React.FC = () => {
           ref={videoContainerRef}
           onMouseMove={handleMouseMove}
           style={{
-            filter: aiEnhancement ? 'contrast(1.2) saturate(1.3) brightness(1.1)' : 'none',
+            willChange: 'transform',
+            transform: `rotate(${rotation}deg) scaleX(${mirrorFlip ? -1 : 1}) scale(${scale})`,
           }}
         >
           {/* Particle System */}
@@ -538,14 +711,19 @@ const VideoPlayer: React.FC = () => {
           <video
             ref={videoRef}
             className={cn(
-              'h-full w-full cursor-pointer object-cover transition-all duration-300',
-              immersiveMode && 'object-fill',
+              'h-full w-full cursor-pointer transition-all duration-300',
+              (aspectRatio === 'fill' || aspectRatio === 'stretch' || aspectRatio === 'anamorphic') ? 'object-fill' :
+              aspectRatio === 'fit' ? 'object-contain' :
+              'object-cover',
             )}
             src={currentFile?.file}
             onClick={togglePlayback}
             playsInline
             style={{
-              filter: `brightness(${aiEnhancement ? 1.1 : 1}) contrast(${aiEnhancement ? 1.2 : 1}) saturate(${aiEnhancement ? 1.3 : 1})`,
+              filter: aiEnhancement
+                ? `contrast(${1.2 * contrast}) saturate(${1.3 * saturation}) brightness(${1.1 * brightness}) hue-rotate(${hue}deg)`
+                : `contrast(${contrast}) saturate(${saturation}) brightness(${brightness}) hue-rotate(${hue}deg)`,
+              aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === 'anamorphic' ? '2.39/1' : 'auto',
             }}
           />
 
