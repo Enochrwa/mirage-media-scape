@@ -5,7 +5,8 @@ import { detectMobileCapabilities } from './detectors/mobile';
 
 function resolveHost(): 'web' | 'desktop' | 'mobile' {
   if (typeof window === 'undefined') return 'web';
-  if ('__TAURI__' in window) return 'desktop';
+  // Support Tauri v2 detection even when withGlobalTauri is false
+  if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window) return 'desktop';
   if (
     'Capacitor' in window &&
     (

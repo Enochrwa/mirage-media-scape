@@ -1,21 +1,27 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 import type { IFileAccessService } from './IFileAccessService';
 
 export class CapacitorFileAccessService implements IFileAccessService {
   async pickFolder(): Promise<string | null> {
-    // In a real production app, we would use a community plugin like:
-    // import { FilePicker } from '@capawesome/capacitor-file-picker';
-    // const result = await FilePicker.pickDirectory();
-    // return result.path;
-
-    // For now, we return the App Data directory as the base for mobile media storage
-    return Directory.Data;
+    try {
+      const result = await FilePicker.pickDirectory();
+      return result.path || null;
+    } catch (e) {
+      console.error('[CapacitorFileAccess] Failed to pick directory:', e);
+      // Fallback to Directory.Data if user cancels or plugin fails
+      return Directory.Data;
+    }
   }
 
   async readFile(path: string): Promise<Uint8Array> {
+    // If path is a full Capacitor URL or external path, Filesystem might need it as is
+    // If it's relative, we assume it's in Directory.Data (or children)
     const result = await Filesystem.readFile({
       path,
-      directory: Directory.Data,
+      // If path starts with a / or a protocol, don't provide directory
+      directory:
+        path.startsWith('/') || path.includes('://') ? undefined : Directory.Data,
     });
 
     const data = result.data;
