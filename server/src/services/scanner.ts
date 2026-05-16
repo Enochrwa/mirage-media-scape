@@ -76,9 +76,7 @@ export class ScannerService {
 
   /** Scan all folders stored in the database. */
   async scanAll(): Promise<void> {
-    const rows = db
-      .prepare('SELECT path FROM watched_folders')
-      .all() as { path: string }[];
+    const rows = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
     if (rows.length === 0) return;
     await this.scan(rows.map((f) => f.path));
   }
@@ -118,10 +116,7 @@ export class ScannerService {
    * @param directory  Absolute path to the folder.
    * @param options.autoDiscovered  Whether the folder was found automatically (vs user-chosen).
    */
-  async addFolder(
-    directory: string,
-    options?: { autoDiscovered?: boolean },
-  ): Promise<void> {
+  async addFolder(directory: string, options?: { autoDiscovered?: boolean }): Promise<void> {
     const auto = options?.autoDiscovered ? 1 : 0;
     db.prepare(
       'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, ?)',

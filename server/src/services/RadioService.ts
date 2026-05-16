@@ -41,17 +41,7 @@ export class RadioService {
     );
     const now = Math.floor(Date.now() / 1000);
     for (const s of stations) {
-      stmt.run(
-        s.stationuuid,
-        s.name,
-        s.url,
-        s.country,
-        s.tags,
-        s.bitrate,
-        s.codec,
-        s.favicon,
-        now,
-      );
+      stmt.run(s.stationuuid, s.name, s.url, s.country, s.tags, s.bitrate, s.codec, s.favicon, now);
     }
   }
 

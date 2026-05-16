@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import db from '../db/index.js';
-import { SmartPlaylistService, type SmartPlaylistDefinition } from '../services/SmartPlaylistService.js';
+import {
+  SmartPlaylistService,
+  type SmartPlaylistDefinition,
+} from '../services/SmartPlaylistService.js';
 import crypto from 'crypto';
 
 interface SmartPlaylistRow {

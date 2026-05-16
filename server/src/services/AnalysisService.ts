@@ -21,21 +21,29 @@ export class AnalysisService {
     if (this.isAnalyzing) return;
 
     // Priority 1: Recently played tracks that aren't analyzed
-    const recentlyPlayed = db.prepare(`
+    const recentlyPlayed = db
+      .prepare(
+        `
       SELECT t.id, t.file_path FROM tracks t
       JOIN play_events p ON t.id = p.track_id
       WHERE (t.analysis_version IS NULL OR t.analysis_version < ?)
       AND t.missing = 0 AND t.file_type = 'audio'
       ORDER BY p.started_at DESC LIMIT 50
-    `).all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
+    `,
+      )
+      .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
     // Priority 2: Rest of the library
-    const remaining = db.prepare(`
+    const remaining = db
+      .prepare(
+        `
       SELECT id, file_path FROM tracks
       WHERE (analysis_version IS NULL OR analysis_version < ?)
       AND missing = 0 AND file_type = 'audio'
       LIMIT 500
-    `).all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
+    `,
+      )
+      .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
     this.queue = [...new Set([...recentlyPlayed, ...remaining])];
 
@@ -56,7 +64,8 @@ export class AnalysisService {
       try {
         const analysis = native.analyzeAudio(track.file_path);
 
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE tracks SET
             bpm = ?,
             key = ?,
@@ -66,7 +75,8 @@ export class AnalysisService {
             analysis_version = ?,
             updated_at = ?
           WHERE id = ?
-        `).run(
+        `,
+        ).run(
           analysis.bpm,
           analysis.key,
           analysis.camelotKey,
@@ -74,22 +84,21 @@ export class AnalysisService {
           analysis.loudness,
           CURRENT_ANALYSIS_VERSION,
           Date.now(),
-          track.id
+          track.id,
         );
 
         processed++;
         this.io?.emit('ANALYSIS_PROGRESS', {
           processed,
           total,
-          currentTrack: track.id
+          currentTrack: track.id,
         });
-
       } catch (e) {
         console.error(`Analysis failed for ${track.file_path}`, e);
       }
 
       // Yield
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     this.isAnalyzing = false;
@@ -97,12 +106,15 @@ export class AnalysisService {
   }
 
   async analyzeSingleTrack(trackId: string) {
-    const track = db.prepare('SELECT id, file_path FROM tracks WHERE id = ?').get(trackId) as { id: string; file_path: string } | undefined;
+    const track = db.prepare('SELECT id, file_path FROM tracks WHERE id = ?').get(trackId) as
+      | { id: string; file_path: string }
+      | undefined;
     if (!track) return;
 
     try {
       const analysis = native.analyzeAudio(track.file_path);
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE tracks SET
           bpm = ?,
           key = ?,
@@ -112,7 +124,8 @@ export class AnalysisService {
           analysis_version = ?,
           updated_at = ?
         WHERE id = ?
-      `).run(
+      `,
+      ).run(
         analysis.bpm,
         analysis.key,
         analysis.camelotKey,
@@ -120,7 +133,7 @@ export class AnalysisService {
         analysis.loudness,
         CURRENT_ANALYSIS_VERSION,
         Date.now(),
-        track.id
+        track.id,
       );
       return analysis;
     } catch (e) {

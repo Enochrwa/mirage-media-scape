@@ -15,16 +15,18 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  const downloads = db.prepare("SELECT * FROM downloads ORDER BY created_at DESC").all();
+  const downloads = db.prepare('SELECT * FROM downloads ORDER BY created_at DESC').all();
   res.json({ data: downloads });
 });
 
 router.delete('/:id', (req, res) => {
-  const dl = db.prepare("SELECT local_path FROM downloads WHERE id = ?").get(req.params.id) as { local_path?: string };
+  const dl = db.prepare('SELECT local_path FROM downloads WHERE id = ?').get(req.params.id) as {
+    local_path?: string;
+  };
   if (dl?.local_path && fs.existsSync(dl.local_path)) {
     fs.unlinkSync(dl.local_path);
   }
-  db.prepare("DELETE FROM downloads WHERE id = ?").run(req.params.id);
+  db.prepare('DELETE FROM downloads WHERE id = ?').run(req.params.id);
   res.json({ data: { success: true } });
 });
 

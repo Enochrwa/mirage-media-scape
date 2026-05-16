@@ -134,14 +134,14 @@ const store = create<PlayerState>((set, get) => ({
       const lastSave = parseInt(localStorage.getItem('ZOVYRA_last_save') || '0');
       if (Date.now() - lastSave > 5000) {
         const { currentFile, currentTime } = get();
-          if (currentFile && currentTime > 5) {
+        if (currentFile && currentTime > 5) {
           fetch(`${API_BASE}/api/stats/state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               trackId: currentFile.id,
               position: currentTime,
-              queueSnapshot: queueManager.getQueue().map(f => f.id),
+              queueSnapshot: queueManager.getQueue().map((f) => f.id),
               queueIndex: queueManager.getCurrentIndex(),
             }),
           }).catch(console.error);
@@ -269,9 +269,9 @@ const store = create<PlayerState>((set, get) => ({
         if (Date.now() - data.timestamp < sevenDaysMs) {
           // Find track in library or fetch it
           const trackRes = await fetch(`${API_BASE}/api/tracks/${data.track_id}`);
-        const trackData = await trackRes.json();
-        if (trackData) {
-          const track = mapIncomingTrackToMediaFile(trackData);
+          const trackData = await trackRes.json();
+          if (trackData) {
+            const track = mapIncomingTrackToMediaFile(trackData);
             set({ currentFile: track });
             await playbackEngine.load(track);
             playbackEngine.seek(data.position_seconds);

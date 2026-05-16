@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { X, Save, Trash2, Power, Zap } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { API_BASE } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -81,7 +87,7 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
   };
 
   const applyPreset = (presetId: string) => {
-    const preset = presets.find(p => p.id === presetId);
+    const preset = presets.find((p) => p.id === presetId);
     if (preset) {
       setGains(preset.bands);
       preset.bands.forEach((g, i) => {
@@ -130,7 +136,7 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
         body: JSON.stringify({ name: newPresetName, bands: gains }),
       });
       const newPreset = await res.json();
-      setPresets(prev => [...prev, newPreset]);
+      setPresets((prev) => [...prev, newPreset]);
       setSelectedPreset(newPreset.id);
       setNewPresetName('');
       toast.success('Preset saved');
@@ -144,7 +150,7 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
   const deletePreset = async (id: string) => {
     try {
       await fetch(`${API_BASE}/api/eq-presets/${id}`, { method: 'DELETE' });
-      setPresets(prev => prev.filter(p => p.id !== id));
+      setPresets((prev) => prev.filter((p) => p.id !== id));
       if (selectedPreset === id) setSelectedPreset('flat');
       toast.success('Preset deleted');
     } catch (e) {
@@ -212,14 +218,19 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
             Parametric Equalizer
           </h3>
           <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1">
-            <Power className={cn("h-3 w-3", enabled ? "text-purple-500" : "text-gray-600")} />
-            <div className="scale-75 origin-right">
+            <Power className={cn('h-3 w-3', enabled ? 'text-purple-500' : 'text-gray-600')} />
+            <div className="origin-right scale-75">
               <Switch checked={enabled} onCheckedChange={toggleEnabled} />
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant={gains[0] === 6 ? "default" : "ghost"} size="sm" onClick={toggleBassBoost} className="gap-2 text-xs">
+          <Button
+            variant={gains[0] === 6 ? 'default' : 'ghost'}
+            size="sm"
+            onClick={toggleBassBoost}
+            className="gap-2 text-xs"
+          >
             <Zap className="h-3 w-3" /> Bass Boost
           </Button>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -237,17 +248,26 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
                 <SelectValue placeholder="Select preset" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="custom" disabled>Custom</SelectItem>
-                {presets.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                <SelectItem value="custom" disabled>
+                  Custom
+                </SelectItem>
+                {presets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedPreset !== 'flat' && !presets.find(p => p.id === selectedPreset)?.is_system && (
-              <Button variant="destructive" size="icon" onClick={() => deletePreset(selectedPreset)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
+            {selectedPreset !== 'flat' &&
+              !presets.find((p) => p.id === selectedPreset)?.is_system && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => deletePreset(selectedPreset)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
           </div>
         </div>
         <div className="space-y-2">
@@ -256,7 +276,7 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
             <Input
               placeholder="Preset Name"
               value={newPresetName}
-              onChange={e => setNewPresetName(e.target.value)}
+              onChange={(e) => setNewPresetName(e.target.value)}
               className="bg-black/40"
             />
             <Button size="icon" onClick={savePreset} disabled={isSaving || !newPresetName}>

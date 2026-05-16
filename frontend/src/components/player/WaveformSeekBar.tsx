@@ -103,7 +103,6 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentTime, duration, pe]);
 
-
   const [isDragging, setIsDragging] = useState(false);
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
 
@@ -169,12 +168,12 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
   };
 
   const progress = duration > 0 ? currentTime / duration : 0;
-  const hoverProgress = (hoverTime !== null && duration > 0) ? hoverTime / duration : null;
+  const hoverProgress = hoverTime !== null && duration > 0 ? hoverTime / duration : null;
 
   const renderWaveform = () => {
     if (!peaks) {
       return (
-        <div className="relative h-1 w-full bg-white/10 overflow-hidden rounded-full">
+        <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/10">
           <div
             className="absolute left-0 top-0 h-full bg-purple-500"
             style={{ width: `${progress * 100}%` }}
@@ -259,7 +258,10 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
 
       <div
         ref={containerRef}
-        className={cn('group relative h-16 w-full select-none', isStream ? 'cursor-default' : 'cursor-pointer')}
+        className={cn(
+          'group relative h-16 w-full select-none',
+          isStream ? 'cursor-default' : 'cursor-pointer',
+        )}
         onMouseDown={handleInteraction}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -273,7 +275,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* Scrubber Handle */}
         {!isStream && (
           <div
-            className="pointer-events-none absolute bottom-0 top-0 w-1 bg-white shadow-lg transition-all duration-75 z-10"
+            className="pointer-events-none absolute bottom-0 top-0 z-10 w-1 bg-white shadow-lg transition-all duration-75"
             style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
           />
         )}
@@ -281,26 +283,26 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
         {/* A/B Markers (Draggable SVG Overlays) */}
         {localABLoop.pointA !== null && (
           <div
-            className="absolute -top-1 z-20 h-full w-6 flex justify-center cursor-ew-resize group/markerA"
+            className="group/markerA absolute -top-1 z-20 flex h-full w-6 cursor-ew-resize justify-center"
             style={{
               left: `${(localABLoop.pointA / duration) * 100}%`,
               transform: 'translateX(-50%)',
             }}
           >
             <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-[#00FFFF] drop-shadow-sm" />
-            <div className="absolute top-0 bottom-0 w-[2px] bg-[#00FFFF] opacity-40 group-hover/markerA:opacity-100" />
+            <div className="absolute bottom-0 top-0 w-[2px] bg-[#00FFFF] opacity-40 group-hover/markerA:opacity-100" />
           </div>
         )}
         {localABLoop.pointB !== null && (
           <div
-            className="absolute -top-1 z-20 h-full w-6 flex justify-center cursor-ew-resize group/markerB"
+            className="group/markerB absolute -top-1 z-20 flex h-full w-6 cursor-ew-resize justify-center"
             style={{
               left: `${(localABLoop.pointB / duration) * 100}%`,
               transform: 'translateX(-50%)',
             }}
           >
             <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-[#FF8C00] drop-shadow-sm" />
-            <div className="absolute top-0 bottom-0 w-[2px] bg-[#FF8C00] opacity-40 group-hover/markerB:opacity-100" />
+            <div className="absolute bottom-0 top-0 w-[2px] bg-[#FF8C00] opacity-40 group-hover/markerB:opacity-100" />
           </div>
         )}
       </div>

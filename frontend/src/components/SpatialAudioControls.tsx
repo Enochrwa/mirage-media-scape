@@ -197,10 +197,14 @@ const SpatialAudioControls: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <Label htmlFor="head-tracking">Head Tracking</Label>
-              <Switch id="head-tracking" checked={headTracking} onCheckedChange={(val) => {
-                setHeadTracking(val);
-                persistSettings(enabled, val, monoMerge, stereoWidth, pos);
-              }} />
+              <Switch
+                id="head-tracking"
+                checked={headTracking}
+                onCheckedChange={(val) => {
+                  setHeadTracking(val);
+                  persistSettings(enabled, val, monoMerge, stereoWidth, pos);
+                }}
+              />
             </div>
           </>
         )}
@@ -216,8 +220,8 @@ const SpatialAudioControls: React.FC = () => {
             <div className="flex items-center gap-1 font-mono text-xs">
               {stereoWidth > 1.2 && (
                 <div className="group relative">
-                  <VolumeX className="h-3 w-3 text-amber-500 cursor-help" />
-                  <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 rounded bg-black px-2 py-1 text-[10px] text-white group-hover:block w-32 text-center border border-white/10">
+                  <VolumeX className="h-3 w-3 cursor-help text-amber-500" />
+                  <div className="absolute bottom-full left-1/2 mb-2 hidden w-32 -translate-x-1/2 rounded border border-white/10 bg-black px-2 py-1 text-center text-[10px] text-white group-hover:block">
                     Mono compatibility warning: excessive side gain
                   </div>
                 </div>

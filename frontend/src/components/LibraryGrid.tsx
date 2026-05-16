@@ -238,10 +238,14 @@ const GridCell = memo(function GridCell({
               <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                 Show in File Explorer
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                setShowInfo(true);
-              }}>Get Info</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowInfo(true);
+                }}
+              >
+                Get Info
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={(e) => {

@@ -83,9 +83,9 @@ export class RecommendationService {
     limit: number = 20,
     excludeIds: string[] = [],
   ): Promise<TrackRow[]> {
-    const target = this.db
-      .prepare('SELECT * FROM tracks WHERE id = ?')
-      .get(trackId) as TrackRow | undefined;
+    const target = this.db.prepare('SELECT * FROM tracks WHERE id = ?').get(trackId) as
+      | TrackRow
+      | undefined;
     if (!target) return [];
 
     const medians = this.getPopulationMedians();
@@ -146,9 +146,9 @@ export class RecommendationService {
 
     const maxCoPlay = coPlays.reduce((max, c) => Math.max(max, c.score), 1);
     const medians = this.getPopulationMedians();
-    const targetFeatures = this.db
-      .prepare('SELECT * FROM tracks WHERE id = ?')
-      .get(trackId) as TrackFeatures | undefined;
+    const targetFeatures = this.db.prepare('SELECT * FROM tracks WHERE id = ?').get(trackId) as
+      | TrackFeatures
+      | undefined;
 
     if (!targetFeatures) return [];
     const targetVector = this.normalizeFeatures(targetFeatures, medians);

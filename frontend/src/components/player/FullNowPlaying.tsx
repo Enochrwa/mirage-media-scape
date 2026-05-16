@@ -161,12 +161,17 @@ export const FullNowPlaying: React.FC = () => {
             </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:text-primary" title="Audio Effects">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-primary"
+                  title="Audio Effects"
+                >
                   <Palette size={20} />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[400px] border-white/10 bg-zinc-900 p-0" side="top">
-                <div className="max-h-[60vh] overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                <div className="custom-scrollbar max-h-[60vh] space-y-6 overflow-y-auto p-4">
                   <EqualizerControls onClose={() => {}} />
                   <CompressorControls />
                   <SpatialAudioControls />
@@ -177,13 +182,16 @@ export const FullNowPlaying: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn('hover:text-primary', pe.sleepTimer?.getState().active && 'text-amber-400')}
+                className={cn(
+                  'hover:text-primary',
+                  pe.sleepTimer?.getState().active && 'text-amber-400',
+                )}
                 title="Sleep Timer"
               >
                 <Moon size={20} />
               </Button>
               {pe.sleepTimer?.getState().active && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[8px] font-bold text-black">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[8px] font-bold text-black">
                   {Math.ceil(pe.sleepTimer.getState().remainingSeconds / 60)}m
                 </span>
               )}
@@ -248,7 +256,7 @@ export const FullNowPlaying: React.FC = () => {
                     className="h-8 w-8"
                     disabled={chapters.length === 0}
                     onClick={() => {
-                      const prev = [...chapters].reverse().find(c => c.time < currentTime - 1);
+                      const prev = [...chapters].reverse().find((c) => c.time < currentTime - 1);
                       if (prev) pe.seek(prev.time);
                     }}
                     title="Previous Chapter"
@@ -261,7 +269,7 @@ export const FullNowPlaying: React.FC = () => {
                     className="h-8 w-8"
                     disabled={chapters.length === 0}
                     onClick={() => {
-                      const next = chapters.find(c => c.time > currentTime + 1);
+                      const next = chapters.find((c) => c.time > currentTime + 1);
                       if (next) pe.seek(next.time);
                     }}
                     title="Next Chapter"

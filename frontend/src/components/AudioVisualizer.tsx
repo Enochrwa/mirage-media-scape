@@ -128,7 +128,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.moveTo(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius);
-          ctx.lineTo(Math.cos(angle) * (innerRadius + barLen), Math.sin(angle) * (innerRadius + barLen));
+          ctx.lineTo(
+            Math.cos(angle) * (innerRadius + barLen),
+            Math.sin(angle) * (innerRadius + barLen),
+          );
           ctx.stroke();
         }
         ctx.restore();
@@ -214,7 +217,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [mode, isVisible, color, lowPowerMode]);
+  }, [mode, isVisible, color, lowPowerMode, background]);
 
   return (
     <canvas

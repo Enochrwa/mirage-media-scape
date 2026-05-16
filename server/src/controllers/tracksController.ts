@@ -33,9 +33,7 @@ export const getInstantTracks = (_req: Request, res: Response): void => {
 };
 
 export const getAllTracks = (_req: Request, res: Response): void => {
-  const tracks = db
-    .prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC')
-    .all();
+  const tracks = db.prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC').all();
   res.json(tracks);
 };
 
@@ -151,9 +149,9 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const identifyTrack = async (req: Request, res: Response): Promise<void> => {
-  const track = db
-    .prepare('SELECT file_path FROM tracks WHERE id = ?')
-    .get(req.params.id) as { file_path: string } | undefined;
+  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
+    | { file_path: string }
+    | undefined;
 
   if (!track) {
     res.status(404).json({ error: 'Track not found' });
@@ -192,9 +190,9 @@ export const getDuplicateCandidates = async (_req: Request, res: Response): Prom
 
 export const getTrackCover = (req: Request, res: Response): void => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const row = db
-    .prepare('SELECT cover_cache_path FROM tracks WHERE id = ?')
-    .get(id) as { cover_cache_path?: string } | undefined;
+  const row = db.prepare('SELECT cover_cache_path FROM tracks WHERE id = ?').get(id) as
+    | { cover_cache_path?: string }
+    | undefined;
 
   if (!row?.cover_cache_path || !fs.existsSync(row.cover_cache_path)) {
     res.status(404).end();
@@ -205,9 +203,9 @@ export const getTrackCover = (req: Request, res: Response): void => {
 
 export const getTrackThumbnail = (req: Request, res: Response): void => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const row = db
-    .prepare('SELECT thumbnail_path FROM tracks WHERE id = ?')
-    .get(id) as { thumbnail_path?: string } | undefined;
+  const row = db.prepare('SELECT thumbnail_path FROM tracks WHERE id = ?').get(id) as
+    | { thumbnail_path?: string }
+    | undefined;
 
   if (!row?.thumbnail_path || !fs.existsSync(row.thumbnail_path)) {
     res.status(404).end();
@@ -268,9 +266,7 @@ export const updateTrackRating = (req: Request, res: Response): void => {
   }
 
   try {
-    const result = db
-      .prepare('UPDATE tracks SET rating = ? WHERE id = ?')
-      .run(ratingNum, id);
+    const result = db.prepare('UPDATE tracks SET rating = ? WHERE id = ?').run(ratingNum, id);
     if (result.changes === 0) {
       res.status(404).json({ error: 'Track not found' });
       return;
@@ -286,9 +282,9 @@ export const updateTrackRating = (req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getTrackWaveform = (req: Request, res: Response): void => {
-  const track = db
-    .prepare('SELECT file_path FROM tracks WHERE id = ?')
-    .get(req.params.id) as { file_path: string } | undefined;
+  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
+    | { file_path: string }
+    | undefined;
 
   if (!track) {
     res.status(404).json({ error: 'Track not found' });

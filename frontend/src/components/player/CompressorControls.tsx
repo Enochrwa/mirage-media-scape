@@ -29,13 +29,16 @@ export const CompressorControls: React.FC = () => {
   };
 
   const persistSettings = (p: typeof params, e: boolean, m: string) => {
-    localStorage.setItem('ZOVYRA_compressor_settings', JSON.stringify({ params: p, enabled: e, mode: m }));
+    localStorage.setItem(
+      'ZOVYRA_compressor_settings',
+      JSON.stringify({ params: p, enabled: e, mode: m }),
+    );
     fetch(`${API_BASE}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         key: 'compressor_settings',
-        value: JSON.stringify({ params: p, enabled: e, mode: m })
+        value: JSON.stringify({ params: p, enabled: e, mode: m }),
       }),
     }).catch(console.error);
   };
@@ -93,13 +96,13 @@ export const CompressorControls: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => setAdvanced(!advanced)}
-            className={cn("h-8 gap-2 px-3 text-xs", advanced && "bg-white/10")}
+            className={cn('h-8 gap-2 px-3 text-xs', advanced && 'bg-white/10')}
           >
             <Settings2 className="h-3 w-3" />
             Advanced
           </Button>
           <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1">
-            <Power className={cn("h-3 w-3", enabled ? "text-orange-500" : "text-gray-600")} />
+            <Power className={cn('h-3 w-3', enabled ? 'text-orange-500' : 'text-gray-600')} />
             <Switch
               checked={enabled}
               onCheckedChange={(val) => {
@@ -140,7 +143,7 @@ export const CompressorControls: React.FC = () => {
       </div>
 
       {advanced && (
-        <div className="grid grid-cols-1 gap-6 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2">
+        <div className="grid grid-cols-1 gap-6 border-t border-white/5 pt-4 animate-in fade-in slide-in-from-top-2">
           <div className="space-y-3">
             <div className="flex justify-between">
               <Label className="text-xs">Threshold</Label>

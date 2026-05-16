@@ -53,7 +53,12 @@ const PlayerWrapper = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setShowResume(false)}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() => setShowResume(false)}
+              >
                 <X size={14} />
               </Button>
               <Button

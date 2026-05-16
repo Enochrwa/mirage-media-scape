@@ -84,9 +84,12 @@ export function processFile(
     }
   }
 
-  const chaptersJson = metadata.chapters && metadata.chapters.length > 0
-    ? JSON.stringify({ chapters: metadata.chapters.map(c => ({ time: c.startTimeMs / 1000, title: c.title })) })
-    : null;
+  const chaptersJson =
+    metadata.chapters && metadata.chapters.length > 0
+      ? JSON.stringify({
+          chapters: metadata.chapters.map((c) => ({ time: c.startTimeMs / 1000, title: c.title })),
+        })
+      : null;
 
   db.prepare(
     `INSERT OR REPLACE INTO tracks (

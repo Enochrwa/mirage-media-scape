@@ -6,17 +6,22 @@ const router = Router();
 
 router.get('/', (req, res) => {
   const presets = db.prepare('SELECT * FROM eq_presets WHERE is_system = 0').all();
-  res.json(presets.map((p: any) => ({
-    ...p,
-    bands: JSON.parse(p.bands)
-  })));
+  res.json(
+    presets.map((p: any) => ({
+      ...p,
+      bands: JSON.parse(p.bands),
+    })),
+  );
 });
 
 router.post('/', (req, res) => {
   const { name, bands } = req.body;
   const id = crypto.randomUUID();
-  db.prepare('INSERT INTO eq_presets (id, name, bands, is_system) VALUES (?, ?, ?, 0)')
-    .run(id, name, JSON.stringify(bands));
+  db.prepare('INSERT INTO eq_presets (id, name, bands, is_system) VALUES (?, ?, ?, 0)').run(
+    id,
+    name,
+    JSON.stringify(bands),
+  );
   res.json({ id, name, bands, is_system: 0 });
 });
 

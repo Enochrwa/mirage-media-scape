@@ -72,7 +72,11 @@ export class PlaybackEngine {
     const duration = el.duration || 0;
 
     // A/B Loop Enforcement
-    if (this._abLoop.isActive && this._abLoop.pointB !== null && currentTime >= this._abLoop.pointB) {
+    if (
+      this._abLoop.isActive &&
+      this._abLoop.pointB !== null &&
+      currentTime >= this._abLoop.pointB
+    ) {
       el.currentTime = this._abLoop.pointA ?? 0;
     }
 
@@ -346,7 +350,9 @@ export class PlaybackEngine {
       // and slice the buffer. With HTMLMediaElement, we can only try to seek
       // slightly forward for delay, but padding at end is harder without MSE.
       // For now, we note the values.
-      console.log(`[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`);
+      console.log(
+        `[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`,
+      );
     }
 
     if (!startNext) {
@@ -492,7 +498,7 @@ export class PlaybackEngine {
     if (enabled) {
       this.panner.panningModel = 'HRTF';
     } else {
-      // @ts-ignore - 'equalpower' is a valid model but might not be in all TS defs
+      // @ts-expect-error - 'equalpower' is a valid model but might not be in all TS defs
       this.panner.panningModel = 'equalpower';
       this.panner.setPosition(0, 0, 0);
     }
@@ -534,7 +540,7 @@ export class PlaybackEngine {
       this.ctx.listener.upZ.setTargetAtTime(up.z, this.ctx.currentTime, 0.1);
     } else {
       // Fallback for older browsers
-      // @ts-ignore
+      // @ts-expect-error - compatibility for older API
       this.ctx.listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
     }
   }
@@ -606,7 +612,8 @@ export class PlaybackEngine {
       this.compressor.threshold.setTargetAtTime(params.threshold, now, 0.1);
     if (params.ratio !== undefined) this.compressor.ratio.setTargetAtTime(params.ratio, now, 0.1);
     if (params.knee !== undefined) this.compressor.knee.setTargetAtTime(params.knee, now, 0.1);
-    if (params.attack !== undefined) this.compressor.attack.setTargetAtTime(params.attack, now, 0.1);
+    if (params.attack !== undefined)
+      this.compressor.attack.setTargetAtTime(params.attack, now, 0.1);
     if (params.release !== undefined)
       this.compressor.release.setTargetAtTime(params.release, now, 0.1);
   }

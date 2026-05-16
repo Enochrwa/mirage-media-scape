@@ -70,10 +70,7 @@ export class SmartPlaylistService {
         const value = cond.value;
         if (Array.isArray(value)) {
           params.push(...value);
-        } else if (
-          cond.operator === 'contains' ||
-          cond.operator === 'not_contains'
-        ) {
+        } else if (cond.operator === 'contains' || cond.operator === 'not_contains') {
           params.push(`%${String(value)}%`);
         } else if (cond.operator === 'starts_with') {
           params.push(`${String(value)}%`);

@@ -35,16 +35,16 @@ const httpServer = createServer(app);
 
 // CORS configuration from environment
 const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+  ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
   : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'];
 
 const io = new Server(httpServer, {
-   cors: {
-     origin: corsOrigins,
-     credentials: true,
-     methods: ['GET', 'POST'],
-   },
- });
+  cors: {
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST'],
+  },
+});
 
 scannerService.setIo(io);
 analysisService.setIo(io);
@@ -60,7 +60,9 @@ const limiter = rateLimit({
   max: 1000, // Limit each IP to 1000 requests per `window`
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: { data: { message: 'Too many requests from this IP, please try again after 15 minutes' } },
+  message: {
+    data: { message: 'Too many requests from this IP, please try again after 15 minutes' },
+  },
 });
 
 app.use('/api/', limiter);

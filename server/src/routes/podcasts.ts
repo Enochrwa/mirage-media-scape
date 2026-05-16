@@ -6,7 +6,7 @@ const router = Router();
 const podcastService = new PodcastService(db);
 
 router.get('/', (req, res) => {
-  const subs = db.prepare("SELECT * FROM podcast_subscriptions").all();
+  const subs = db.prepare('SELECT * FROM podcast_subscriptions').all();
   res.json({ data: subs });
 });
 
@@ -17,7 +17,9 @@ router.post('/subscribe', async (req, res) => {
 });
 
 router.get('/:id/episodes', (req, res) => {
-  const episodes = db.prepare("SELECT * FROM podcast_episodes WHERE podcast_id = ?").all(req.params.id);
+  const episodes = db
+    .prepare('SELECT * FROM podcast_episodes WHERE podcast_id = ?')
+    .all(req.params.id);
   res.json({ data: episodes });
 });
 
