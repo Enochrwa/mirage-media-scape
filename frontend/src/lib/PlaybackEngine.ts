@@ -192,17 +192,21 @@ export class PlaybackEngine {
 
     // Restore audio source if it was swapped by a video
     if (chain.element !== chain.audioElement) {
+      chain.element.pause();
+      chain.element.removeEventListener('play', this.boundHandlePlay);
+      chain.element.removeEventListener('pause', this.boundHandlePause);
+      chain.element.removeEventListener('ended', this.boundHandleEnded);
+      chain.element.removeEventListener('error', this.boundHandleError);
+      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+
       if (chain.element instanceof HTMLVideoElement) {
-        chain.element.pause();
-        chain.element.removeEventListener('play', this.boundHandlePlay);
-        chain.element.removeEventListener('pause', this.boundHandlePause);
-        chain.element.removeEventListener('ended', this.boundHandleEnded);
-        chain.element.removeEventListener('error', this.boundHandleError);
-        chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+        chain.element.src = '';
+        chain.element.load();
         if (this.lastVideoElement === chain.element) {
           this.lastVideoElement = null;
         }
       }
+
       try {
         chain.source.disconnect();
       } catch (e) {
@@ -239,29 +243,38 @@ export class PlaybackEngine {
     this.initContext();
     const chain = this.chains[this.activeIndex];
 
-    // Cleanup old listeners if we are swapping elements or chain elements
-    if (chain.element !== videoElement && chain.element instanceof HTMLVideoElement) {
+    // Cleanup old listeners if we are swapping elements
+    if (chain.element !== videoElement) {
+      chain.element.pause();
       chain.element.removeEventListener('play', this.boundHandlePlay);
       chain.element.removeEventListener('pause', this.boundHandlePause);
       chain.element.removeEventListener('ended', this.boundHandleEnded);
       chain.element.removeEventListener('error', this.boundHandleError);
       chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+
+      // Reset src to stop background activity if it's the audio element
+      if (chain.element === chain.audioElement) {
+        chain.element.src = '';
+        chain.element.load();
+      }
     }
 
     if (this.lastVideoElement && this.lastVideoElement !== videoElement) {
+      this.lastVideoElement.pause();
       this.lastVideoElement.removeEventListener('play', this.boundHandlePlay);
       this.lastVideoElement.removeEventListener('pause', this.boundHandlePause);
       this.lastVideoElement.removeEventListener('ended', this.boundHandleEnded);
       this.lastVideoElement.removeEventListener('error', this.boundHandleError);
       this.lastVideoElement.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+      this.lastVideoElement.src = '';
+      this.lastVideoElement.load();
     }
 
-    // Disconnect current source and pause element if it was swapped by a video
+    // Disconnect current source
     try {
-      chain.element.pause();
       chain.source.disconnect();
     } catch (e) {
-      // Ignore errors if not connected or already paused
+      // Ignore disconnect error
     }
 
     // Reuse or create source node for the video element
