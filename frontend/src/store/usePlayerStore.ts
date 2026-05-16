@@ -269,14 +269,16 @@ const store = create<PlayerState>((set, get) => ({
         if (Date.now() - data.timestamp < sevenDaysMs) {
           // Find track in library or fetch it
           const trackRes = await fetch(`${API_BASE}/api/tracks/${data.track_id}`);
-          const trackData = await trackRes.json();
-          if (trackData) {
-            const track = mapIncomingTrackToMediaFile(trackData);
-            set({ currentFile: track });
-            await playbackEngine.load(track);
-            playbackEngine.seek(data.position_seconds);
-            // Don't auto-play, just load
-            set({ currentTime: data.position_seconds, isPlaying: false });
+          if (trackRes.ok) {
+            const trackData = await trackRes.json();
+            if (trackData && trackData.id && trackData.file_path) {
+              const track = mapIncomingTrackToMediaFile(trackData);
+              set({ currentFile: track });
+              await playbackEngine.load(track);
+              playbackEngine.seek(data.position_seconds);
+              // Don't auto-play, just load
+              set({ currentTime: data.position_seconds, isPlaying: false });
+            }
           }
         }
       }

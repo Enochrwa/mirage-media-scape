@@ -28,6 +28,10 @@ export interface IncomingTrack {
   file_type?: string | null;
   rating?: number | null;
   play_count?: number | null;
+  replaygain_track_gain?: number | null;
+  replaygain_track_peak?: number | null;
+  replaygain_album_gain?: number | null;
+  replaygain_album_peak?: number | null;
 }
 
 function resolveMediaType(
@@ -66,6 +70,10 @@ export function mapIncomingTrackToMediaFile(track: IncomingTrack): MediaFile {
     rating: track.rating ?? undefined,
     play_count: track.play_count ?? undefined,
     file_type: track.file_type ?? undefined,
+    replaygain_track_gain: track.replaygain_track_gain ?? undefined,
+    replaygain_track_peak: track.replaygain_track_peak ?? undefined,
+    replaygain_album_gain: track.replaygain_album_gain ?? undefined,
+    replaygain_album_peak: track.replaygain_album_peak ?? undefined,
   };
 }
 

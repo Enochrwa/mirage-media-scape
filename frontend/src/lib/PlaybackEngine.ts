@@ -328,12 +328,14 @@ export class PlaybackEngine {
     // ReplayGain application
     let gainDb = 0;
     const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
-    if (mode === 'track' && file.replaygain_track_gain != null) {
-      gainDb = file.replaygain_track_gain;
-    } else if (mode === 'album' && file.replaygain_album_gain != null) {
-      gainDb = file.replaygain_album_gain;
-    } else if (file.replay_gain_db) {
-      gainDb = file.replay_gain_db;
+    if (mode !== 'off') {
+      if (mode === 'track' && file.replaygain_track_gain != null) {
+        gainDb = file.replaygain_track_gain;
+      } else if (mode === 'album' && file.replaygain_album_gain != null) {
+        gainDb = file.replaygain_album_gain;
+      } else if (file.replay_gain_db) {
+        gainDb = file.replay_gain_db;
+      }
     }
 
     const gain = Math.pow(10, gainDb / 20);
@@ -498,7 +500,6 @@ export class PlaybackEngine {
     if (enabled) {
       this.panner.panningModel = 'HRTF';
     } else {
-      // @ts-expect-error - 'equalpower' is a valid model but might not be in all TS defs
       this.panner.panningModel = 'equalpower';
       this.panner.setPosition(0, 0, 0);
     }
@@ -540,7 +541,6 @@ export class PlaybackEngine {
       this.ctx.listener.upZ.setTargetAtTime(up.z, this.ctx.currentTime, 0.1);
     } else {
       // Fallback for older browsers
-      // @ts-expect-error - compatibility for older API
       this.ctx.listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
     }
   }
@@ -773,6 +773,7 @@ export class PlaybackEngine {
 
   async crossfadeTo(file: MediaFile, durationMs: number = 3000) {
     this.initContext();
+    const oldId = this.currentTrackId;
     const nextIndex = (this.activeIndex + 1) % 2;
     const currentChain = this.chains[this.activeIndex];
     const nextChain = this.chains[nextIndex];
@@ -784,6 +785,7 @@ export class PlaybackEngine {
     // We assume if crossfadeTo is called, we want a crossfade unless it's overridden.
 
     // Preload next track silently
+    // Note: load() updates this.currentTrackId
     await this.load(file, true); // startNext = true
 
     // Start next chain playing at volume 0
@@ -811,13 +813,11 @@ export class PlaybackEngine {
 
     // Update currentTrackId to the new one and report the previous ended
     // We do this BEFORE the timeout to ensure we don't end the newly started event
-    const oldId = this.currentTrackId;
-    this.currentTrackId = file.id;
     if (oldId) {
-      // Temporarily swap trackId to report the correct one
       const newId = this.currentTrackId;
+      // Temporarily swap trackId to report the correct one
       this.currentTrackId = oldId;
-      this.reportPlaybackEnd(true, false);
+      await this.reportPlaybackEnd(true, false);
       this.currentTrackId = newId;
     }
   }
