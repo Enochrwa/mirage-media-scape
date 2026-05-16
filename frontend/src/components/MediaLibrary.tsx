@@ -167,7 +167,9 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
           </p>
         </div>
         <Button
-          onClick={() => MobileMediaService.requestPermissions().then(() => window.location.reload())}
+          onClick={() =>
+            MobileMediaService.requestPermissions().then(() => window.location.reload())
+          }
         >
           Grant Permission
         </Button>

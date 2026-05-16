@@ -16,7 +16,11 @@ export class MobileMediaService {
       const result = await CapacitorMediaStore.requestPermissions({
         types: ['audio', 'video'],
       });
-      return result.readMediaAudio === 'granted' || result.readMediaVideo === 'granted' || result.readExternalStorage === 'granted';
+      return (
+        result.readMediaAudio === 'granted' ||
+        result.readMediaVideo === 'granted' ||
+        result.readExternalStorage === 'granted'
+      );
     } catch (e) {
       console.error('[MobileMedia] Permission request failed', e);
       return false;
@@ -25,7 +29,8 @@ export class MobileMediaService {
 
   static async getAllAudio(): Promise<MediaFile[]> {
     try {
-      const { CapacitorMediaStore, MediaType: PluginMediaType } = await import('@odion-cloud/capacitor-mediastore');
+      const { CapacitorMediaStore, MediaType: PluginMediaType } =
+        await import('@odion-cloud/capacitor-mediastore');
       const result = await CapacitorMediaStore.getMediasByType({
         mediaType: PluginMediaType.AUDIO,
         sortBy: 'TITLE',
@@ -56,7 +61,8 @@ export class MobileMediaService {
 
   static async getAllVideo(): Promise<MediaFile[]> {
     try {
-      const { CapacitorMediaStore, MediaType: PluginMediaType } = await import('@odion-cloud/capacitor-mediastore');
+      const { CapacitorMediaStore, MediaType: PluginMediaType } =
+        await import('@odion-cloud/capacitor-mediastore');
       const result = await CapacitorMediaStore.getMediasByType({
         mediaType: PluginMediaType.VIDEO,
         sortBy: 'TITLE',
