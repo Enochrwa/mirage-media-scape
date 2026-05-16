@@ -5,9 +5,8 @@ import { detectMobileCapabilities } from './detectors/mobile'
 
 function resolveHost(): 'web' | 'desktop' | 'mobile' {
   if (typeof window === 'undefined') return 'web'
-  // Tauri v2 detection when withGlobalTauri is false
-  if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window) return 'desktop'
-  if ('zovyraMobile' in window) return 'mobile'
+  if ('__TAURI__' in window) return 'desktop'
+  if ('Capacitor' in window && (window as any).Capacitor?.isNativePlatform?.()) return 'mobile'
   return 'web'
 }
 

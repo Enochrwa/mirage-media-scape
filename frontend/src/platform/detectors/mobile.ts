@@ -1,29 +1,32 @@
+import { Capacitor } from '@capacitor/core';
 import type { PlatformCapabilities } from '../capabilities';
 
 export function detectMobileCapabilities(): PlatformCapabilities {
+  const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
   return {
     host: 'mobile',
+    platform,
 
-    canAccessLocalFiles: false, // requires explicit OS permission
+    canAccessLocalFiles: false,
     canWatchFileSystem: false,
-    canPickFolder: true, // OS document picker
+    canPickFolder: true,
 
-    canUseHardwareDecoding: true, // iOS/Android always hardware decode
+    canUseHardwareDecoding: true,
     canPlayHDR: false,
     supportsWebAudioAPI: true,
     canPlayDRM: true,
 
-    canControlMediaKeys: true, // AVAudioSession / ExoPlayer
+    canControlMediaKeys: true,
     canShowSystemTray: false,
-    canShowLockScreen: true, // lock screen now-playing
+    canShowLockScreen: true,
     canSendNativeNotifications: true,
 
     canCacheOffline: true,
-    canSyncInBackground: true,
+    canSyncInBackground: platform === 'android', // iOS background sync is heavily restricted
 
     supportsFileSystemAccessAPI: false,
     supportsWebCodecs: false,
-    supportsMediaSourceExtensions: false,
+    supportsMediaSourceExtensions: platform === 'android', // iOS WebKit has MSE limitations
 
     canUseNativeContextMenu: false,
     supportsHapticFeedback: true,

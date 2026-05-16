@@ -3,6 +3,7 @@ import type { PlatformCapabilities } from '../capabilities'
 export function detectWebCapabilities(): PlatformCapabilities {
   return {
     host: 'web',
+    platform: 'web',
 
     canAccessLocalFiles: false,
     canWatchFileSystem: false,
