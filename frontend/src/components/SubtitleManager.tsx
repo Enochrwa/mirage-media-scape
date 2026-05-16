@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Captions, Upload } from 'lucide-react';
+import { Captions, Upload, Search } from 'lucide-react';
 
 const SubtitleManager: React.FC = () => {
   const { currentFile, currentTime } = usePlayerStore();
@@ -41,7 +41,7 @@ const SubtitleManager: React.FC = () => {
         `${API_BASE}/api/subtitles/tracks?path=${encodeURIComponent(currentFile.file_path || '')}`,
       );
       if (res.ok) {
-        const data = await res.json();
+        const { data } = await res.json();
         setTracks(data);
       }
     };
@@ -54,16 +54,19 @@ const SubtitleManager: React.FC = () => {
       `${API_BASE}/api/subtitles/extract?path=${encodeURIComponent(currentFile.file_path || '')}&index=${index}`,
     );
     if (res.ok) {
-      const { raw } = await res.json();
-      const format = currentFile.file_path?.endsWith('.ass') ? 'ass' : 'srt';
+      const { data: content } = await res.json();
+      // Detect format from codec if possible, otherwise fallback
+      const track = tracks.find(t => t.index === index);
+      const format = track?.codec === 'ass' || track?.codec === 'ssa' ? 'ass' : 'srt';
+
       const parseRes = await fetch(`${API_BASE}/api/subtitles/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raw, format }),
+        body: JSON.stringify({ content, format }),
       });
       if (parseRes.ok) {
-        const { cues } = await parseRes.json();
-        setCues(cues);
+        const { data } = await parseRes.json();
+        setCues(data);
       }
     }
   };
@@ -202,6 +205,20 @@ const SubtitleManager: React.FC = () => {
                   onChange={(e) => handleFileUpload(e, true)}
                 />
               </label>
+            </DropdownMenuItem>
+            <div className="my-1 border-t border-zinc-800" />
+            <DropdownMenuItem onClick={async () => {
+               if (!currentFile) return;
+               const hashRes = await fetch(`${API_BASE}/api/subtitles/hash?path=${encodeURIComponent(currentFile.file_path || '')}`);
+               const { data: hash } = await hashRes.json();
+               const searchRes = await fetch(`${API_BASE}/api/subtitles/search?hash=${hash}&filename=${encodeURIComponent(currentFile.title || '')}`);
+               const { data: results } = await searchRes.json();
+               if (results.length > 0) {
+                 // In real app, show a dialog to pick. For now, take first.
+               }
+            }}>
+              <Search className="mr-2 h-4 w-4" />
+              <span>Search Online</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

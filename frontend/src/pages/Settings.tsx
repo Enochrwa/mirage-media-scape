@@ -40,6 +40,7 @@ import {
   Trash2,
   Plus,
   X,
+  Video,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { playbackEngine } from '@/lib/PlaybackEngine';
@@ -79,9 +80,12 @@ const Settings = () => {
     'avi',
   ]);
   const [newExt, setNewExt] = useState('');
+  const [hwSupport, setHwSupport] = useState<Record<string, boolean>>({});
+  const [autoPiP, setAutoPiP] = useState(localStorage.getItem('ZOVYRA_auto_pip') === 'true');
   const canSendNativeNotifications = useCapability('canSendNativeNotifications');
 
   useEffect(() => {
+    VideoDecodeEngine.probeHardwareDecode().then(setHwSupport);
     if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
       navigator.mediaDevices.enumerateDevices().then((devices) => {
         setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
@@ -121,15 +125,59 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="playback" className="w-full">
-          <TabsList className="mb-6 grid max-w-4xl grid-cols-7">
+          <TabsList className="mb-6 grid max-w-4xl grid-cols-8">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="playback">Playback</TabsTrigger>
+            <TabsTrigger value="video">Video</TabsTrigger>
             <TabsTrigger value="library">Library</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="video" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="h-5 w-5" />
+                  Video Engine
+                </CardTitle>
+                <CardDescription>Hardware acceleration and playback behavior</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Auto-PiP on navigate</Label>
+                    <p className="text-xs text-muted-foreground">Automatically trigger Picture-in-Picture when leaving the player page</p>
+                  </div>
+                  <Switch
+                    checked={autoPiP}
+                    onCheckedChange={(v) => {
+                      setAutoPiP(v);
+                      localStorage.setItem('ZOVYRA_auto_pip', v.toString());
+                    }}
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-white/5">
+                  <Label className="mb-3 block">Hardware Acceleration Status</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(hwSupport).map(([codec, supported]) => (
+                      <div key={codec} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10">
+                        <span className="text-sm font-medium uppercase">{codec}</span>
+                        {supported ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-zinc-500">Software</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="playback" className="space-y-6">
             <Card>

@@ -16,6 +16,8 @@ import {
   getTrackWaveform,
   updateTrackMetadata,
   reanalyzeTrack,
+  getTrackAudioStreams,
+  getTrackChapters,
 } from '../controllers/tracksController.js';
 import db from '../db/index.js';
 import { RecommendationService } from '../services/RecommendationService.js';
@@ -79,6 +81,12 @@ router.get('/:id/waveform', getTrackWaveform);
 
 /** GET /api/tracks/:id/recommendations */
 router.get('/:id/recommendations', getRecommendations);
+
+/** GET /api/tracks/:id/audio-streams */
+router.get('/:id/audio-streams', getTrackAudioStreams);
+
+/** GET /api/tracks/:id/chapters */
+router.get('/:id/chapters', getTrackChapters);
 
 /** POST /api/tracks/:id/identify */
 router.post('/:id/identify', identifyTrack);

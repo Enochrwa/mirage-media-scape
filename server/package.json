@@ -6,7 +6,7 @@
   "main": "dist/src/index.js",
   "scripts": {
     "start": "node dist/src/index.js",
-    "dev": "ts-node-dev --esm --respawn --transpile-only --exit-child src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/index.ts",
     "build": "tsc",
     "lint": "eslint .",
     "test": "NODE_ENV=test DATABASE_PATH=./zovyra.test.db NODE_OPTIONS=--experimental-vm-modules jest",

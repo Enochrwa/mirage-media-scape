@@ -199,6 +199,26 @@ export const identifyTrack = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+export const getTrackAudioStreams = (req: Request, res: Response): void => {
+  const { id } = req.params;
+  try {
+    const streams = db.prepare('SELECT * FROM track_audio_streams WHERE track_id = ?').all(id);
+    res.json(streams);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const getTrackChapters = (req: Request, res: Response): void => {
+  const { id } = req.params;
+  try {
+    const chapters = db.prepare('SELECT * FROM track_chapters WHERE track_id = ? ORDER BY chapter_index ASC').all(id);
+    res.json(chapters);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Duplicates
 // ─────────────────────────────────────────────────────────────────────────────
