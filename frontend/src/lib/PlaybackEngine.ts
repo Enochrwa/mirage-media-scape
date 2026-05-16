@@ -199,7 +199,9 @@ export class PlaybackEngine {
     // Disconnect old source if it exists
     try {
       chain.source.disconnect();
-    } catch {}
+    } catch (e) {
+      // Ignore if not connected
+    }
 
     // Create new source from the video element
     chain.element = videoElement;

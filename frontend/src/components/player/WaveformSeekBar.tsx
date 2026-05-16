@@ -8,12 +8,7 @@ interface WaveformSeekBarProps {
 }
 
 export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) => {
-  const {
-    currentTime,
-    duration,
-    currentFile,
-    playbackEngine: pe,
-  } = usePlayerStore();
+  const { currentTime, duration, currentFile, playbackEngine: pe } = usePlayerStore();
   const isStream =
     (currentFile?.file ?? '').includes('stream') || !duration || duration === Infinity;
   const [hoverTime, setHoverTime] = useState<number | null>(null);

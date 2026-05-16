@@ -20,8 +20,7 @@ export class CapacitorFileAccessService implements IFileAccessService {
     const result = await Filesystem.readFile({
       path,
       // If path starts with a / or a protocol, don't provide directory
-      directory:
-        path.startsWith('/') || path.includes('://') ? undefined : Directory.Data,
+      directory: path.startsWith('/') || path.includes('://') ? undefined : Directory.Data,
     });
 
     const data = result.data;
