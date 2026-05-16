@@ -330,7 +330,7 @@ const VideoPlayer: React.FC = () => {
   }, [ambientLighting]);
 
   const togglePlayback = () => {
-    pe.togglePlayback();
+    usePlayerStore.getState().togglePlayback();
   };
 
   const handleVolumeClick = () => {

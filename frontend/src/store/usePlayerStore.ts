@@ -103,11 +103,21 @@ const store = create<PlayerState>((set, get) => ({
     const nextFile = await queueManager.smartNext();
     if (nextFile) {
       get().playFile(nextFile);
+    } else {
+      set({ currentFile: null, isPlaying: false });
     }
   },
 
   previousTrack: () => {
-    // Implement previous logic
+    // Implement basic previous logic
+    const { currentTime } = get();
+    if (currentTime > 3) {
+      playbackEngine.seek(0);
+    } else {
+      // In a real app, this would get the previous track from the queue
+      // For now, we just restart the current track
+      playbackEngine.seek(0);
+    }
   },
 
   setVolume: (v: number) => {

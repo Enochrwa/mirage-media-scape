@@ -5,7 +5,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 
 export function useMediaSession() {
   const canControl = useCapability('canControlMediaKeys');
-  const { currentFile } = usePlayerStore();
+  const currentFile = usePlayerStore((state) => state.currentFile);
 
   useEffect(() => {
     if (!canControl || !currentFile) return;

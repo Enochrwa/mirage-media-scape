@@ -155,6 +155,14 @@
   - CSS Marquee scroll for long titles.
   - Seek bar hover tooltip.
 
+- ✅ Section 27 — Playback Engine Integration & Audit
+  - Integrated `PlaybackEngine` as single source of truth for audio and video.
+  - Unified audio graph with shared EQ, ReplayGain, and Analyser for all media.
+  - Fixed state synchronization between engine and `usePlayerStore`.
+  - Implemented `useMediaSession` hook for cross-platform media control.
+  - Removed forbidden frontend FFmpeg WASM usage in favor of server-side stubs.
+  - Robust listener management and source node reuse for video elements.
+
 ---
 ### Modified/Created Files
 - `native/src/lib.rs`

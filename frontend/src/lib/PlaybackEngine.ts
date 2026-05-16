@@ -17,6 +17,8 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 //   → Destination
 
 interface TrackChain {
+  audioElement: HTMLAudioElement;
+  audioSource: MediaElementAudioSourceNode;
   element: HTMLMediaElement;
   source: MediaElementAudioSourceNode;
   eq: BiquadFilterNode[];
@@ -44,6 +46,18 @@ export class PlaybackEngine {
   private _capabilities: PlatformCapabilities | null = null;
   private _mediaKeys: IMediaKeyService | null = null;
   private _onTimeUpdate: ((time: number, duration: number) => void) | null = null;
+
+  private videoSourceNodes = new WeakMap<HTMLVideoElement, MediaElementAudioSourceNode>();
+  private lastVideoElement: HTMLVideoElement | null = null;
+
+  private boundHandlePlay = this.handlePlay.bind(this);
+  private boundHandlePause = this.handlePause.bind(this);
+  private boundHandleEnded = this.handleEnded.bind(this);
+  private boundHandleError = (e: Event) => this.handleError(e);
+  private boundHandleTimeUpdate = (e: Event) => {
+    const el = e.target as HTMLMediaElement;
+    this._onTimeUpdate?.(el.currentTime, el.duration || 0);
+  };
 
   private _abLoop: {
     pointA: number | null;
@@ -124,13 +138,11 @@ export class PlaybackEngine {
     const source = this.ctx.createMediaElementSource(el);
 
     // Stats tracking: monitor media element events
-    el.addEventListener('play', () => this.handlePlay());
-    el.addEventListener('pause', () => this.handlePause());
-    el.addEventListener('ended', () => this.handleEnded());
-    el.addEventListener('error', (e) => this.handleError(e));
-    el.addEventListener('timeupdate', () => {
-      this._onTimeUpdate?.(el.currentTime, el.duration || 0);
-    });
+    el.addEventListener('play', this.boundHandlePlay);
+    el.addEventListener('pause', this.boundHandlePause);
+    el.addEventListener('ended', this.boundHandleEnded);
+    el.addEventListener('error', this.boundHandleError);
+    el.addEventListener('timeupdate', this.boundHandleTimeUpdate);
 
     // 1. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
@@ -157,7 +169,15 @@ export class PlaybackEngine {
     replayGain.connect(fade);
     fade.connect(this.analyser);
 
-    return { element: el, source, eq, replayGain, fade };
+    return {
+      audioElement: el,
+      audioSource: source,
+      element: el,
+      source,
+      eq,
+      replayGain,
+      fade,
+    };
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
@@ -170,6 +190,28 @@ export class PlaybackEngine {
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
+    // Restore audio source if it was swapped by a video
+    if (chain.element !== chain.audioElement) {
+      if (chain.element instanceof HTMLVideoElement) {
+        chain.element.removeEventListener('play', this.boundHandlePlay);
+        chain.element.removeEventListener('pause', this.boundHandlePause);
+        chain.element.removeEventListener('ended', this.boundHandleEnded);
+        chain.element.removeEventListener('error', this.boundHandleError);
+        chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+        if (this.lastVideoElement === chain.element) {
+          this.lastVideoElement = null;
+        }
+      }
+      try {
+        chain.source.disconnect();
+      } catch (e) {
+        // Ignore disconnect error
+      }
+      chain.element = chain.audioElement;
+      chain.source = chain.audioSource;
+      chain.source.connect(chain.eq[0]);
+    }
+
     this.currentTrackId = file.id;
     chain.element.src = file.file;
     chain.element.load();
@@ -178,7 +220,7 @@ export class PlaybackEngine {
       const gain = Math.pow(10, file.replay_gain_db / 20);
       chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
     } else {
-      chain.replayGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
     }
 
     if (!startNext) {
@@ -196,26 +238,50 @@ export class PlaybackEngine {
     this.initContext();
     const chain = this.chains[this.activeIndex];
 
-    // Disconnect old source if it exists
+    // Cleanup old listeners if we are swapping elements or chain elements
+    if (chain.element !== videoElement && chain.element instanceof HTMLVideoElement) {
+      chain.element.removeEventListener('play', this.boundHandlePlay);
+      chain.element.removeEventListener('pause', this.boundHandlePause);
+      chain.element.removeEventListener('ended', this.boundHandleEnded);
+      chain.element.removeEventListener('error', this.boundHandleError);
+      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+    }
+
+    if (this.lastVideoElement && this.lastVideoElement !== videoElement) {
+      this.lastVideoElement.removeEventListener('play', this.boundHandlePlay);
+      this.lastVideoElement.removeEventListener('pause', this.boundHandlePause);
+      this.lastVideoElement.removeEventListener('ended', this.boundHandleEnded);
+      this.lastVideoElement.removeEventListener('error', this.boundHandleError);
+      this.lastVideoElement.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
+    }
+
+    // Disconnect current source if it exists
     try {
       chain.source.disconnect();
     } catch (e) {
-      // Ignore if not connected
+      // Ignore disconnect error
     }
 
-    // Create new source from the video element
+    // Reuse or create source node for the video element
+    let videoSource = this.videoSourceNodes.get(videoElement);
+    if (!videoSource) {
+      videoSource = this.ctx.createMediaElementSource(videoElement);
+      this.videoSourceNodes.set(videoElement, videoSource);
+    }
+
     chain.element = videoElement;
-    chain.source = this.ctx.createMediaElementSource(videoElement);
+    chain.source = videoSource;
     chain.source.connect(chain.eq[0]);
 
-    // Attach listeners to video element
-    videoElement.addEventListener('play', () => this.handlePlay());
-    videoElement.addEventListener('pause', () => this.handlePause());
-    videoElement.addEventListener('ended', () => this.handleEnded());
-    videoElement.addEventListener('error', (e) => this.handleError(e));
-    videoElement.addEventListener('timeupdate', () => {
-      this._onTimeUpdate?.(videoElement.currentTime, videoElement.duration || 0);
-    });
+    // Attach listeners to video element (only if changed or first time)
+    if (this.lastVideoElement !== videoElement) {
+      videoElement.addEventListener('play', this.boundHandlePlay);
+      videoElement.addEventListener('pause', this.boundHandlePause);
+      videoElement.addEventListener('ended', this.boundHandleEnded);
+      videoElement.addEventListener('error', this.boundHandleError);
+      videoElement.addEventListener('timeupdate', this.boundHandleTimeUpdate);
+      this.lastVideoElement = videoElement;
+    }
 
     // Set src and load
     videoElement.src = file.file;
@@ -224,6 +290,8 @@ export class PlaybackEngine {
     if (file.replay_gain_db) {
       const gain = Math.pow(10, file.replay_gain_db / 20);
       chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+    } else {
+      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
     }
 
     if (this.capabilities.canControlMediaKeys) {
@@ -354,7 +422,7 @@ export class PlaybackEngine {
 
   setState(s: PlaybackState) {
     this.state = s;
-    // Emit event or update store
+    usePlayerStore.setState({ isPlaying: s === 'PLAYING' });
   }
 
   get analyserNode() {
@@ -369,6 +437,7 @@ export class PlaybackEngine {
 
   // Stats reporting handlers
   private async handlePlay() {
+    this.setState('PLAYING');
     if (!this.currentTrackId) return;
     // Only report start event if we don't have an active event
     if (!this.currentEventId) {
@@ -391,15 +460,19 @@ export class PlaybackEngine {
   }
 
   private async handlePause() {
+    this.setState('PAUSED');
     // Don't report end yet - could be resume. Stats event end is sent on track switch or ended.
     // This is handled by track change logic or explicit stop.
   }
 
   private async handleEnded() {
+    this.setState('ENDED');
     await this.reportPlaybackEnd(true, false);
+    window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
   }
 
   private async handleError(_e: Event) {
+    this.setState('ERROR');
     await this.reportPlaybackEnd(false, true);
   }
 
