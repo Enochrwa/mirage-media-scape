@@ -22,6 +22,8 @@ import {
   Heart,
   Plus,
   Palette,
+  SkipBack as StepBack,
+  SkipForward as StepForward,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -48,9 +50,22 @@ export const FullNowPlaying: React.FC = () => {
     setVolume,
     aiDjEnabled,
     setAiDjEnabled,
+    playbackEngine: pe,
   } = usePlayerStore();
   const { files } = useLibraryStore();
   const [recommendations, setRecommendations] = useState<MediaFile[]>([]);
+  const [chapters, setChapters] = useState<{ time: number; title: string }[]>([]);
+
+  useEffect(() => {
+    if (currentFile?.metadata_json) {
+      try {
+        const meta = JSON.parse(currentFile.metadata_json);
+        setChapters(meta.chapters || []);
+      } catch (e) {
+        setChapters([]);
+      }
+    }
+  }, [currentFile]);
 
   useEffect(() => {
     if (currentFile?.id) {
@@ -143,9 +158,21 @@ export const FullNowPlaying: React.FC = () => {
             <Button variant="ghost" size="icon" className="hover:text-primary" title="Visualizer">
               <Palette size={20} />
             </Button>
-            <Button variant="ghost" size="icon" className="hover:text-primary" title="Sleep Timer">
-              <Moon size={20} />
-            </Button>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('hover:text-primary', pe.sleepTimer?.getState().active && 'text-amber-400')}
+                title="Sleep Timer"
+              >
+                <Moon size={20} />
+              </Button>
+              {pe.sleepTimer?.getState().active && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[8px] font-bold text-black">
+                  {Math.ceil(pe.sleepTimer.getState().remainingSeconds / 60)}m
+                </span>
+              )}
+            </div>
             <Button variant="ghost" size="icon" className="hover:text-primary" title="Share">
               <Share2 size={20} />
             </Button>
@@ -189,14 +216,46 @@ export const FullNowPlaying: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShuffle(!shuffle)}
-              className={cn(shuffle && 'text-primary')}
-            >
-              <Shuffle size={24} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShuffle(!shuffle)}
+                className={cn(shuffle && 'text-primary')}
+              >
+                <Shuffle size={20} />
+              </Button>
+              {currentFile.metadata_json && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={chapters.length === 0}
+                    onClick={() => {
+                      const prev = [...chapters].reverse().find(c => c.time < currentTime - 1);
+                      if (prev) pe.seek(prev.time);
+                    }}
+                    title="Previous Chapter"
+                  >
+                    <StepBack size={16} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={chapters.length === 0}
+                    onClick={() => {
+                      const next = chapters.find(c => c.time > currentTime + 1);
+                      if (next) pe.seek(next.time);
+                    }}
+                    title="Next Chapter"
+                  >
+                    <StepForward size={16} />
+                  </Button>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center gap-8">
               <Button

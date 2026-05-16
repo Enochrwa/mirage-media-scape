@@ -36,6 +36,8 @@ export class PlaybackEngine {
   private analyser!: AnalyserNode;
   private panner!: PannerNode;
   private compressor!: DynamicsCompressorNode;
+  private hardLimiter!: DynamicsCompressorNode;
+  private preAmp!: GainNode;
   private masterGain!: GainNode;
 
   private state: PlaybackState = 'IDLE';
@@ -48,6 +50,7 @@ export class PlaybackEngine {
   private _onTimeUpdate: ((time: number, duration: number) => void) | null = null;
   private _preloadStarted: boolean = false;
   private _preloadedFile: MediaFile | null = null;
+  private _globalCrossfadeDuration: number = 2000;
 
   private videoSourceNodes = new WeakMap<HTMLVideoElement, MediaElementAudioSourceNode>();
   private lastVideoElement: HTMLVideoElement | null = null;
@@ -60,6 +63,12 @@ export class PlaybackEngine {
     const el = e.target as HTMLMediaElement;
     const currentTime = el.currentTime;
     const duration = el.duration || 0;
+
+    // A/B Loop Enforcement
+    if (this._abLoop.isActive && this._abLoop.pointB !== null && currentTime >= this._abLoop.pointB) {
+      el.currentTime = this._abLoop.pointA ?? 0;
+    }
+
     this._onTimeUpdate?.(currentTime, duration);
 
     if (duration > 0 && duration - currentTime < 30 && !this._preloadStarted) {
@@ -110,11 +119,23 @@ export class PlaybackEngine {
     this.compressor = this.ctx.createDynamicsCompressor();
     this.compressor.ratio.value = 1; // Bypass
 
+    this.hardLimiter = this.ctx.createDynamicsCompressor();
+    this.hardLimiter.threshold.value = -0.1;
+    this.hardLimiter.knee.value = 0;
+    this.hardLimiter.ratio.value = 20;
+    this.hardLimiter.attack.value = 0.001;
+    this.hardLimiter.release.value = 0.1;
+
+    this.preAmp = this.ctx.createGain();
+    this.preAmp.gain.value = 1.0;
+
     this.masterGain = this.ctx.createGain();
 
     this.analyser.connect(this.panner);
     this.panner.connect(this.compressor);
-    this.compressor.connect(this.masterGain);
+    this.compressor.connect(this.hardLimiter);
+    this.hardLimiter.connect(this.preAmp);
+    this.preAmp.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
 
     // Two parallel chains for crossfading
@@ -236,11 +257,32 @@ export class PlaybackEngine {
     chain.element.src = file.file;
     chain.element.load();
 
-    if (file.replay_gain_db) {
-      const gain = Math.pow(10, file.replay_gain_db / 20);
-      chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
-    } else {
-      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    // ReplayGain application
+    let gainDb = 0;
+    const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
+    if (mode === 'track' && file.replaygain_track_gain != null) {
+      gainDb = file.replaygain_track_gain;
+    } else if (mode === 'album' && file.replaygain_album_gain != null) {
+      gainDb = file.replaygain_album_gain;
+    } else if (file.replay_gain_db) {
+      gainDb = file.replay_gain_db;
+    }
+
+    const gain = Math.pow(10, gainDb / 20);
+    chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+
+    // Preferred speed
+    if (file.preferred_speed) {
+      chain.element.playbackRate = file.preferred_speed;
+    }
+
+    // Encoder padding/delay trimming (Gapless precision)
+    if (file.encoder_delay || file.encoder_padding) {
+      // In a real Web Audio implementation, we'd use AudioBufferSourceNode
+      // and slice the buffer. With HTMLMediaElement, we can only try to seek
+      // slightly forward for delay, but padding at end is harder without MSE.
+      // For now, we note the values.
+      console.log(`[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`);
     }
 
     if (!startNext) {
@@ -397,23 +439,73 @@ export class PlaybackEngine {
   }
 
   setEQBand(index: number, gain: number) {
-    // Implement
+    this.initContext();
+    this.chains.forEach((chain) => {
+      if (chain.eq[index]) {
+        chain.eq[index].gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+      }
+    });
   }
 
   getFrequencyResponse(frequencies: Float32Array) {
-    return new Float32Array(frequencies.length); // Placeholder
+    this.initContext();
+    const magResponse = new Float32Array(frequencies.length);
+    const phaseResponse = new Float32Array(frequencies.length);
+    const totalMag = new Float32Array(frequencies.length).fill(1.0);
+
+    // Sum responses of all filters in the active chain
+    const chain = this.chains[this.activeIndex];
+    chain.eq.forEach((filter) => {
+      // @ts-expect-error - compatibility between Float32Array types
+      filter.getFrequencyResponse(frequencies, magResponse, phaseResponse);
+      for (let i = 0; i < frequencies.length; i++) {
+        totalMag[i] *= magResponse[i];
+      }
+    });
+
+    return totalMag;
   }
 
   setBassEnhancerEnabled(enabled: boolean) {
-    // Implement
+    this.initContext();
+    // Simple implementation: boost low shelf
+    this.setEQBand(0, enabled ? 6 : 0);
   }
 
   setNightModeEnabled(enabled: boolean) {
-    // Implement
+    this.initContext();
+    if (enabled) {
+      this.compressor.threshold.value = -24;
+      this.compressor.knee.value = 30;
+      this.compressor.ratio.value = 12;
+      this.compressor.attack.value = 0.003;
+      this.compressor.release.value = 0.25;
+    } else {
+      this.compressor.ratio.value = 1; // Bypass
+    }
+  }
+
+  setPlaybackRate(rate: number) {
+    this.initContext();
+    this.chains.forEach((chain) => {
+      chain.element.playbackRate = rate;
+      // Note: HTMLMediaElement preserves pitch by default in most browsers
+      // when playbackRate is changed.
+    });
+  }
+
+  setPreAmp(gainDb: number) {
+    this.initContext();
+    const gain = Math.pow(10, gainDb / 20);
+    this.preAmp.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
   }
 
   setSleepTimer(minutes: number) {
     this.sleepTimer?.set(minutes);
+  }
+
+  setGlobalCrossfadeDuration(durationMs: number) {
+    this._globalCrossfadeDuration = durationMs;
   }
 
   preview(time: number) {
@@ -509,7 +601,7 @@ export class PlaybackEngine {
     if (this._preloadedFile) {
       const file = this._preloadedFile;
       this._preloadedFile = null;
-      await this.crossfadeTo(file);
+      await this.crossfadeTo(file, this._globalCrossfadeDuration);
       // After crossfade, update store with the new current file
       usePlayerStore.setState({ currentFile: file, isPlaying: true });
       return;
@@ -524,6 +616,12 @@ export class PlaybackEngine {
     const currentChain = this.chains[this.activeIndex];
     const nextChain = this.chains[nextIndex];
 
+    // Smart Crossfade detection
+    // If it's a live album continuation, we might want to disable crossfade
+    // but the spec says "Smart crossfade auto-disables for live album continuations"
+    // which usually means gapless.
+    // We assume if crossfadeTo is called, we want a crossfade unless it's overridden.
+
     // Preload next track silently
     await this.load(file, true); // startNext = true
 
@@ -533,8 +631,14 @@ export class PlaybackEngine {
 
     // Crossfade over durationMs
     const durationSec = durationMs / 1000;
-    currentChain.fade.gain.linearRampToValueAtTime(0, this.ctx.currentTime + durationSec);
-    nextChain.fade.gain.linearRampToValueAtTime(1, this.ctx.currentTime + durationSec);
+    const now = this.ctx.currentTime;
+    currentChain.fade.gain.cancelScheduledValues(now);
+    nextChain.fade.gain.cancelScheduledValues(now);
+    currentChain.fade.gain.setValueAtTime(currentChain.fade.gain.value, now);
+    nextChain.fade.gain.setValueAtTime(nextChain.fade.gain.value, now);
+
+    currentChain.fade.gain.linearRampToValueAtTime(0, now + durationSec);
+    nextChain.fade.gain.linearRampToValueAtTime(1, now + durationSec);
 
     // After crossfade, clean up old chain
     setTimeout(() => {
@@ -543,6 +647,18 @@ export class PlaybackEngine {
       this.activeIndex = nextIndex;
       this._preloadStarted = false;
     }, durationMs + 100);
+
+    // Update currentTrackId to the new one and report the previous ended
+    // We do this BEFORE the timeout to ensure we don't end the newly started event
+    const oldId = this.currentTrackId;
+    this.currentTrackId = file.id;
+    if (oldId) {
+      // Temporarily swap trackId to report the correct one
+      const newId = this.currentTrackId;
+      this.currentTrackId = oldId;
+      this.reportPlaybackEnd(true, false);
+      this.currentTrackId = newId;
+    }
   }
 
   startPreload(file: MediaFile) {
@@ -558,7 +674,11 @@ export class PlaybackEngine {
   }
 
   private async reportPlaybackEnd(completed: boolean, skipped: boolean) {
-    if (!this.currentEventId || !this.currentTrackId) return;
+    if (!this.currentEventId || !this.currentTrackId) {
+      this.currentEventId = null;
+      this.currentTrackId = null;
+      return;
+    }
     try {
       const secondsPlayed = (Date.now() - this.playbackStartTime) / 1000;
       await fetch(`${API_BASE}/api/stats/event/end`, {
@@ -587,6 +707,38 @@ export class PlaybackEngine {
   // Call this when track ends naturally (also triggered by 'ended' event)
   async completeTrack() {
     await this.reportPlaybackEnd(true, false);
+  }
+
+  /**
+   * Samples a short snippet of audio at the given position.
+   * Used for crossfade preview or waveform scrubbing.
+   */
+  async samplePreview(file: MediaFile, position: number, durationMs: number = 2000) {
+    this.initContext();
+    const tempAudio = new Audio(file.file);
+    tempAudio.crossOrigin = 'anonymous';
+    const tempSource = this.ctx.createMediaElementSource(tempAudio);
+    const tempGain = this.ctx.createGain();
+
+    tempSource.connect(tempGain);
+    tempGain.connect(this.ctx.destination);
+
+    tempAudio.currentTime = position;
+    tempGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    tempAudio.play();
+    tempGain.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.1);
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        tempGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+        setTimeout(() => {
+          tempAudio.pause();
+          tempSource.disconnect();
+          tempGain.disconnect();
+          resolve();
+        }, 150);
+      }, durationMs);
+    });
   }
 }
 

@@ -38,7 +38,17 @@ db.exec(`
       year INTEGER, genre TEXT, track_number INTEGER, disc_number INTEGER,
       duration REAL, sample_rate INTEGER, bitrate INTEGER, channels INTEGER,
       bpm REAL, key TEXT, camelot_key TEXT, bpm_confidence REAL, energy REAL, loudness REAL,
-      replay_gain_db REAL DEFAULT 0,
+      codec TEXT,
+      gapless_disabled INTEGER DEFAULT 0,
+      replaygain_track_gain REAL,
+      replaygain_track_peak REAL,
+      replaygain_album_gain REAL,
+      replaygain_album_peak REAL,
+      preferred_speed REAL,
+      encoder_delay INTEGER,
+      encoder_padding INTEGER,
+      waveform_data TEXT,
+      metadata_json TEXT,
       cover_cache_path TEXT, thumbnail_path TEXT,
       last_modified INTEGER, mtime INTEGER, file_size INTEGER,
       missing INTEGER DEFAULT 0,
@@ -47,6 +57,25 @@ db.exec(`
       skip_count INTEGER DEFAULT 0,
       added_at INTEGER NOT NULL,
       updated_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS track_chapters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      track_id TEXT NOT NULL,
+      chapter_index INTEGER NOT NULL,
+      title TEXT,
+      start_time_ms INTEGER NOT NULL,
+      end_time_ms INTEGER,
+      FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS playback_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      track_id TEXT,
+      position_seconds REAL,
+      queue_snapshot TEXT,
+      queue_index INTEGER,
+      timestamp INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS play_events (
@@ -75,7 +104,8 @@ db.exec(`
       description TEXT,
       created_at INTEGER,
       updated_at INTEGER,
-      is_smart INTEGER DEFAULT 0
+      is_smart INTEGER DEFAULT 0,
+      crossfade_duration_override REAL
     );
 
     CREATE TABLE IF NOT EXISTS playlist_tracks (
@@ -238,5 +268,43 @@ db.exec(`
         VALUES (new.id, new.title, new.artist, new.album, new.genre);
     END;
 `);
+
+// Migration: Add new columns to existing tables
+const tablesInfo = {
+  tracks: [
+    'codec',
+    'gapless_disabled',
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
+    'preferred_speed',
+    'encoder_delay',
+    'encoder_padding',
+    'waveform_data',
+    'metadata_json',
+  ],
+  playlists: ['crossfade_duration_override'],
+};
+
+for (const [table, columns] of Object.entries(tablesInfo)) {
+  const info = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  const existingColumns = info.map((c) => c.name);
+  for (const col of columns) {
+    if (!existingColumns.includes(col)) {
+      try {
+        const type =
+          col.includes('gain') || col.includes('speed')
+            ? 'REAL'
+            : col.includes('delay') || col.includes('padding') || col.includes('disabled')
+              ? 'INTEGER'
+              : 'TEXT';
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      } catch (e) {
+        console.warn(`Migration failed for ${table}.${col}:`, e);
+      }
+    }
+  }
+}
 
 export default db;

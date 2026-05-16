@@ -45,8 +45,9 @@ import { toast } from '@/hooks/use-toast';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { Badge } from '@/components/ui/badge';
 import { useEffect } from 'react';
-import { API_BASE } from '@/lib/utils';
+import { API_BASE, cn } from '@/lib/utils';
 import { useCapability } from '@/platform';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -59,6 +60,12 @@ const Settings = () => {
   const [bassEnhancer, setBassEnhancer] = useState(false);
   const [nightMode, setNightMode] = useState(false);
   const [crossfade, setCrossfade] = useState(2);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [replaygainMode, setReplaygainMode] = useState(
+    localStorage.getItem('ZOVYRA_replaygain_mode') || 'track',
+  );
+  const [preamp, setPreamp] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState('default');
   const [extensions, setExtensions] = useState([
@@ -173,9 +180,85 @@ const Settings = () => {
                   </div>
                   <Slider
                     value={[crossfade]}
-                    onValueChange={(v) => setCrossfade(v[0])}
+                    onValueChange={(v) => {
+                      setCrossfade(v[0]);
+                      playbackEngine.setGlobalCrossfadeDuration(v[0] * 1000);
+                    }}
                     max={12}
-                    step={1}
+                    step={0.5}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn('w-full mt-2', isPreviewing && 'bg-primary/20')}
+                    disabled={isPreviewing}
+                    onClick={async () => {
+                      const { currentFile, currentTime } = usePlayerStore.getState();
+                      if (currentFile) {
+                        setIsPreviewing(true);
+                        // Play a 4s snippet to hear crossfade-like start/end
+                        await playbackEngine.samplePreview(currentFile, currentTime, 4000);
+                        setIsPreviewing(false);
+                      } else {
+                        toast({ title: 'No track playing', description: 'Play a track first to preview.' });
+                      }
+                    }}
+                  >
+                    {isPreviewing ? 'Previewing...' : 'Preview Crossfade Effect'}
+                  </Button>
+                </div>
+
+                <div className="space-y-4 border-t border-white/5 pt-6">
+                  <Label className="text-base">ReplayGain Mode</Label>
+                  <Select
+                    value={replaygainMode}
+                    onValueChange={(v) => {
+                      setReplaygainMode(v);
+                      localStorage.setItem('ZOVYRA_replaygain_mode', v);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">Off</SelectItem>
+                      <SelectItem value="track">Track</SelectItem>
+                      <SelectItem value="album">Album</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <Label className="text-sm">Pre-amp</Label>
+                      <span className="font-mono text-xs">{preamp > 0 ? '+' : ''}{preamp} dB</span>
+                    </div>
+                    <Slider
+                      value={[preamp]}
+                      onValueChange={(v) => {
+                        setPreamp(v[0]);
+                        playbackEngine.setPreAmp(v[0]);
+                      }}
+                      min={-6}
+                      max={6}
+                      step={0.5}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t border-white/5 pt-6">
+                  <div className="flex justify-between">
+                    <Label className="text-base">Global Playback Speed</Label>
+                    <span className="font-mono text-primary">{playbackSpeed.toFixed(2)}x</span>
+                  </div>
+                  <Slider
+                    value={[playbackSpeed]}
+                    onValueChange={(v) => {
+                      setPlaybackSpeed(v[0]);
+                      playbackEngine.setPlaybackRate(v[0]);
+                    }}
+                    min={0.25}
+                    max={4.0}
+                    step={0.05}
                   />
                 </div>
 

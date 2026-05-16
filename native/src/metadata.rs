@@ -6,6 +6,14 @@ use crate::utils::extract_dominant_color_from_bytes;
 /// Full metadata struct – mirrors both `native/index.d.ts` and
 /// `server/zovyra-native.d.ts` exactly.
 #[napi(object)]
+pub struct ChapterInfo {
+    pub index: i32,
+    pub title: Option<String>,
+    pub start_time_ms: i64,
+    pub end_time_ms: i64,
+}
+
+#[napi(object)]
 pub struct TrackMetadata {
     // ── tags ──────────────────────────────────────────────────────────────
     pub title: Option<String>,
@@ -48,6 +56,47 @@ pub struct TrackMetadata {
     pub replaygain_album_gain: Option<f64>,
     pub replaygain_track_peak: Option<f64>,
     pub replaygain_album_peak: Option<f64>,
+
+    // ── gapless info ──────────────────────────────────────────────────────
+    pub encoder_delay: Option<i32>,
+    pub encoder_padding: Option<i32>,
+
+    // ── chapters ──────────────────────────────────────────────────────────
+    pub chapters: Vec<ChapterInfo>,
+}
+
+fn detect_codec_by_magic_bytes(path: &Path) -> Option<String> {
+    use std::fs::File;
+    use std::io::Read;
+
+    let mut file = File::open(path).ok()?;
+    let mut buffer = [0u8; 12];
+    let n = file.read(&mut buffer).ok()?;
+    if n < 4 {
+        return None;
+    }
+
+    // Common magic bytes
+    if &buffer[0..4] == b"fLaC" {
+        return Some("flac".to_string());
+    }
+    if &buffer[0..4] == b"OggS" {
+        return Some("ogg".to_string());
+    }
+    if &buffer[0..3] == b"ID3" || (buffer[0] == 0xFF && (buffer[1] & 0xE0) == 0xE0) {
+        return Some("mp3".to_string());
+    }
+    if &buffer[0..4] == b"RIFF" && n >= 12 && &buffer[8..12] == b"WAVE" {
+        return Some("wav".to_string());
+    }
+    if n >= 8 && &buffer[4..8] == b"ftyp" {
+        return Some("m4a/mp4".to_string());
+    }
+    if &buffer[0..4] == b"\x1A\x45\xDF\xA3" {
+        return Some("mkv/webm".to_string());
+    }
+
+    None
 }
 
 #[napi]
@@ -81,6 +130,8 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
     let mut replaygain_album_gain: Option<f64> = None;
     let mut replaygain_track_peak: Option<f64> = None;
     let mut replaygain_album_peak: Option<f64> = None;
+    let mut encoder_delay: Option<i32> = None;
+    let mut encoder_padding: Option<i32> = None;
 
     for (key, value) in context.metadata().iter() {
         match key.to_lowercase().as_str() {
@@ -125,6 +176,15 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
             "replaygain_album_peak" => {
                 replaygain_album_peak = value.parse::<f64>().ok();
             }
+            "itunsmpb" => {
+                // iTunSMPB format: " 00000000 00000840 000001D0 00000000002A3C20 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000"
+                // Parts: [preamble, delay, padding, samples, ...]
+                let parts: Vec<&str> = value.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    encoder_delay = i32::from_str_radix(parts[1], 16).ok();
+                    encoder_padding = i32::from_str_radix(parts[2], 16).ok();
+                }
+            }
             _ => {}
         }
     }
@@ -137,7 +197,7 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
     let mut frame_rate: Option<f64> = None;
     let mut video_codec: Option<String> = None;
     let mut audio_codec: Option<String> = None;
-    let mut codec_name: Option<String> = None;
+    let mut codec_name: Option<String> = detect_codec_by_magic_bytes(path_buf);
     let mut file_type = "audio".to_string();
     let mut attached_pic_stream_index: Option<usize> = None;
 
@@ -148,7 +208,9 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
                 if sample_rate.is_none() {
                     let acodec = params.id().name().to_string();
                     audio_codec = Some(acodec.clone());
-                    codec_name = Some(acodec);
+                    if codec_name.is_none() {
+                        codec_name = Some(acodec);
+                    }
                     if let Ok(codec_ctx) =
                         ffmpeg::codec::context::Context::from_parameters(params)
                     {
@@ -182,6 +244,31 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
             }
             _ => {}
         }
+    }
+
+    // ── chapters ──────────────────────────────────────────────────────────
+    let mut chapters = Vec::new();
+    for chapter in context.chapters() {
+        let mut title = None;
+        for (key, value) in chapter.metadata().iter() {
+            if key.to_lowercase() == "title" {
+                title = Some(value.to_string());
+                break;
+            }
+        }
+
+        let time_base = chapter.time_base();
+        let start_ms = (chapter.start() as f64 * f64::from(time_base.0) / f64::from(time_base.1)
+            * 1000.0) as i64;
+        let end_ms = (chapter.end() as f64 * f64::from(time_base.0) / f64::from(time_base.1)
+            * 1000.0) as i64;
+
+        chapters.push(ChapterInfo {
+            index: chapter.id() as i32,
+            title,
+            start_time_ms: start_ms,
+            end_time_ms: end_ms,
+        });
     }
 
     // ── cover art ──────────────────────────────────────────────────────────
@@ -236,5 +323,8 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         replaygain_album_gain,
         replaygain_track_peak,
         replaygain_album_peak,
+        encoder_delay,
+        encoder_padding,
+        chapters,
     })
 }

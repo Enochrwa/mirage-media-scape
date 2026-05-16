@@ -29,4 +29,11 @@ router.get('/stats', async (req, res) => {
   res.json({ data: stats });
 });
 
+/** POST /api/library/replaygain-scan */
+router.post('/replaygain-scan', async (req, res) => {
+  // Fire and forget background job
+  scannerService.runBulkReplayGainScan().catch(console.error);
+  res.json({ data: { message: 'ReplayGain scan started' } });
+});
+
 export default router;

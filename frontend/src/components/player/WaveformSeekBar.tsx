@@ -135,6 +135,10 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
       const xB = (localABLoop.pointB / duration) * width;
       ctx.fillStyle = 'rgba(0, 255, 255, 0.12)';
       ctx.fillRect(xA, 0, xB - xA, height);
+    } else if (localABLoop.pointA !== null) {
+      const xA = (localABLoop.pointA / duration) * width;
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+      ctx.fillRect(xA, 0, 2, height);
     }
 
     // Chapter markers
@@ -149,6 +153,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
   const [dragMarker, setDragMarker] = useState<'progress' | 'A' | 'B' | null>(null);
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.type === 'mousedown' && (e as React.MouseEvent).button !== 0) return;
     if (!containerRef.current || isStream) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
