@@ -25,7 +25,10 @@ async function scan() {
   }
 
   // Configure worker pool size
-  const concurrency = Math.max(1, Math.min(parseInt(process.env.WORKER_THREADS || '4', 10), allFiles.length));
+  const concurrency = Math.max(
+    1,
+    Math.min(parseInt(process.env.WORKER_THREADS || '4', 10), allFiles.length),
+  );
   const chunkSize = Math.ceil(allFiles.length / concurrency);
 
   let totalScanned = 0;
@@ -47,7 +50,11 @@ async function scan() {
       if (msg.type === 'SCAN_PROGRESS') {
         const delta = msg.delta as number;
         totalScanned += delta;
-        parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned: totalScanned, total: totalFiles });
+        parentPort?.postMessage({
+          type: 'SCAN_PROGRESS',
+          scanned: totalScanned,
+          total: totalFiles,
+        });
       } else if (msg.type === 'NEW_TRACKS') {
         parentPort?.postMessage({ type: 'NEW_TRACKS', tracks: msg.tracks as unknown[] });
       } else if (msg.type === 'SCAN_CHUNK_COMPLETE') {
@@ -82,9 +89,10 @@ async function scan() {
   function markMissingFiles() {
     const db = new Database(dbPath) as unknown as Db;
     db.pragma('journal_mode = WAL');
-    const dbTracks = db
-      .prepare('SELECT id, file_path FROM tracks WHERE missing = 0')
-      .all() as { id: string; file_path: string }[];
+    const dbTracks = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0').all() as {
+      id: string;
+      file_path: string;
+    }[];
     for (const track of dbTracks) {
       if (!fs.existsSync(track.file_path)) {
         db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?').run(track.id);
@@ -99,7 +107,7 @@ async function scan() {
 
     const unanalyzed = db
       .prepare(
-        `SELECT id, file_path FROM tracks WHERE bpm IS NULL AND file_type = 'audio' AND missing = 0`,
+        `SELECT id, file_path FROM tracks WHERE analysis_version IS NULL AND file_type = 'audio' AND missing = 0`,
       )
       .all() as { id: string; file_path: string }[];
 
@@ -109,7 +117,7 @@ async function scan() {
         try {
           const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
           db.prepare(
-            `UPDATE tracks SET bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?, updated_at = ? WHERE id = ?`,
+            `UPDATE tracks SET bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?, analysis_version = 1, updated_at = ? WHERE id = ?`,
           ).run(
             analysis.bpm,
             analysis.key,

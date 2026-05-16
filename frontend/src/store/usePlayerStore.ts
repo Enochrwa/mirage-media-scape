@@ -72,6 +72,43 @@ const store = create<PlayerState>((set, get) => ({
 
     queueManager.load();
     get().restoreSession();
+
+    // Restore EQ settings
+    const savedEQ = localStorage.getItem('ZOVYRA_eq_bands');
+    if (savedEQ) {
+      try {
+        const bands = JSON.parse(savedEQ);
+        bands.forEach((g: number, i: number) => playbackEngine.setEQBand(i, g));
+      } catch (e) {
+        console.error('Failed to restore EQ bands', e);
+      }
+    }
+
+    // Restore Compressor settings
+    const savedCompressor = localStorage.getItem('ZOVYRA_compressor_settings');
+    if (savedCompressor) {
+      try {
+        const { params, enabled } = JSON.parse(savedCompressor);
+        playbackEngine.setCompressorParams({ ...params, enabled });
+      } catch (e) {
+        console.error('Failed to restore compressor settings', e);
+      }
+    }
+
+    // Restore Spatial/Widening settings
+    const savedSpatial = localStorage.getItem('ZOVYRA_spatial_settings');
+    if (savedSpatial) {
+      try {
+        const s = JSON.parse(savedSpatial);
+        playbackEngine.setSpatialAudioEnabled(s.enabled);
+        playbackEngine.setSpatialMonoMerge(s.monoMerge || false);
+        playbackEngine.setStereoWidth(s.stereoWidth ?? 1.0);
+        playbackEngine.setSpatialPosition(s.pos.x, s.pos.y, s.pos.z);
+      } catch (e) {
+        console.error('Failed to restore spatial settings', e);
+      }
+    }
+
     queueManager.setOnQueueExhausted(async () => {
       const current = get().currentFile;
       if (!current) return;
@@ -97,14 +134,14 @@ const store = create<PlayerState>((set, get) => ({
       const lastSave = parseInt(localStorage.getItem('ZOVYRA_last_save') || '0');
       if (Date.now() - lastSave > 5000) {
         const { currentFile, currentTime } = get();
-          if (currentFile && currentTime > 5) {
+        if (currentFile && currentTime > 5) {
           fetch(`${API_BASE}/api/stats/state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               trackId: currentFile.id,
               position: currentTime,
-              queueSnapshot: queueManager.getQueue().map(f => f.id),
+              queueSnapshot: queueManager.getQueue().map((f) => f.id),
               queueIndex: queueManager.getCurrentIndex(),
             }),
           }).catch(console.error);
@@ -232,14 +269,16 @@ const store = create<PlayerState>((set, get) => ({
         if (Date.now() - data.timestamp < sevenDaysMs) {
           // Find track in library or fetch it
           const trackRes = await fetch(`${API_BASE}/api/tracks/${data.track_id}`);
-        const trackData = await trackRes.json();
-        if (trackData) {
-          const track = mapIncomingTrackToMediaFile(trackData);
-            set({ currentFile: track });
-            await playbackEngine.load(track);
-            playbackEngine.seek(data.position_seconds);
-            // Don't auto-play, just load
-            set({ currentTime: data.position_seconds, isPlaying: false });
+          if (trackRes.ok) {
+            const trackData = await trackRes.json();
+            if (trackData && trackData.id && trackData.file_path) {
+              const track = mapIncomingTrackToMediaFile(trackData);
+              set({ currentFile: track });
+              await playbackEngine.load(track);
+              playbackEngine.seek(data.position_seconds);
+              // Don't auto-play, just load
+              set({ currentTime: data.position_seconds, isPlaying: false });
+            }
           }
         }
       }

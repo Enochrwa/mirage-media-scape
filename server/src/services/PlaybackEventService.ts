@@ -32,9 +32,9 @@ export class PlaybackEventService {
        WHERE id = ?`,
     ).run(endedAt, secondsPlayed, completed ? 1 : 0, skipped ? 1 : 0, eventId);
 
-    const event = db
-      .prepare('SELECT track_id FROM play_events WHERE id = ?')
-      .get(eventId) as { track_id: string } | undefined;
+    const event = db.prepare('SELECT track_id FROM play_events WHERE id = ?').get(eventId) as
+      | { track_id: string }
+      | undefined;
 
     if (event) {
       this.updateTrackCounts(event.track_id, completed, skipped);
@@ -42,11 +42,7 @@ export class PlaybackEventService {
     }
   }
 
-  private static updateTrackCounts(
-    trackId: string,
-    completed: boolean,
-    skipped: boolean,
-  ): void {
+  private static updateTrackCounts(trackId: string, completed: boolean, skipped: boolean): void {
     if (completed) {
       db.prepare('UPDATE tracks SET play_count = play_count + 1 WHERE id = ?').run(trackId);
     }

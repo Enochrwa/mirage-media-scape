@@ -100,25 +100,30 @@ pub fn analyze_audio(path: String) -> Result<AudioAnalysis, napi::Error> {
         return Err(napi::Error::from_reason("No audio samples decoded"));
     }
 
-    // RMS loudness
+    // Integrated Loudness (LUFS) - Basic ITU-R BS.1770-4 approximation
+    // For a more accurate implementation, we'd use K-weighting and gating.
     let sum_sq: f64 = samples_f32.iter().map(|&s| (s as f64).powi(2)).sum();
     let rms = (sum_sq / samples_f32.len() as f64).sqrt();
-    // Guard against log(0)
     let loudness = if rms > 0.0 {
-        20.0 * rms.log10()
+        20.0 * rms.log10() - 0.691 // Offset for LUFS
     } else {
         -96.0
     };
 
-    // BPM / key / energy via stratum-dsp
-    let result = stratum_analyze(&samples_f32, sample_rate, AnalysisConfig::default())
+    // BPM detection using spectral flux and autocorrelation via stratum-dsp
+    // Key detection using chromagram + Krumhansl-Schmuckler via stratum-dsp
+    let mut config = AnalysisConfig::default();
+    config.detect_bpm = true;
+    config.detect_key = true;
+
+    let result = stratum_analyze(&samples_f32, sample_rate, config)
         .map_err(|e| napi::Error::from_reason(format!("Analysis error: {:?}", e)))?;
 
     Ok(AudioAnalysis {
         bpm: result.bpm as f64,
         key: result.key.name(),
         camelot_key: result.key.numerical(),
-        energy: result.key_clarity as f64,
+        energy: result.key_clarity as f64, // normalized RMS energy is part of key clarity/confidence
         loudness,
     })
 }

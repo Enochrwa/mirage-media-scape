@@ -4,32 +4,57 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
+import { VolumeX, Volume2, Maximize2 } from 'lucide-react';
+import { API_BASE } from '@/lib/utils';
 
 const SpatialAudioControls: React.FC = () => {
-  const [enabled, setEnabled] = useState(playbackEngine.isSpatialAudioEnabled());
+  const [enabled, setEnabled] = useState(false);
   const [headTracking, setHeadTracking] = useState(false);
+  const [monoMerge, setMonoMerge] = useState(false);
+  const [stereoWidth, setStereoWidth] = useState(1.0);
   const [pos, setPos] = useState({ x: 0, y: 0, z: 5 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const persistSettings = (e: boolean, h: boolean, m: boolean, w: number, p: typeof pos) => {
+    const settings = { enabled: e, headTracking: h, monoMerge: m, stereoWidth: w, pos: p };
+    localStorage.setItem('ZOVYRA_spatial_settings', JSON.stringify(settings));
+    fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'spatial_settings', value: JSON.stringify(settings) }),
+    }).catch(console.error);
+  };
 
   const toggleSpatial = (val: boolean) => {
     setEnabled(val);
     playbackEngine.setSpatialAudioEnabled(val);
+    persistSettings(val, headTracking, monoMerge, stereoWidth, pos);
+  };
+
+  const toggleMonoMerge = (val: boolean) => {
+    setMonoMerge(val);
+    playbackEngine.setSpatialMonoMerge(val);
+    persistSettings(enabled, headTracking, val, stereoWidth, pos);
+  };
+
+  const updateStereoWidth = (val: number) => {
+    setStereoWidth(val);
+    playbackEngine.setStereoWidth(val);
+    persistSettings(enabled, headTracking, monoMerge, val, pos);
   };
 
   const updatePosition = (x: number, z: number) => {
-    setPos((prev) => {
-      const next = { ...prev, x, z };
-      playbackEngine.setSpatialPosition(next.x, next.y, next.z);
-      return next;
-    });
+    const next = { ...pos, x, z };
+    setPos(next);
+    playbackEngine.setSpatialPosition(next.x, next.y, next.z);
+    persistSettings(enabled, headTracking, monoMerge, stereoWidth, next);
   };
 
   const updateElevation = (y: number) => {
-    setPos((prev) => {
-      const next = { ...prev, y };
-      playbackEngine.setSpatialPosition(next.x, next.y, next.z);
-      return next;
-    });
+    const next = { ...pos, y };
+    setPos(next);
+    playbackEngine.setSpatialPosition(next.x, next.y, next.z);
+    persistSettings(enabled, headTracking, monoMerge, stereoWidth, next);
   };
 
   useEffect(() => {
@@ -70,6 +95,23 @@ const SpatialAudioControls: React.FC = () => {
     window.addEventListener('deviceorientation', handleOrientation);
     return () => window.removeEventListener('deviceorientation', handleOrientation);
   }, [headTracking]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('ZOVYRA_spatial_settings');
+    if (saved) {
+      const s = JSON.parse(saved);
+      setEnabled(s.enabled);
+      setHeadTracking(s.headTracking);
+      setMonoMerge(s.monoMerge || false);
+      setStereoWidth(s.stereoWidth ?? 1.0);
+      setPos(s.pos);
+
+      playbackEngine.setSpatialAudioEnabled(s.enabled);
+      playbackEngine.setSpatialMonoMerge(s.monoMerge || false);
+      playbackEngine.setStereoWidth(s.stereoWidth ?? 1.0);
+      playbackEngine.setSpatialPosition(s.pos.x, s.pos.y, s.pos.z);
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -114,46 +156,93 @@ const SpatialAudioControls: React.FC = () => {
   };
 
   return (
-    <Card className="space-y-4 border-white/10 bg-black/40 p-4">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="spatial-toggle">Spatial Audio (HRTF)</Label>
-        <Switch id="spatial-toggle" checked={enabled} onCheckedChange={toggleSpatial} />
-      </div>
+    <div className="space-y-6">
+      <Card className="space-y-4 border-white/10 bg-black/40 p-4">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="spatial-toggle">Spatial Audio (HRTF)</Label>
+          <Switch id="spatial-toggle" checked={enabled} onCheckedChange={toggleSpatial} />
+        </div>
 
-      {enabled && (
-        <>
-          <div className="space-y-2">
-            <Label>Position (X, Z)</Label>
-            <canvas
-              ref={canvasRef}
-              width={200}
-              height={200}
-              className="mx-auto cursor-crosshair rounded-lg border border-white/5 bg-black/60"
-              onClick={handleCanvasClick}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <Label>Elevation (Y)</Label>
-              <span>{pos.y.toFixed(1)}</span>
+        {enabled && (
+          <>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="mono-merge">Stereo-to-Mono Merge</Label>
+              <Switch id="mono-merge" checked={monoMerge} onCheckedChange={toggleMonoMerge} />
             </div>
-            <Slider
-              value={[pos.y]}
-              min={-5}
-              max={5}
-              step={0.1}
-              onValueChange={([val]) => updateElevation(val)}
-            />
-          </div>
 
+            <div className="space-y-2">
+              <Label>Position (X, Z)</Label>
+              <canvas
+                ref={canvasRef}
+                width={200}
+                height={200}
+                className="mx-auto cursor-crosshair rounded-lg border border-white/5 bg-black/60"
+                onClick={handleCanvasClick}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <Label>Elevation (Y)</Label>
+                <span>{pos.y.toFixed(1)}</span>
+              </div>
+              <Slider
+                value={[pos.y]}
+                min={-5}
+                max={5}
+                step={0.1}
+                onValueChange={([val]) => updateElevation(val)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="head-tracking">Head Tracking</Label>
+              <Switch
+                id="head-tracking"
+                checked={headTracking}
+                onCheckedChange={(val) => {
+                  setHeadTracking(val);
+                  persistSettings(enabled, val, monoMerge, stereoWidth, pos);
+                }}
+              />
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card className="space-y-4 border-white/10 bg-black/40 p-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="head-tracking">Head Tracking</Label>
-            <Switch id="head-tracking" checked={headTracking} onCheckedChange={setHeadTracking} />
+            <div className="flex items-center gap-2">
+              <Maximize2 className="h-4 w-4 text-purple-400" />
+              <Label>Stereo Widening</Label>
+            </div>
+            <div className="flex items-center gap-1 font-mono text-xs">
+              {stereoWidth > 1.2 && (
+                <div className="group relative">
+                  <VolumeX className="h-3 w-3 cursor-help text-amber-500" />
+                  <div className="absolute bottom-full left-1/2 mb-2 hidden w-32 -translate-x-1/2 rounded border border-white/10 bg-black px-2 py-1 text-center text-[10px] text-white group-hover:block">
+                    Mono compatibility warning: excessive side gain
+                  </div>
+                </div>
+              )}
+              {Math.round(stereoWidth * 100)}%
+            </div>
           </div>
-        </>
-      )}
-    </Card>
+          <div className="flex items-center gap-4">
+            <Volume2 className="h-4 w-4 text-gray-500" />
+            <Slider
+              value={[stereoWidth]}
+              min={0}
+              max={2}
+              step={0.01}
+              onValueChange={([val]) => updateStereoWidth(val)}
+            />
+            <Maximize2 className="h-4 w-4 text-gray-500" />
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 };
 

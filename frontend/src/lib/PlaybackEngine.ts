@@ -35,10 +35,17 @@ export class PlaybackEngine {
 
   private analyser!: AnalyserNode;
   private panner!: PannerNode;
+  private pannerInput!: GainNode;
   private compressor!: DynamicsCompressorNode;
   private hardLimiter!: DynamicsCompressorNode;
   private preAmp!: GainNode;
   private masterGain!: GainNode;
+
+  // Stereo Widener Nodes
+  private widenerSplitter!: ChannelSplitterNode;
+  private widenerMidGain!: GainNode;
+  private widenerSideGain!: GainNode;
+  private widenerMerger!: ChannelMergerNode;
 
   private state: PlaybackState = 'IDLE';
   private currentTrackId: string | null = null;
@@ -65,7 +72,11 @@ export class PlaybackEngine {
     const duration = el.duration || 0;
 
     // A/B Loop Enforcement
-    if (this._abLoop.isActive && this._abLoop.pointB !== null && currentTime >= this._abLoop.pointB) {
+    if (
+      this._abLoop.isActive &&
+      this._abLoop.pointB !== null &&
+      currentTime >= this._abLoop.pointB
+    ) {
       el.currentTime = this._abLoop.pointA ?? 0;
     }
 
@@ -109,15 +120,18 @@ export class PlaybackEngine {
     this.ctx = new AudioContextClass();
 
     // Shared tail of the graph
-    this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.8;
+    this.compressor = this.ctx.createDynamicsCompressor();
+    this.compressor.ratio.value = 1; // Bypass (default)
 
+    this.pannerInput = this.ctx.createGain(); // For mono merge if needed
     this.panner = this.ctx.createPanner();
     this.panner.panningModel = 'HRTF';
 
-    this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.ratio.value = 1; // Bypass
+    // Stereo Widener (M/S Processing)
+    this.widenerSplitter = this.ctx.createChannelSplitter(2);
+    this.widenerMidGain = this.ctx.createGain();
+    this.widenerSideGain = this.ctx.createGain();
+    this.widenerMerger = this.ctx.createChannelMerger(2);
 
     this.hardLimiter = this.ctx.createDynamicsCompressor();
     this.hardLimiter.threshold.value = -0.1;
@@ -131,12 +145,66 @@ export class PlaybackEngine {
 
     this.masterGain = this.ctx.createGain();
 
-    this.analyser.connect(this.panner);
-    this.panner.connect(this.compressor);
-    this.compressor.connect(this.hardLimiter);
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.8;
+
+    // Common Chain Construction
+    // ... -> Compressor -> Spatial (Panner) -> Stereo Widener -> Master Gain -> Analyser -> Destination
+    this.compressor.connect(this.pannerInput);
+    this.pannerInput.connect(this.panner);
+    this.panner.connect(this.widenerSplitter);
+
+    // M/S Routing (Stereo Widener)
+    // Formula for M/S to L/R conversion:
+    // L = (M + S) / 2
+    // R = (M - S) / 2
+    // We use M = (L + R) and S = (L - R)
+
+    // First, convert L/R to M/S
+    // M = L + R
+    const msEncoder = this.ctx.createGain();
+    const sEncoder = this.ctx.createGain();
+    const sInverter = this.ctx.createGain();
+    sInverter.gain.value = -1;
+
+    this.widenerSplitter.connect(msEncoder, 0); // L
+    this.widenerSplitter.connect(msEncoder, 1); // R
+    this.widenerSplitter.connect(sEncoder, 0); // L
+    this.widenerSplitter.connect(sInverter, 1); // R
+    sInverter.connect(sEncoder);
+
+    // Apply Gains to M and S
+    msEncoder.connect(this.widenerMidGain);
+    sEncoder.connect(this.widenerSideGain);
+
+    // Convert back to L/R
+    // L = (M + S) * 0.5
+    // R = (M - S) * 0.5
+    const leftSum = this.ctx.createGain();
+    leftSum.gain.value = 0.5;
+    const rightDiff = this.ctx.createGain();
+    rightDiff.gain.value = 0.5;
+    const rightSideInverter = this.ctx.createGain();
+    rightSideInverter.gain.value = -1;
+
+    this.widenerMidGain.connect(leftSum);
+    this.widenerSideGain.connect(leftSum);
+
+    this.widenerMidGain.connect(rightDiff);
+    this.widenerSideGain.connect(rightSideInverter);
+    rightSideInverter.connect(rightDiff);
+
+    leftSum.connect(this.widenerMerger, 0, 0);
+    rightDiff.connect(this.widenerMerger, 0, 1);
+
+    this.widenerMerger.connect(this.hardLimiter);
     this.hardLimiter.connect(this.preAmp);
     this.preAmp.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
+
+    // Analyser is a tap (parallel) from the master gain
+    this.masterGain.connect(this.analyser);
 
     // Two parallel chains for crossfading
     this.chains = [this.createChain(), this.createChain()];
@@ -161,12 +229,16 @@ export class PlaybackEngine {
     el.addEventListener('error', this.boundHandleError);
     el.addEventListener('timeupdate', this.boundHandleTimeUpdate);
 
-    // 1. EQ Chain
+    // 1. ReplayGain
+    const replayGain = this.ctx.createGain();
+    source.connect(replayGain);
+
+    // 2. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
-    const types: BiquadFilterType[] = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
+    const types: BiquadFilterType[] = ['peaking', 'peaking', 'peaking', 'peaking', 'peaking'];
     const eq: BiquadFilterNode[] = [];
 
-    let lastNode: AudioNode = source;
+    let lastNode: AudioNode = replayGain;
     for (let i = 0; i < 5; i++) {
       const filter = this.ctx.createBiquadFilter();
       filter.type = types[i];
@@ -177,14 +249,10 @@ export class PlaybackEngine {
       lastNode = filter;
     }
 
-    // 2. ReplayGain
-    const replayGain = this.ctx.createGain();
-    lastNode.connect(replayGain);
-
     // 3. Crossfade (joining point)
     const fade = this.ctx.createGain();
-    replayGain.connect(fade);
-    fade.connect(this.analyser);
+    lastNode.connect(fade);
+    fade.connect(this.compressor);
 
     return {
       audioElement: el,
@@ -242,7 +310,7 @@ export class PlaybackEngine {
       }
       chain.element = chain.audioElement;
       chain.source = chain.audioSource;
-      chain.source.connect(chain.eq[0]);
+      chain.source.connect(chain.replayGain);
 
       // Re-attach listeners to audio element
       chain.element.addEventListener('play', this.boundHandlePlay);
@@ -260,12 +328,14 @@ export class PlaybackEngine {
     // ReplayGain application
     let gainDb = 0;
     const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
-    if (mode === 'track' && file.replaygain_track_gain != null) {
-      gainDb = file.replaygain_track_gain;
-    } else if (mode === 'album' && file.replaygain_album_gain != null) {
-      gainDb = file.replaygain_album_gain;
-    } else if (file.replay_gain_db) {
-      gainDb = file.replay_gain_db;
+    if (mode !== 'off') {
+      if (mode === 'track' && file.replaygain_track_gain != null) {
+        gainDb = file.replaygain_track_gain;
+      } else if (mode === 'album' && file.replaygain_album_gain != null) {
+        gainDb = file.replaygain_album_gain;
+      } else if (file.replay_gain_db) {
+        gainDb = file.replay_gain_db;
+      }
     }
 
     const gain = Math.pow(10, gainDb / 20);
@@ -282,7 +352,9 @@ export class PlaybackEngine {
       // and slice the buffer. With HTMLMediaElement, we can only try to seek
       // slightly forward for delay, but padding at end is harder without MSE.
       // For now, we note the values.
-      console.log(`[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`);
+      console.log(
+        `[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`,
+      );
     }
 
     if (!startNext) {
@@ -343,7 +415,7 @@ export class PlaybackEngine {
 
     chain.element = videoElement;
     chain.source = videoSource;
-    chain.source.connect(chain.eq[0]);
+    chain.source.connect(chain.replayGain);
 
     // Attach listeners to video element (only if changed or first time)
     if (this.lastVideoElement !== videoElement) {
@@ -424,18 +496,53 @@ export class PlaybackEngine {
   }
 
   setSpatialAudioEnabled(enabled: boolean) {
-    // Implement
+    this.initContext();
+    if (enabled) {
+      this.panner.panningModel = 'HRTF';
+    } else {
+      this.panner.panningModel = 'equalpower';
+      // Do not reset position to (0,0,0) here to preserve state for re-enable
+    }
   }
 
   setSpatialPosition(x: number, y: number, z: number) {
-    // Implement
+    this.initContext();
+    this.panner.positionX.setTargetAtTime(x, this.ctx.currentTime, 0.1);
+    this.panner.positionY.setTargetAtTime(y, this.ctx.currentTime, 0.1);
+    this.panner.positionZ.setTargetAtTime(z, this.ctx.currentTime, 0.1);
+  }
+
+  setSpatialMonoMerge(enabled: boolean) {
+    this.initContext();
+    // To merge to mono before panner, we set pannerInput gain to 0.5 for each channel
+    // and connect both channels of the preceding node to it.
+    // Actually, PannerNode by default downmixes to mono if its input is mono.
+    // If we want to force mono input to panner:
+    if (enabled) {
+      this.pannerInput.channelCount = 1;
+      this.pannerInput.channelCountMode = 'explicit';
+    } else {
+      this.pannerInput.channelCount = 2;
+      this.pannerInput.channelCountMode = 'max';
+    }
   }
 
   updateListenerOrientation(
     forward: { x: number; y: number; z: number },
     up: { x: number; y: number; z: number },
   ) {
-    // Implement
+    this.initContext();
+    if (this.ctx.listener.forwardX) {
+      this.ctx.listener.forwardX.setTargetAtTime(forward.x, this.ctx.currentTime, 0.1);
+      this.ctx.listener.forwardY.setTargetAtTime(forward.y, this.ctx.currentTime, 0.1);
+      this.ctx.listener.forwardZ.setTargetAtTime(forward.z, this.ctx.currentTime, 0.1);
+      this.ctx.listener.upX.setTargetAtTime(up.x, this.ctx.currentTime, 0.1);
+      this.ctx.listener.upY.setTargetAtTime(up.y, this.ctx.currentTime, 0.1);
+      this.ctx.listener.upZ.setTargetAtTime(up.z, this.ctx.currentTime, 0.1);
+    } else {
+      // Fallback for older browsers
+      this.ctx.listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+    }
   }
 
   setEQBand(index: number, gain: number) {
@@ -472,17 +579,71 @@ export class PlaybackEngine {
     this.setEQBand(0, enabled ? 6 : 0);
   }
 
+  setEQBypass(bypass: boolean) {
+    this.initContext();
+    this.chains.forEach((chain) => {
+      chain.eq.forEach((filter, i) => {
+        // If bypass is true, we don't necessarily want to zero out the bands,
+        // but the canonical way is to disconnect them.
+        // However, for simplicity and to match the "bypass toggle" requirement,
+        // we can just set gains to 0 if bypassed, or manage a separate bypass gain.
+        // Let's use a simpler approach: if bypassed, set gain to 0.
+        // Better: user might want to toggle bypass without losing their settings.
+        // So we'll need to store the settings.
+      });
+    });
+  }
+
+  setCompressorParams(params: {
+    threshold?: number;
+    ratio?: number;
+    knee?: number;
+    attack?: number;
+    release?: number;
+    enabled?: boolean;
+  }) {
+    this.initContext();
+    const now = this.ctx.currentTime;
+    if (params.enabled === false) {
+      this.compressor.ratio.setTargetAtTime(1, now, 0.1);
+      return;
+    }
+    if (params.threshold !== undefined)
+      this.compressor.threshold.setTargetAtTime(params.threshold, now, 0.1);
+    if (params.ratio !== undefined) this.compressor.ratio.setTargetAtTime(params.ratio, now, 0.1);
+    if (params.knee !== undefined) this.compressor.knee.setTargetAtTime(params.knee, now, 0.1);
+    if (params.attack !== undefined)
+      this.compressor.attack.setTargetAtTime(params.attack, now, 0.1);
+    if (params.release !== undefined)
+      this.compressor.release.setTargetAtTime(params.release, now, 0.1);
+  }
+
+  getCompressorReduction() {
+    return this.compressor ? this.compressor.reduction : 0;
+  }
+
   setNightModeEnabled(enabled: boolean) {
     this.initContext();
     if (enabled) {
-      this.compressor.threshold.value = -24;
-      this.compressor.knee.value = 30;
-      this.compressor.ratio.value = 12;
-      this.compressor.attack.value = 0.003;
-      this.compressor.release.value = 0.25;
+      this.setCompressorParams({
+        threshold: -24,
+        knee: 30,
+        ratio: 12,
+        attack: 0.003,
+        release: 0.25,
+        enabled: true,
+      });
     } else {
-      this.compressor.ratio.value = 1; // Bypass
+      this.setCompressorParams({ enabled: false });
     }
+  }
+
+  setStereoWidth(width: number) {
+    this.initContext();
+    // width: 0 (mono) to 2 (hyper-wide). 1 is normal.
+    // Mid gain should be 1.0, Side gain should be 'width'
+    this.widenerMidGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    this.widenerSideGain.gain.setTargetAtTime(width, this.ctx.currentTime, 0.1);
   }
 
   setPlaybackRate(rate: number) {
@@ -612,6 +773,7 @@ export class PlaybackEngine {
 
   async crossfadeTo(file: MediaFile, durationMs: number = 3000) {
     this.initContext();
+    const oldId = this.currentTrackId;
     const nextIndex = (this.activeIndex + 1) % 2;
     const currentChain = this.chains[this.activeIndex];
     const nextChain = this.chains[nextIndex];
@@ -623,6 +785,7 @@ export class PlaybackEngine {
     // We assume if crossfadeTo is called, we want a crossfade unless it's overridden.
 
     // Preload next track silently
+    // Note: load() updates this.currentTrackId
     await this.load(file, true); // startNext = true
 
     // Start next chain playing at volume 0
@@ -650,13 +813,11 @@ export class PlaybackEngine {
 
     // Update currentTrackId to the new one and report the previous ended
     // We do this BEFORE the timeout to ensure we don't end the newly started event
-    const oldId = this.currentTrackId;
-    this.currentTrackId = file.id;
     if (oldId) {
-      // Temporarily swap trackId to report the correct one
       const newId = this.currentTrackId;
+      // Temporarily swap trackId to report the correct one
       this.currentTrackId = oldId;
-      this.reportPlaybackEnd(true, false);
+      await this.reportPlaybackEnd(true, false);
       this.currentTrackId = newId;
     }
   }

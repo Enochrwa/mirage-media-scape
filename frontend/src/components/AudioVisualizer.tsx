@@ -7,12 +7,14 @@ interface AudioVisualizerProps {
   className?: string;
   mode?: 'spectrum' | 'oscilloscope' | 'circular' | 'particles' | 'hybrid';
   color?: string;
+  background?: boolean;
 }
 
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   className,
   mode = 'spectrum',
   color = '#8B5CF6',
+  background = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lowPowerMode = useLowPowerMode();
@@ -21,12 +23,11 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
   // Background Visibility Management
   useEffect(() => {
-    const handleVisibility = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      setIsVisible(customEvent.detail === 'visible');
+    const handleVisibility = () => {
+      setIsVisible(document.visibilityState === 'visible');
     };
-    window.addEventListener('zovyra-visibility-change', handleVisibility);
-    return () => window.removeEventListener('zovyra-visibility-change', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   useEffect(() => {
@@ -64,41 +65,35 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         return;
       }
 
+      if (background) ctx.globalAlpha = 0.3;
+
       if (mode === 'spectrum') {
         analyser.getByteFrequencyData(freqData);
-        const barWidth = (width / (bufferLength / 2)) * 2.5;
-        let x = 0;
-        for (let i = 0; i < bufferLength / 2; i++) {
-          const value = freqData[i];
+        // Logarithmic scale mapping
+        const barCount = 64;
+        const barWidth = width / barCount;
+        for (let i = 0; i < barCount; i++) {
+          // Logarithmic index mapping
+          const logIdx = Math.floor(Math.pow(bufferLength, i / barCount));
+          const value = freqData[logIdx];
           const barHeight = (value / 255) * height;
 
-          // Logarithmic-ish color
-          const hue = (i / (bufferLength / 2)) * 280;
+          const hue = (i / barCount) * 280;
           ctx.fillStyle = `hsla(${hue}, 70%, 55%, 0.8)`;
-          ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+          ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
 
-          // Peaks with gravity
-          if (barHeight > peaks[i]) {
-            peaks[i] = barHeight;
-          } else {
-            peaks[i] -= 2;
-          }
-          ctx.fillStyle = 'white';
-          ctx.beginPath();
-          ctx.arc(x + barWidth / 2, height - peaks[i] - 2, 1, 0, Math.PI * 2);
-          ctx.fill();
+          if (barHeight > peaks[i]) peaks[i] = barHeight;
+          else peaks[i] *= 0.95; // Decay factor
 
-          // Reflection
-          ctx.fillStyle = `hsla(${hue}, 70%, 55%, 0.2)`;
-          ctx.fillRect(x, height, barWidth, barHeight * 0.3);
-
-          x += barWidth + 1;
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(i * barWidth, height - peaks[i] - 2, barWidth - 1, 2);
         }
       } else if (mode === 'oscilloscope') {
         analyser.getByteTimeDomainData(timeData);
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.strokeStyle = color;
-        ctx.shadowBlur = 15;
+        // Glow pass
+        ctx.shadowBlur = 20;
         ctx.shadowColor = color;
         ctx.beginPath();
         const sliceWidth = width / bufferLength;
@@ -106,16 +101,8 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         for (let i = 0; i < bufferLength; i++) {
           const v = timeData[i] / 128.0;
           const y = (v * height) / 2;
-
           if (i === 0) ctx.moveTo(x, y);
-          else {
-            // Smooth curves
-            const nextX = x + sliceWidth;
-            const nextV = timeData[i + 1] / 128.0 || 1;
-            const nextY = (nextV * height) / 2;
-            const cpX = (x + nextX) / 2;
-            ctx.quadraticCurveTo(x, y, cpX, (y + nextY) / 2);
-          }
+          else ctx.lineTo(x, y);
           x += sliceWidth;
         }
         ctx.stroke();
@@ -126,50 +113,46 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         const centerY = height / 2;
         const innerRadius = Math.min(width, height) * 0.25;
 
+        // Album art center fill (simulated with a circle here, handled by UI overlay in reality)
         ctx.save();
         ctx.translate(centerX, centerY);
-        ctx.rotate(Date.now() * 0.0002); // Slow rotation
+        ctx.rotate(Date.now() * 0.0005);
 
-        for (let i = 0; i < bufferLength / 2; i += 2) {
-          const angle = (i / (bufferLength / 2)) * Math.PI * 2;
-          const value = freqData[i] / 255;
-          const barLen = value * innerRadius * 1.2;
+        for (let i = 0; i < 120; i++) {
+          const angle = (i / 120) * Math.PI * 2;
+          const logIdx = Math.floor(Math.pow(bufferLength, i / 120));
+          const value = freqData[logIdx] / 255;
+          const barLen = value * innerRadius;
 
-          const x1 = Math.cos(angle) * innerRadius;
-          const y1 = Math.sin(angle) * innerRadius;
-          const x2 = Math.cos(angle) * (innerRadius + barLen);
-          const y2 = Math.sin(angle) * (innerRadius + barLen);
-
-          ctx.strokeStyle = `hsla(${(i / (bufferLength / 2)) * 360}, 70%, 55%, 0.8)`;
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = `hsla(${(i / 120) * 360}, 70%, 55%, 0.8)`;
+          ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          ctx.moveTo(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius);
+          ctx.lineTo(
+            Math.cos(angle) * (innerRadius + barLen),
+            Math.sin(angle) * (innerRadius + barLen),
+          );
           ctx.stroke();
         }
         ctx.restore();
-
-        // Inner circle
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.stroke();
       } else if (mode === 'particles') {
         analyser.getByteFrequencyData(freqData);
-        // Bass energy (bins < 300Hz)
-        const bassBins = Math.floor(300 / (playbackEngine.ctx.sampleRate / bufferLength));
-        const energy = freqData.slice(0, bassBins).reduce((a, b) => a + b, 0) / bassBins;
-        rollingEnergy = rollingEnergy * 0.95 + energy * 0.05;
+        // Bass onset detection (20-150Hz)
+        const bassEnd = Math.floor(150 / (playbackEngine.ctx.sampleRate / bufferLength));
+        let bassSum = 0;
+        for (let i = 0; i < bassEnd; i++) bassSum += freqData[i];
+        const currentBass = bassSum / bassEnd;
 
-        if (energy > rollingEnergy * 1.5 && energy > 140 && Date.now() - lastBeat > 150) {
+        rollingEnergy = rollingEnergy * 0.9 + currentBass * 0.1;
+        if (currentBass > rollingEnergy * 1.3 && currentBass > 100 && Date.now() - lastBeat > 100) {
           lastBeat = Date.now();
-          for (let i = 0; i < 40; i++) {
+          const count = Math.min(20, 200 - particles.length);
+          for (let i = 0; i < count; i++) {
             particles.push({
               x: width / 2,
               y: height / 2,
-              vx: (Math.random() - 0.5) * 12,
-              vy: (Math.random() - 0.5) * 12,
+              vx: (Math.random() - 0.5) * 15,
+              vy: (Math.random() - 0.5) * 15,
               life: 1.0,
               maxLife: 1.0,
               hue: Math.random() * 360,
@@ -182,30 +165,13 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         particles.forEach((p) => {
           p.x += p.vx;
           p.y += p.vy;
-          p.vx *= 0.96;
-          p.vy *= 0.96;
-          p.life -= 0.015;
-
-          const alpha = Math.pow(p.life / p.maxLife, 2);
-          ctx.fillStyle = `hsla(${p.hue}, 70%, 55%, ${alpha})`;
+          p.vx *= 0.97;
+          p.vy *= 0.97;
+          p.life -= 0.01;
+          ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.life})`;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
           ctx.fill();
-
-          // Connecting lines
-          particles.forEach((other) => {
-            const dx = p.x - other.x;
-            const dy = p.y - other.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 60) {
-              ctx.strokeStyle = `hsla(${p.hue}, 70%, 55%, ${alpha * 0.2})`;
-              ctx.lineWidth = 0.5;
-              ctx.beginPath();
-              ctx.moveTo(p.x, p.y);
-              ctx.lineTo(other.x, other.y);
-              ctx.stroke();
-            }
-          });
         });
         ctx.globalCompositeOperation = 'source-over';
       } else if (mode === 'hybrid') {
@@ -251,7 +217,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [mode, isVisible, color, lowPowerMode]);
+  }, [mode, isVisible, color, lowPowerMode, background]);
 
   return (
     <canvas

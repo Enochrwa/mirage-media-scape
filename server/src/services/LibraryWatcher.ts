@@ -14,7 +14,9 @@ function scheduleRescan(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
-    scannerService.scanAll().catch((e: unknown) => console.error('LibraryWatcher rescan failed:', e));
+    scannerService
+      .scanAll()
+      .catch((e: unknown) => console.error('LibraryWatcher rescan failed:', e));
   }, DEBOUNCE_MS);
 }
 

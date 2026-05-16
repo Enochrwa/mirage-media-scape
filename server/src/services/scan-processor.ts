@@ -13,7 +13,7 @@ export interface Db {
   close(): void;
 }
 
-import type { TrackMetadata, ChapterInfo } from '../../zovyra-native.js';
+import type { TrackMetadata } from '../../zovyra-native.js';
 
 export interface ProcessedTrack {
   id: string;
@@ -84,9 +84,12 @@ export function processFile(
     }
   }
 
-  const chaptersJson = metadata.chapters && metadata.chapters.length > 0
-    ? JSON.stringify({ chapters: metadata.chapters.map(c => ({ time: c.startTimeMs / 1000, title: c.title })) })
-    : null;
+  const chaptersJson =
+    metadata.chapters && metadata.chapters.length > 0
+      ? JSON.stringify({
+          chapters: metadata.chapters.map((c) => ({ time: c.startTimeMs / 1000, title: c.title })),
+        })
+      : null;
 
   db.prepare(
     `INSERT OR REPLACE INTO tracks (
@@ -123,7 +126,16 @@ export function processFile(
     metadata.replaygainAlbumPeak ?? null,
     metadata.encoderDelay ?? null,
     metadata.encoderPadding ?? null,
-    metadata.fileType === 'audio' ? JSON.stringify(native.generateWaveform(filePath)) : null,
+    metadata.fileType === 'audio'
+      ? (() => {
+          try {
+            return JSON.stringify(native.generateWaveform(filePath));
+          } catch (e) {
+            console.warn(`Waveform generation failed for ${filePath}`, e);
+            return null;
+          }
+        })()
+      : null,
     chaptersJson,
     coverCachePath,
     thumbnailPath,

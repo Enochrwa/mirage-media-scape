@@ -56,9 +56,7 @@ export class DownloadManager {
 
   private resumeDownloads(): void {
     const pending = this.db
-      .prepare(
-        "SELECT * FROM downloads WHERE status IN ('pending', 'downloading', 'waiting_wifi')",
-      )
+      .prepare("SELECT * FROM downloads WHERE status IN ('pending', 'downloading', 'waiting_wifi')")
       .all() as DownloadItem[];
     this.queue = pending;
     this.processQueue();
@@ -161,13 +159,11 @@ export class DownloadManager {
     const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
     const threshold = Date.now() - maxAgeMs;
 
-    const files = fs
-      .readdirSync(this.downloadsDir)
-      .map((fileName) => {
-        const filePath = path.join(this.downloadsDir, fileName);
-        const stats = fs.statSync(filePath);
-        return { fileName, filePath, stats };
-      });
+    const files = fs.readdirSync(this.downloadsDir).map((fileName) => {
+      const filePath = path.join(this.downloadsDir, fileName);
+      const stats = fs.statSync(filePath);
+      return { fileName, filePath, stats };
+    });
 
     // Remove files older than maxAgeDays
     for (const file of files) {

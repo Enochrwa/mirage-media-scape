@@ -63,11 +63,7 @@ export class PodcastService {
       );
 
     const rawItems = channel.item;
-    const items: PodcastItem[] = rawItems
-      ? Array.isArray(rawItems)
-        ? rawItems
-        : [rawItems]
-      : [];
+    const items: PodcastItem[] = rawItems ? (Array.isArray(rawItems) ? rawItems : [rawItems]) : [];
 
     for (const item of items) {
       this.insertEpisode(podcastId, item);
@@ -151,9 +147,7 @@ export class PodcastService {
     const played = ep && ep.duration > 0 && seconds / ep.duration > 0.9 ? 1 : 0;
 
     this.db
-      .prepare(
-        `UPDATE podcast_episodes SET progress_seconds = ?, played = ? WHERE id = ?`,
-      )
+      .prepare(`UPDATE podcast_episodes SET progress_seconds = ?, played = ? WHERE id = ?`)
       .run(seconds, played, episodeId);
   }
 }

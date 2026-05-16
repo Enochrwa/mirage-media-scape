@@ -190,7 +190,7 @@ const Settings = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={cn('w-full mt-2', isPreviewing && 'bg-primary/20')}
+                    className={cn('mt-2 w-full', isPreviewing && 'bg-primary/20')}
                     disabled={isPreviewing}
                     onClick={async () => {
                       const { currentFile, currentTime } = usePlayerStore.getState();
@@ -200,7 +200,10 @@ const Settings = () => {
                         await playbackEngine.samplePreview(currentFile, currentTime, 4000);
                         setIsPreviewing(false);
                       } else {
-                        toast({ title: 'No track playing', description: 'Play a track first to preview.' });
+                        toast({
+                          title: 'No track playing',
+                          description: 'Play a track first to preview.',
+                        });
                       }
                     }}
                   >
@@ -230,7 +233,10 @@ const Settings = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <Label className="text-sm">Pre-amp</Label>
-                      <span className="font-mono text-xs">{preamp > 0 ? '+' : ''}{preamp} dB</span>
+                      <span className="font-mono text-xs">
+                        {preamp > 0 ? '+' : ''}
+                        {preamp} dB
+                      </span>
                     </div>
                     <Slider
                       value={[preamp]}

@@ -16,10 +16,15 @@ const PlayerWrapper = () => {
     // If we have a currentFile but it's not playing and we just restored it
     if (currentFile && !hasCheckedResume) {
       const { isPlaying } = usePlayerStore.getState();
+      // If currentTime is 0, we might still be in the process of restoring session.
+      // We only finalize check once we have a non-zero time OR if we've waited a bit.
       if (!isPlaying && currentTime > 5) {
         setShowResume(true);
+        setHasCheckedResume(true);
+      } else if (isPlaying) {
+        // If it's already playing, we don't need to show resume
+        setHasCheckedResume(true);
       }
-      setHasCheckedResume(true);
     }
   }, [currentFile, hasCheckedResume, currentTime]);
 
@@ -53,7 +58,12 @@ const PlayerWrapper = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setShowResume(false)}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() => setShowResume(false)}
+              >
                 <X size={14} />
               </Button>
               <Button
