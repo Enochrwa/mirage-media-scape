@@ -202,17 +202,43 @@ Actual Delta:
 | Playback Engine | ✅ Complete | Refactored to use HTMLMediaElement and Platform API | `frontend/src/lib/PlaybackEngine.ts` |
 | UI Components | 🟡 Partial | Most components exist but need logic audit | `frontend/src/components/` |
 
+## Library Discovery Strategy
+
+### Web
+Manual folder picker (File System Access API or path input).
+Onboarding flow shown on first launch when no folders configured.
+Server-side Rust scanner walks filesystem and indexes to SQLite.
+
+### Desktop (Tauri)
+Automatic on first launch: server scans ~/Music, ~/Videos, ~/Downloads, ~/Desktop
+(+ XDG dirs on Linux, platform equivalents on Windows/macOS).
+Background re-scan triggered if last scan > 1 hour ago.
+chokidar watches configured folders for real-time changes while running.
+Library loads from SQLite cache instantly on subsequent launches.
+No manual scan required. No onboarding shown.
+
+### Mobile (Capacitor)
+Queries device OS media database directly via @odion-cloud/capacitor-mediastore.
+Android: MediaStore API — no filesystem walking, instant results.
+iOS: MPMediaLibrary (plugin iOS support in progress — check plugin status).
+Requires permissions: READ_MEDIA_AUDIO, READ_MEDIA_VIDEO (Android 13+).
+Re-queries on every app foreground event to catch newly downloaded files.
+No server scan. No onboarding. No manual action required.
+
 ## Native Configuration Required (Cannot be automated):
 
 ### iOS
 - `UIBackgroundModes: [audio]` must be set in `ios/App/App/Info.plist`
   Without this, audio stops when the screen locks.
 - IndexedDB NOT used for offline cache on iOS — CapacitorOfflineCacheService uses Directory.Data
+- `NSAppleMusicUsageDescription`: Required for media library access.
+- `NSPhotoLibraryUsageDescription`: Required for video access.
 
 ### Android
 - Background audio requires a foreground service with persistent notification
 - `@capacitor-community/background-runner` alone is insufficient for lock screen controls
 - A native Android module will be needed for full MPRIS-equivalent lock screen behavior
+- Permissions: `READ_EXTERNAL_STORAGE` (up to API 32), `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` (API 33+).
 
 ### FFmpeg WASM
 - NEVER use @ffmpeg/ffmpeg in the browser

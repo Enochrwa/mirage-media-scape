@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { rateLimit } from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
@@ -48,6 +49,17 @@ refreshLibraryWatcherPaths();
 
 app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json());
+
+// Apply rate limiting to all requests
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per `window`
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: { data: { message: 'Too many requests from this IP, please try again after 15 minutes' } },
+});
+
+app.use('/api/', limiter);
 
 // Initialize services
 new LocalSyncServer(8766);
