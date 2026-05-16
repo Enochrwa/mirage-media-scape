@@ -22,7 +22,7 @@ export function PlatformFeature({
   children,
   desktop,
   mobile,
-  chrome
+  chrome,
 }: PlatformFeatureProps) {
   const capabilities = usePlatform();
 
