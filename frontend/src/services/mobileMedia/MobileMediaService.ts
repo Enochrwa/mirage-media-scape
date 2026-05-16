@@ -16,7 +16,7 @@ export class MobileMediaService {
       const result = await CapacitorMediaStore.requestPermissions({
         types: ['audio', 'video'],
       });
-      return result.audio === 'granted' || result.video === 'granted';
+      return result.readMediaAudio === 'granted' || result.readMediaVideo === 'granted' || result.readExternalStorage === 'granted';
     } catch (e) {
       console.error('[MobileMedia] Permission request failed', e);
       return false;
@@ -25,26 +25,26 @@ export class MobileMediaService {
 
   static async getAllAudio(): Promise<MediaFile[]> {
     try {
-      const { CapacitorMediaStore } = await import('@odion-cloud/capacitor-mediastore');
+      const { CapacitorMediaStore, MediaType: PluginMediaType } = await import('@odion-cloud/capacitor-mediastore');
       const result = await CapacitorMediaStore.getMediasByType({
-        mediaType: 'audio',
+        mediaType: PluginMediaType.AUDIO,
         sortBy: 'TITLE',
         includeExternal: true, // include SD card
       });
 
-      return result.medias.map((item) => ({
-        id: item.id ?? item.path,
-        title: item.title ?? item.name ?? 'Unknown',
+      return result.media.map((item) => ({
+        id: item.id ?? item.uri,
+        title: item.title ?? item.displayName ?? 'Unknown',
         artist: item.artist ?? undefined,
         album: item.album ?? undefined,
-        cover: item.albumArtPath ?? undefined,
-        file: Capacitor.convertFileSrc(item.path), // converts native path to web-accessible URL
-        file_path: item.path,
-        type: 'audio' as const,
+        cover: item.albumArtUri ?? undefined,
+        file: Capacitor.convertFileSrc(item.uri), // converts native path to web-accessible URL
+        file_path: item.uri,
+        type: 'audio',
         duration: item.duration ? item.duration / 1000 : undefined, // ms → seconds
         bitrate: item.bitrate ? String(item.bitrate) : undefined,
         sampleRate: item.sampleRate ? String(item.sampleRate) : undefined,
-        year: item.year ? parseInt(item.year) : undefined,
+        year: item.year ? item.year : undefined,
         genre: item.genre ?? undefined,
         size: item.size ?? undefined,
       }));
@@ -56,21 +56,21 @@ export class MobileMediaService {
 
   static async getAllVideo(): Promise<MediaFile[]> {
     try {
-      const { CapacitorMediaStore } = await import('@odion-cloud/capacitor-mediastore');
+      const { CapacitorMediaStore, MediaType: PluginMediaType } = await import('@odion-cloud/capacitor-mediastore');
       const result = await CapacitorMediaStore.getMediasByType({
-        mediaType: 'video',
+        mediaType: PluginMediaType.VIDEO,
         sortBy: 'TITLE',
         includeExternal: true,
       });
 
-      return result.medias.map((item) => ({
-        id: item.id ?? item.path,
-        title: item.title ?? item.name ?? 'Unknown',
+      return result.media.map((item) => ({
+        id: item.id ?? item.uri,
+        title: item.title ?? item.displayName ?? 'Unknown',
         artist: item.artist ?? undefined,
-        cover: item.thumbnailPath ?? undefined,
-        file: Capacitor.convertFileSrc(item.path),
-        file_path: item.path,
-        type: 'video' as const,
+        cover: item.albumArtUri ?? undefined, // Using albumArtUri as proxy for thumbnail if available
+        file: Capacitor.convertFileSrc(item.uri),
+        file_path: item.uri,
+        type: 'video',
         duration: item.duration ? item.duration / 1000 : undefined,
         width: item.width ?? undefined,
         height: item.height ?? undefined,
