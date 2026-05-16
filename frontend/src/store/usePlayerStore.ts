@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { queueManager } from '@/engines/QueueManager';
 import { MediaFile } from '@/types/media';
+import { API_BASE } from '@/lib/utils';
 
 // Explicit ABLoop type matching what PlaybackEngine.abLoop returns
 export interface ABLoop {
@@ -62,11 +63,41 @@ const store = create<PlayerState>((set, get) => ({
   playbackEngine,
 
   init: () => {
+    const { playFile, nextTrack } = get();
+    const savedVolume = parseFloat(localStorage.getItem('ZOVYRA_volume') ?? '0.8');
+    playbackEngine.setVolume(savedVolume);
+    set({ volume: savedVolume });
+
     queueManager.load();
+    queueManager.setOnQueueExhausted(async () => {
+      const current = get().currentFile;
+      if (!current) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/tracks/${current.id}/recommendations?limit=10`);
+        const { data } = await res.json();
+        if (data?.length > 0) {
+          data.forEach((t: MediaFile) => queueManager.addToQueue(t, 'last'));
+          const next = await queueManager.smartNext();
+          if (next) playFile(next);
+        }
+      } catch (e) {
+        console.error('Failed to fetch recommendations for queue', e);
+      }
+    });
+
     // Queue state is now managed entirely by QueueManager
     // Components can subscribe to queueManager changes via addListener
     playbackEngine.setTimeUpdateCallback((time, duration) => {
       set({ currentTime: time, duration });
+    });
+
+    window.addEventListener('zovyra-preload-next', async () => {
+      // Find the next track without moving the index
+      const queue = queueManager.getQueue();
+      const currentIndex = queueManager.getCurrentIndex();
+      if (currentIndex < queue.length - 1) {
+        playbackEngine.startPreload(queue[currentIndex + 1]);
+      }
     });
   },
 
@@ -106,6 +137,23 @@ const store = create<PlayerState>((set, get) => ({
     if (get().currentFile) {
       await playbackEngine.skipTrack();
     }
+
+    const { shuffle } = get();
+
+    if (shuffle) {
+      const queue = queueManager.getQueue();
+      const currentIndex = queueManager.getCurrentIndex();
+      // Pick random index that isn't current
+      const available = queue.filter((_, i) => i !== currentIndex);
+      if (available.length > 0) {
+        const randomFile = available[Math.floor(Math.random() * available.length)];
+        const newIndex = queue.findIndex((f) => f.id === randomFile.id);
+        queueManager.setCurrentIndex(newIndex);
+        get().playFile(randomFile);
+        return;
+      }
+    }
+
     const nextFile = await queueManager.smartNext();
     if (nextFile) {
       get().playFile(nextFile);
@@ -129,6 +177,7 @@ const store = create<PlayerState>((set, get) => ({
 
   setVolume: (v: number) => {
     playbackEngine.setVolume(v);
+    localStorage.setItem('ZOVYRA_volume', String(v));
     set({ volume: v });
   },
 
@@ -150,6 +199,13 @@ const store = create<PlayerState>((set, get) => ({
 // Listen for end of track
 if (typeof window !== 'undefined') {
   window.addEventListener('zovyra-track-ended', () => {
+    const { repeat, currentFile } = store.getState();
+    if (repeat && currentFile) {
+      // Repeat current track
+      playbackEngine.seek(0);
+      playbackEngine.play();
+      return;
+    }
     store.getState().nextTrack();
   });
 }

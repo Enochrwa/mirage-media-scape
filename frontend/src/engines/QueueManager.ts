@@ -103,20 +103,14 @@ export class QueueManager {
       return this.queue[0];
     }
 
-    if (this.repeatMode === 'off') {
-      const current = this.queue[this.currentIndex];
-      if (current) {
-        const res = await fetch(`${API_BASE}/api/tracks/recommendations/${current.id}?limit=10`);
-        const { data } = await res.json();
-        if (data && data.length > 0) {
-          this.queue.push(...data);
-          this.setCurrentIndex(this.currentIndex + 1);
-          return data[0];
-        }
-      }
-    }
-
+    // Emit event for the store to handle recommendation fetching
+    this._onQueueExhausted?.();
     return null;
+  }
+
+  private _onQueueExhausted: (() => void) | null = null;
+  setOnQueueExhausted(cb: () => void) {
+    this._onQueueExhausted = cb;
   }
 
   private save() {

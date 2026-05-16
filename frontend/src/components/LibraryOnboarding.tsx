@@ -68,7 +68,10 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
         body: JSON.stringify({ directory: selectedFolders[0] || '/home' }),
       });
       if (!res.ok) throw new Error('Request failed');
-      toast({ title: 'Scan started', description: 'Your library is being indexed.' });
+      toast({
+        title: 'Scan started',
+        description: 'Your library is being indexed in the background.',
+      });
       onComplete();
     } catch {
       toast({ title: 'Could not start scan', variant: 'destructive' });

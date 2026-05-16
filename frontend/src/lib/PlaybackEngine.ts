@@ -46,6 +46,8 @@ export class PlaybackEngine {
   private _capabilities: PlatformCapabilities | null = null;
   private _mediaKeys: IMediaKeyService | null = null;
   private _onTimeUpdate: ((time: number, duration: number) => void) | null = null;
+  private _preloadStarted: boolean = false;
+  private _preloadedFile: MediaFile | null = null;
 
   private videoSourceNodes = new WeakMap<HTMLVideoElement, MediaElementAudioSourceNode>();
   private lastVideoElement: HTMLVideoElement | null = null;
@@ -56,7 +58,13 @@ export class PlaybackEngine {
   private boundHandleError = (e: Event) => this.handleError(e);
   private boundHandleTimeUpdate = (e: Event) => {
     const el = e.target as HTMLMediaElement;
-    this._onTimeUpdate?.(el.currentTime, el.duration || 0);
+    const currentTime = el.currentTime;
+    const duration = el.duration || 0;
+    this._onTimeUpdate?.(currentTime, duration);
+
+    if (duration > 0 && duration - currentTime < 30 && !this._preloadStarted) {
+      window.dispatchEvent(new CustomEvent('zovyra-preload-next'));
+    }
   };
 
   private _abLoop: {
@@ -170,6 +178,9 @@ export class PlaybackEngine {
 
   async load(file: MediaFile, startNext: boolean = false) {
     this.initContext();
+    if (!startNext) {
+      this._preloadStarted = false;
+    }
     // If this load is replacing the active track (not preloading), report previous track as skipped
     if (!startNext && this.currentEventId && this.currentTrackId) {
       await this.reportPlaybackEnd(false, true);
@@ -494,7 +505,51 @@ export class PlaybackEngine {
   private async handleEnded() {
     this.setState('ENDED');
     await this.reportPlaybackEnd(true, false);
+
+    if (this._preloadedFile) {
+      const file = this._preloadedFile;
+      this._preloadedFile = null;
+      await this.crossfadeTo(file);
+      // After crossfade, update store with the new current file
+      usePlayerStore.setState({ currentFile: file, isPlaying: true });
+      return;
+    }
+
     window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
+  }
+
+  async crossfadeTo(file: MediaFile, durationMs: number = 3000) {
+    this.initContext();
+    const nextIndex = (this.activeIndex + 1) % 2;
+    const currentChain = this.chains[this.activeIndex];
+    const nextChain = this.chains[nextIndex];
+
+    // Preload next track silently
+    await this.load(file, true); // startNext = true
+
+    // Start next chain playing at volume 0
+    nextChain.fade.gain.setValueAtTime(0, this.ctx.currentTime);
+    nextChain.element.play();
+
+    // Crossfade over durationMs
+    const durationSec = durationMs / 1000;
+    currentChain.fade.gain.linearRampToValueAtTime(0, this.ctx.currentTime + durationSec);
+    nextChain.fade.gain.linearRampToValueAtTime(1, this.ctx.currentTime + durationSec);
+
+    // After crossfade, clean up old chain
+    setTimeout(() => {
+      currentChain.element.pause();
+      currentChain.element.src = '';
+      this.activeIndex = nextIndex;
+      this._preloadStarted = false;
+    }, durationMs + 100);
+  }
+
+  startPreload(file: MediaFile) {
+    if (this._preloadStarted) return;
+    this._preloadStarted = true;
+    this._preloadedFile = file;
+    this.load(file, true); // preload into the inactive chain
   }
 
   private async handleError(_e: Event) {

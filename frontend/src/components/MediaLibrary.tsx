@@ -16,7 +16,8 @@ interface MediaLibraryProps {
 }
 
 const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initialMediaType }) => {
-  const { files, fetchInstantTracks, fetchTracks, fetchSmartPlaylists } = useLibraryStore();
+  const { files, fetchInstantTracks, fetchTracks, fetchSmartPlaylists, scanProgress } =
+    useLibraryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ field: string; direction: 'asc' | 'desc' }>(() => {
     const saved = localStorage.getItem('ZOVYRA_sort_songs');
@@ -158,6 +159,16 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
           />
         </div>
       </div>
+
+      {scanProgress && (
+        <div className="flex items-center gap-3 rounded-lg border border-purple-500/20 bg-purple-500/10 p-3 text-sm">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+          <span>
+            Scanning library... {scanProgress.percentage}% ({scanProgress.scanned} /{' '}
+            {scanProgress.total} files)
+          </span>
+        </div>
+      )}
 
       {initialMediaType ? (
         <div className="mt-6">{renderMediaGrid(filteredFiles)}</div>

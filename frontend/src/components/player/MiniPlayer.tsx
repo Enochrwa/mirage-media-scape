@@ -52,6 +52,12 @@ export const MiniPlayer: React.FC = () => {
         className="group absolute left-0 right-0 top-0 h-1 cursor-pointer"
         onMouseMove={handleProgressMouseMove}
         onMouseLeave={() => setTooltipTime(null)}
+        onClick={(e) => {
+          if (!progressRef.current) return;
+          const rect = progressRef.current.getBoundingClientRect();
+          const percent = (e.clientX - rect.left) / rect.width;
+          usePlayerStore.getState().seekTo(percent * duration);
+        }}
       >
         <Progress
           value={(currentTime / duration) * 100}
