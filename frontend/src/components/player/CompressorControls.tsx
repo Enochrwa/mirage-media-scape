@@ -45,21 +45,22 @@ export const CompressorControls: React.FC = () => {
 
   const setModeAndApply = (newMode: 'off' | 'standard' | 'night') => {
     setMode(newMode);
+    let p = { ...params };
     if (newMode === 'off') {
       setEnabled(false);
       playbackEngine.setCompressorParams({ enabled: false });
     } else if (newMode === 'standard') {
       setEnabled(true);
-      const p = { threshold: -16, ratio: 4, knee: 12, attack: 0.003, release: 0.25 };
+      p = { threshold: -16, ratio: 4, knee: 12, attack: 0.003, release: 0.25 };
       setParams(p);
       playbackEngine.setCompressorParams({ ...p, enabled: true });
     } else if (newMode === 'night') {
       setEnabled(true);
-      const p = { threshold: -30, ratio: 12, knee: 40, attack: 0.003, release: 0.25 };
+      p = { threshold: -30, ratio: 12, knee: 40, attack: 0.003, release: 0.25 };
       setParams(p);
       playbackEngine.setCompressorParams({ ...p, enabled: true });
     }
-    persistSettings(params, newMode !== 'off', newMode);
+    persistSettings(p, newMode !== 'off', newMode);
   };
 
   useEffect(() => {
@@ -108,7 +109,9 @@ export const CompressorControls: React.FC = () => {
               onCheckedChange={(val) => {
                 setEnabled(val);
                 playbackEngine.setCompressorParams({ ...params, enabled: val });
+                const newMode = val ? mode : 'off';
                 if (!val) setMode('off');
+                persistSettings(params, val, newMode);
               }}
             />
           </div>

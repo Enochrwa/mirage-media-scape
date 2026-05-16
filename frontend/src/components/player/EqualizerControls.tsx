@@ -151,7 +151,9 @@ export const EqualizerControls: React.FC<EqualizerControlsProps> = ({ onClose })
     try {
       await fetch(`${API_BASE}/api/eq-presets/${id}`, { method: 'DELETE' });
       setPresets((prev) => prev.filter((p) => p.id !== id));
-      if (selectedPreset === id) setSelectedPreset('flat');
+      if (selectedPreset === id) {
+        applyPreset('flat');
+      }
       toast.success('Preset deleted');
     } catch (e) {
       toast.error('Failed to delete preset');

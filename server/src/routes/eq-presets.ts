@@ -4,10 +4,17 @@ import crypto from 'crypto';
 
 const router = Router();
 
+interface EQPresetRow {
+  id: string;
+  name: string;
+  bands: string;
+  is_system: number;
+}
+
 router.get('/', (req, res) => {
-  const presets = db.prepare('SELECT * FROM eq_presets WHERE is_system = 0').all();
+  const presets = db.prepare('SELECT * FROM eq_presets WHERE is_system = 0').all() as EQPresetRow[];
   res.json(
-    presets.map((p: any) => ({
+    presets.map((p) => ({
       ...p,
       bands: JSON.parse(p.bands),
     })),

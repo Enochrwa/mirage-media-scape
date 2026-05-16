@@ -353,6 +353,10 @@ export const reanalyzeTrack = async (req: Request, res: Response): Promise<void>
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   try {
     const analysis = await analysisService.analyzeSingleTrack(id);
+    if (!analysis) {
+      res.status(404).json({ error: 'Track not found' });
+      return;
+    }
     res.json(analysis);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });

@@ -52,6 +52,9 @@ export class ScannerService {
         }
         if (msg.type === 'SCAN_COMPLETE') {
           this.isScanning = false;
+          // Background analysis is now handled inside the scan worker (scan-worker.ts)
+          // and marked with analysis_version=1 to avoid duplicate work here.
+          // We call it here only as a fallback for any missed tracks.
           analysisService.startBackgroundAnalysis().catch(console.error);
           resolve();
         }

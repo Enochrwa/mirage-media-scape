@@ -13,7 +13,7 @@ export interface Db {
   close(): void;
 }
 
-import type { TrackMetadata, ChapterInfo } from '../../zovyra-native.js';
+import type { TrackMetadata } from '../../zovyra-native.js';
 
 export interface ProcessedTrack {
   id: string;

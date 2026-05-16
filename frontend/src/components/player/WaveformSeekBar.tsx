@@ -28,6 +28,7 @@ export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) =
     if (!currentFile?.waveform_data) return null;
     try {
       const allPeaks = JSON.parse(currentFile.waveform_data) as number[];
+      if (allPeaks.length === 0) return null;
       const targetCount = lowPowerMode ? 250 : 300;
 
       // Resample to targetCount

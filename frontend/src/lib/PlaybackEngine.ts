@@ -501,7 +501,7 @@ export class PlaybackEngine {
       this.panner.panningModel = 'HRTF';
     } else {
       this.panner.panningModel = 'equalpower';
-      this.panner.setPosition(0, 0, 0);
+      // Do not reset position to (0,0,0) here to preserve state for re-enable
     }
   }
 

@@ -107,7 +107,7 @@ async function scan() {
 
     const unanalyzed = db
       .prepare(
-        `SELECT id, file_path FROM tracks WHERE bpm IS NULL AND file_type = 'audio' AND missing = 0`,
+        `SELECT id, file_path FROM tracks WHERE analysis_version IS NULL AND file_type = 'audio' AND missing = 0`,
       )
       .all() as { id: string; file_path: string }[];
 
@@ -117,7 +117,7 @@ async function scan() {
         try {
           const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
           db.prepare(
-            `UPDATE tracks SET bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?, updated_at = ? WHERE id = ?`,
+            `UPDATE tracks SET bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?, analysis_version = 1, updated_at = ? WHERE id = ?`,
           ).run(
             analysis.bpm,
             analysis.key,

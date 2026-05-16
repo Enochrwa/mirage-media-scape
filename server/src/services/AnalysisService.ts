@@ -45,7 +45,13 @@ export class AnalysisService {
       )
       .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
-    this.queue = [...new Set([...recentlyPlayed, ...remaining])];
+    const combined = [...recentlyPlayed, ...remaining];
+    const seen = new Set<string>();
+    this.queue = combined.filter((track) => {
+      if (seen.has(track.id)) return false;
+      seen.add(track.id);
+      return true;
+    });
 
     if (this.queue.length > 0) {
       this.isAnalyzing = true;

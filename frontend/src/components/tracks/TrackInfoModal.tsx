@@ -55,7 +55,7 @@ export const TrackInfoModal: React.FC<TrackInfoModalProps> = ({
       setFormData((prev) => ({
         ...prev,
         bpm: data.bpm.toFixed(1),
-        camelot_key: data.camelot_key,
+        camelot_key: data.camelotKey,
       }));
       toast.success('Analysis complete');
     } catch (e) {
