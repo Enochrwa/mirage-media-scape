@@ -134,6 +134,24 @@ const VideoPlayer: React.FC = () => {
 
   // Load per-file settings
   useEffect(() => {
+    const handlePopState = () => {
+      const autoPiP = localStorage.getItem('ZOVYRA_auto_pip') === 'true';
+      if (autoPiP && isPlaying && hasInteracted && videoRef.current && !document.pictureInPictureElement) {
+        if (document.pictureInPictureEnabled) {
+          videoRef.current.requestPictureInPicture().catch(console.error);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // Also handle navigation via React Router by checking location change
+      handlePopState();
+    };
+  }, [location.pathname, isPlaying, hasInteracted]);
+
+  useEffect(() => {
     if (currentFile?.id) {
       client.get(`/api/tracks/${currentFile.id}`).then((res) => {
         if (res.aspect_ratio_override) setAspectRatio(res.aspect_ratio_override);
@@ -267,9 +285,18 @@ const VideoPlayer: React.FC = () => {
     setSelectedAudioTrack(index);
     const url = new URL(currentFile.file || '', window.location.origin);
     url.searchParams.set('audio_stream', index.toString());
+
+    const onLoadedMetadata = () => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+        if (isPlaying) videoRef.current.play();
+      }
+      videoRef.current?.removeEventListener('loadedmetadata', onLoadedMetadata);
+    };
+
+    videoRef.current.addEventListener('loadedmetadata', onLoadedMetadata);
     videoRef.current.src = url.toString();
-    videoRef.current.currentTime = time;
-    if (isPlaying) videoRef.current.play();
+    videoRef.current.load();
   };
 
   // Chapter navigation

@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { spawn } from 'child_process';
 import native from '../utils/native-loader.js';
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
@@ -10,6 +11,7 @@ import { RecommendationService } from '../services/RecommendationService.js';
 import { FingerprintService } from '../services/FingerprintService.js';
 import { DuplicateFinderService } from '../services/DuplicateFinderService.js';
 import { analysisService } from '../services/AnalysisService.js';
+import { validatePath } from '../utils/path-utils.js';
 
 // ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -44,14 +46,27 @@ export const getAllTracks = (_req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const streamTrack = (req: Request, res: Response): void => {
-  const { path: filePath, audio_stream } = req.query;
-  if (!filePath || typeof filePath !== 'string') {
-    res.status(400).send('Path is required');
-    return;
+  const { path: queryPath, id, audio_stream } = req.query;
+  let filePath: string | undefined;
+
+  const identifier = (id || queryPath) as string;
+
+  if (identifier && typeof identifier === 'string') {
+    // Try as track ID first
+    const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(identifier) as
+      | { file_path: string }
+      | undefined;
+
+    if (track) {
+      filePath = track.file_path;
+    } else if (validatePath(identifier)) {
+      // Fallback to direct path validation
+      filePath = identifier;
+    }
   }
 
-  if (!fs.existsSync(filePath)) {
-    res.status(404).send('File not found');
+  if (!filePath) {
+    res.status(404).send('Track not found or access restricted');
     return;
   }
 
@@ -63,7 +78,6 @@ export const streamTrack = (req: Request, res: Response): void => {
       'Transfer-Encoding': 'chunked',
     });
 
-    const { spawn } = require('child_process');
     const ffmpeg = spawn('ffmpeg', [
       '-i', filePath,
       '-map', '0:v:0',
@@ -238,29 +252,41 @@ export const getDuplicateCandidates = async (_req: Request, res: Response): Prom
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getTrackCover = (req: Request, res: Response): void => {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id).replace(/[^a-z0-9_-]/gi, '');
   const row = db.prepare('SELECT cover_cache_path FROM tracks WHERE id = ?').get(id) as
     | { cover_cache_path?: string }
     | undefined;
 
-  if (!row?.cover_cache_path || !fs.existsSync(row.cover_cache_path)) {
+  if (!row?.cover_cache_path) {
     res.status(404).end();
     return;
   }
-  res.sendFile(path.resolve(row.cover_cache_path));
+
+  const absolutePath = path.resolve(row.cover_cache_path);
+  if (!fs.existsSync(absolutePath)) {
+    res.status(404).end();
+    return;
+  }
+  res.sendFile(absolutePath);
 };
 
 export const getTrackThumbnail = (req: Request, res: Response): void => {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id).replace(/[^a-z0-9_-]/gi, '');
   const row = db.prepare('SELECT thumbnail_path FROM tracks WHERE id = ?').get(id) as
     | { thumbnail_path?: string }
     | undefined;
 
-  if (!row?.thumbnail_path || !fs.existsSync(row.thumbnail_path)) {
+  if (!row?.thumbnail_path) {
     res.status(404).end();
     return;
   }
-  res.sendFile(path.resolve(row.thumbnail_path));
+
+  const absolutePath = path.resolve(row.thumbnail_path);
+  if (!fs.existsSync(absolutePath)) {
+    res.status(404).end();
+    return;
+  }
+  res.sendFile(absolutePath);
 };
 
 const thumbAtCache = new Map<string, Buffer>();
@@ -286,9 +312,11 @@ export const getTrackThumbnailAt = (req: Request, res: Response): void => {
     return;
   }
 
-  const tempThumbPath = path.join(os.tmpdir(), `thumb_${id}_${at}.jpg`);
+  const safeId = id.replace(/[^a-z0-9_-]/gi, '');
+  const safeAt = Math.floor(at);
+  const tempThumbPath = path.join(os.tmpdir(), `thumb_${safeId}_${safeAt}.jpg`);
   try {
-    native.generateThumbnail(row.file_path, at, tempThumbPath);
+    native.generateThumbnail(row.file_path, safeAt, tempThumbPath);
     const buffer = fs.readFileSync(tempThumbPath);
 
     if (thumbAtCache.size >= MAX_THUMB_CACHE) {
@@ -300,7 +328,9 @@ export const getTrackThumbnailAt = (req: Request, res: Response): void => {
     res.set('Content-Type', 'image/jpeg');
     res.send(buffer);
 
-    fs.unlinkSync(tempThumbPath);
+    if (fs.existsSync(tempThumbPath)) {
+      fs.unlinkSync(tempThumbPath);
+    }
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }

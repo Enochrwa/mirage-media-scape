@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { SubtitleService, type SubtitleCue } from '../services/SubtitleService.js';
 import native from '../utils/native-loader.js';
 import axios from 'axios';
+import { validatePath } from '../utils/path-utils.js';
 
 const router = Router();
 
 router.get('/tracks', (req, res) => {
   const { path } = req.query;
   if (!path || typeof path !== 'string') return res.status(400).send('Path required');
+  if (!validatePath(path)) return res.status(403).send('Forbidden');
   try {
     const tracks = native.getSubtitleTracks(path);
     res.json({ data: tracks });
@@ -19,6 +21,7 @@ router.get('/tracks', (req, res) => {
 router.get('/extract', (req, res) => {
   const { path, index } = req.query;
   if (!path || typeof path !== 'string') return res.status(400).send('Path required');
+  if (!validatePath(path)) return res.status(403).send('Forbidden');
   try {
     const content = native.extractSubtitleStream(path, Number(index));
     res.json({ data: content });
@@ -30,6 +33,7 @@ router.get('/extract', (req, res) => {
 router.get('/hash', async (req, res) => {
   const { path } = req.query;
   if (!path || typeof path !== 'string') return res.status(400).send('Path required');
+  if (!validatePath(path)) return res.status(403).send('Forbidden');
   try {
     const hash = await SubtitleService.calculateOpenSubtitlesHash(path);
     res.json({ data: hash });

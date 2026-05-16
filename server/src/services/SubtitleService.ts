@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { validatePath } from '../utils/path-utils.js';
 
 export interface SubtitleCue {
   start: number;
@@ -8,6 +9,7 @@ export interface SubtitleCue {
 
 export class SubtitleService {
   static async calculateOpenSubtitlesHash(filePath: string): Promise<string> {
+    if (!validatePath(filePath)) throw new Error('Access denied');
     const stats = fs.statSync(filePath);
     const fileSize = stats.size;
     const CHUNK_SIZE = 65536; // 64KB
