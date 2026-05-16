@@ -104,6 +104,7 @@ const store = create<PlayerState>((set, get) => ({
     if (nextFile) {
       get().playFile(nextFile);
     } else {
+      playbackEngine.pause();
       set({ currentFile: null, isPlaying: false });
     }
   },

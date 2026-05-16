@@ -193,6 +193,7 @@ export class PlaybackEngine {
     // Restore audio source if it was swapped by a video
     if (chain.element !== chain.audioElement) {
       if (chain.element instanceof HTMLVideoElement) {
+        chain.element.pause();
         chain.element.removeEventListener('play', this.boundHandlePlay);
         chain.element.removeEventListener('pause', this.boundHandlePause);
         chain.element.removeEventListener('ended', this.boundHandleEnded);
@@ -255,11 +256,12 @@ export class PlaybackEngine {
       this.lastVideoElement.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
     }
 
-    // Disconnect current source if it exists
+    // Disconnect current source and pause element if it was swapped by a video
     try {
+      chain.element.pause();
       chain.source.disconnect();
     } catch (e) {
-      // Ignore disconnect error
+      // Ignore errors if not connected or already paused
     }
 
     // Reuse or create source node for the video element
