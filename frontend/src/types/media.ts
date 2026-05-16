@@ -34,6 +34,15 @@ export interface MediaFile {
   dominant_color?: string;
   missing?: number;
   replay_gain_db?: number;
+  replaygain_track_gain?: number;
+  replaygain_track_peak?: number;
+  replaygain_album_gain?: number;
+  replaygain_album_peak?: number;
+  codec?: string;
+  gapless_disabled?: number;
+  preferred_speed?: number;
+  encoder_delay?: number;
+  encoder_padding?: number;
 }
 
 export interface SmartPlaylistCondition {

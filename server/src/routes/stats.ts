@@ -20,6 +20,34 @@ router.post('/event/end', (req, res) => {
   res.json({ data: { success: true } });
 });
 
+/** POST /api/stats/state */
+router.post('/state', (req, res) => {
+  const { trackId, position, queueSnapshot, queueIndex } = req.body;
+  db.prepare(`
+    INSERT INTO playback_state (id, track_id, position_seconds, queue_snapshot, queue_index, timestamp)
+    VALUES (1, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      track_id = excluded.track_id,
+      position_seconds = excluded.position_seconds,
+      queue_snapshot = excluded.queue_snapshot,
+      queue_index = excluded.queue_index,
+      timestamp = excluded.timestamp
+  `).run(
+    trackId ?? null,
+    position ?? 0,
+    queueSnapshot ? JSON.stringify(queueSnapshot) : null,
+    queueIndex ?? 0,
+    Date.now(),
+  );
+  res.json({ data: { success: true } });
+});
+
+/** GET /api/stats/state */
+router.get('/state', (req, res) => {
+  const state = db.prepare('SELECT * FROM playback_state WHERE id = 1').get();
+  res.json({ data: state });
+});
+
 router.get('/top-tracks', (req, res) => {
   const { period = 'all', limit = 10 } = req.query;
   const periodValue = typeof period === 'string' && ['7d', '30d', '90d', 'all'].includes(period) ? period as StatsPeriod : 'all';

@@ -2,7 +2,6 @@ import native from '../utils/native-loader.js';
 import path from 'path';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import type { TrackMetadata } from '../../zovyra-native.js';
 
 export interface Db {
   pragma(sql: string): void;
@@ -13,6 +12,8 @@ export interface Db {
   };
   close(): void;
 }
+
+import type { TrackMetadata, ChapterInfo } from '../../zovyra-native.js';
 
 export interface ProcessedTrack {
   id: string;
@@ -30,6 +31,13 @@ export interface ProcessedTrack {
   sample_rate?: number | null;
   bitrate?: number | null;
   channels?: number | null;
+  codec?: string | null;
+  replaygain_track_gain?: number | null;
+  replaygain_track_peak?: number | null;
+  replaygain_album_gain?: number | null;
+  replaygain_album_peak?: number | null;
+  encoder_delay?: number | null;
+  encoder_padding?: number | null;
   cover_cache_path?: string | null;
   thumbnail_path?: string | null;
   last_modified: number;
@@ -76,13 +84,22 @@ export function processFile(
     }
   }
 
+  const chaptersJson = metadata.chapters && metadata.chapters.length > 0
+    ? JSON.stringify({ chapters: metadata.chapters.map(c => ({ time: c.startTimeMs / 1000, title: c.title })) })
+    : null;
+
   db.prepare(
     `INSERT OR REPLACE INTO tracks (
       id, file_path, file_type, title, artist, album, album_artist,
       year, genre, track_number, disc_number, duration,
-      sample_rate, bitrate, channels, cover_cache_path, thumbnail_path,
+      sample_rate, bitrate, channels, codec,
+      replaygain_track_gain, replaygain_track_peak,
+      replaygain_album_gain, replaygain_album_peak,
+      encoder_delay, encoder_padding,
+      waveform_data, metadata_json,
+      cover_cache_path, thumbnail_path,
       last_modified, mtime, file_size, added_at, updated_at, missing
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   ).run(
     id,
     filePath,
@@ -99,6 +116,15 @@ export function processFile(
     metadata.sampleRate ?? null,
     bitRate,
     metadata.channels ?? null,
+    metadata.codecName ?? null,
+    metadata.replaygainTrackGain ?? null,
+    metadata.replaygainTrackPeak ?? null,
+    metadata.replaygainAlbumGain ?? null,
+    metadata.replaygainAlbumPeak ?? null,
+    metadata.encoderDelay ?? null,
+    metadata.encoderPadding ?? null,
+    metadata.fileType === 'audio' ? JSON.stringify(native.generateWaveform(filePath)) : null,
+    chaptersJson,
     coverCachePath,
     thumbnailPath,
     mtime,
@@ -107,6 +133,24 @@ export function processFile(
     Date.now(),
     Date.now(),
   );
+
+  // Save chapters to dedicated table
+  if (metadata.chapters && metadata.chapters.length > 0) {
+    db.prepare('DELETE FROM track_chapters WHERE track_id = ?').run(id);
+    const insertChapter = db.prepare(`
+      INSERT INTO track_chapters (track_id, chapter_index, title, start_time_ms, end_time_ms)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const chapter of metadata.chapters) {
+      insertChapter.run(
+        id,
+        chapter.index,
+        chapter.title ?? null,
+        chapter.startTimeMs,
+        chapter.endTimeMs,
+      );
+    }
+  }
 
   const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id) as ProcessedTrack;
   return track;

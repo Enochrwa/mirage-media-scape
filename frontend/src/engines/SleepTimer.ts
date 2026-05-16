@@ -56,8 +56,10 @@ export class SleepTimer {
     this.timerId = null;
     this.mode = null;
     this.endTime = 0;
-    this.gainNode.gain.cancelScheduledValues(this.audioCtx.currentTime);
-    this.gainNode.gain.setTargetAtTime(1.0, this.audioCtx.currentTime, 0.1);
+    const now = this.audioCtx.currentTime;
+    this.gainNode.gain.cancelScheduledValues(now);
+    // Restore gain quickly
+    this.gainNode.gain.linearRampToValueAtTime(1.0, now + 0.5);
   }
 
   remaining(): number {

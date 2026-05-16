@@ -46,6 +46,7 @@ export interface PlayerState {
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   closePlayer: () => void;
+  restoreSession: () => Promise<void>;
 }
 
 const store = create<PlayerState>((set, get) => ({
@@ -69,6 +70,7 @@ const store = create<PlayerState>((set, get) => ({
     set({ volume: savedVolume });
 
     queueManager.load();
+    get().restoreSession();
     queueManager.setOnQueueExhausted(async () => {
       const current = get().currentFile;
       if (!current) return;
@@ -89,6 +91,25 @@ const store = create<PlayerState>((set, get) => ({
     // Components can subscribe to queueManager changes via addListener
     playbackEngine.setTimeUpdateCallback((time, duration) => {
       set({ currentTime: time, duration });
+
+      // Persist state every 5 seconds
+      const lastSave = parseInt(localStorage.getItem('ZOVYRA_last_save') || '0');
+      if (Date.now() - lastSave > 5000) {
+        const { currentFile, currentTime } = get();
+          if (currentFile && currentTime > 5) {
+          fetch(`${API_BASE}/api/stats/state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trackId: currentFile.id,
+              position: currentTime,
+              queueSnapshot: queueManager.getQueue().map(f => f.id),
+              queueIndex: queueManager.getCurrentIndex(),
+            }),
+          }).catch(console.error);
+          localStorage.setItem('ZOVYRA_last_save', Date.now().toString());
+        }
+      }
     });
 
     window.addEventListener('zovyra-preload-next', async () => {
@@ -103,6 +124,12 @@ const store = create<PlayerState>((set, get) => ({
 
   playFile: async (file: MediaFile) => {
     set({ currentFile: file, isPlaying: true });
+
+    // Check for playlist crossfade override
+    // This would require knowing the current playlist context,
+    // which is not always available here.
+    // For now, we use the global setting from playbackEngine.
+
     await playbackEngine.load(file);
     playbackEngine.play();
   },
@@ -193,6 +220,30 @@ const store = create<PlayerState>((set, get) => ({
     // Report current track as skipped/stopped
     playbackEngine.skipTrack();
     set({ currentFile: null });
+  },
+
+  restoreSession: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/stats/state`);
+      const { data } = await res.json();
+      if (data && data.track_id && data.position_seconds > 5) {
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        if (Date.now() - data.timestamp < sevenDaysMs) {
+          // Find track in library or fetch it
+          const trackRes = await fetch(`${API_BASE}/api/tracks/${data.track_id}`);
+          const track = await trackRes.json();
+          if (track) {
+            set({ currentFile: track });
+            await playbackEngine.load(track);
+            playbackEngine.seek(data.position_seconds);
+            // Don't auto-play, just load
+            set({ currentTime: data.position_seconds, isPlaying: false });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore session', e);
+    }
   },
 }));
 

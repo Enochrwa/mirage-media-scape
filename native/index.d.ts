@@ -38,6 +38,12 @@ export declare function writeTags(path: string, tags: TagInput): void
  * Full metadata struct – mirrors both `native/index.d.ts` and
  * `server/zovyra-native.d.ts` exactly.
  */
+export interface ChapterInfo {
+  index: number
+  title?: string
+  startTimeMs: number
+  endTimeMs: number
+}
 export interface TrackMetadata {
   title?: string
   artist?: string
@@ -71,6 +77,9 @@ export interface TrackMetadata {
   replaygainAlbumGain?: number
   replaygainTrackPeak?: number
   replaygainAlbumPeak?: number
+  encoderDelay?: number
+  encoderPadding?: number
+  chapters: Array<ChapterInfo>
 }
 export declare function extractMetadata(path: string): TrackMetadata
 export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void
