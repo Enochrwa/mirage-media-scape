@@ -187,11 +187,19 @@ export class PlaybackEngine {
       await this.reportPlaybackEnd(false, true);
     }
 
+    // If this is a video, we don't load it in the background Audio element.
+    // VideoPlayer.tsx will call loadVideo() which attaches the real element.
+    if (file.type === 'video' && !startNext) {
+      this.currentTrackId = file.id;
+      this.setState('LOADING');
+      return;
+    }
+
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
 
-    // Restore audio source if it was swapped by a video
-    if (chain.element !== chain.audioElement) {
+    // Restore audio source if it was swapped by a video and this is an audio file
+    if (chain.element !== chain.audioElement && file.type !== 'video') {
       chain.element.pause();
       chain.element.removeEventListener('play', this.boundHandlePlay);
       chain.element.removeEventListener('pause', this.boundHandlePause);
@@ -218,6 +226,7 @@ export class PlaybackEngine {
     }
 
     this.currentTrackId = file.id;
+    this.setState('LOADING');
     chain.element.src = file.file;
     chain.element.load();
 
@@ -314,6 +323,10 @@ export class PlaybackEngine {
     }
 
     this.currentTrackId = file.id;
+
+    if (this.state === 'PLAYING') {
+      videoElement.play().catch((e) => console.error('Failed to resume video playback', e));
+    }
   }
 
   setTimeUpdateCallback(cb: (time: number, duration: number) => void) {
@@ -437,7 +450,10 @@ export class PlaybackEngine {
 
   setState(s: PlaybackState) {
     this.state = s;
-    usePlayerStore.setState({ isPlaying: s === 'PLAYING' });
+    usePlayerStore.setState({
+      isPlaying: s === 'PLAYING',
+      currentEngineTrackId: this.currentTrackId,
+    });
   }
 
   get analyserNode() {

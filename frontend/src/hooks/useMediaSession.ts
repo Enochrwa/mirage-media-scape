@@ -17,11 +17,31 @@ export function useMediaSession() {
     if (!canControl) return;
 
     getMediaKeyService().setActionHandlers({
-      play: () => usePlayerStore.getState().resumePlayback(),
-      pause: () => usePlayerStore.getState().pausePlayback(),
-      next: () => usePlayerStore.getState().nextTrack(),
-      previous: () => usePlayerStore.getState().previousTrack(),
-      seek: (time) => usePlayerStore.getState().seekTo(time),
+      play: () => {
+        if (usePlayerStore.getState().currentFile) {
+          usePlayerStore.getState().resumePlayback();
+        }
+      },
+      pause: () => {
+        if (usePlayerStore.getState().currentFile) {
+          usePlayerStore.getState().pausePlayback();
+        }
+      },
+      next: () => {
+        if (usePlayerStore.getState().currentFile) {
+          usePlayerStore.getState().nextTrack();
+        }
+      },
+      previous: () => {
+        if (usePlayerStore.getState().currentFile) {
+          usePlayerStore.getState().previousTrack();
+        }
+      },
+      seek: (time) => {
+        if (usePlayerStore.getState().currentFile) {
+          usePlayerStore.getState().seekTo(time);
+        }
+      },
     });
   }, [canControl]);
 }

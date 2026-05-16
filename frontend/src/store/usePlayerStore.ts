@@ -24,6 +24,7 @@ export interface PlayerState {
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
+  currentEngineTrackId: string | null;
   playbackEngine: typeof playbackEngine;
 
   // Actions
@@ -57,6 +58,7 @@ const store = create<PlayerState>((set, get) => ({
   isPlayerFullscreen: false,
   showMobilePlayer: false,
   aiDjEnabled: false,
+  currentEngineTrackId: null,
   playbackEngine,
 
   init: () => {
@@ -75,22 +77,26 @@ const store = create<PlayerState>((set, get) => ({
   },
 
   pausePlayback: () => {
+    if (!get().currentFile) return;
     playbackEngine.pause();
     set({ isPlaying: false });
   },
 
   resumePlayback: () => {
+    if (!get().currentFile) return;
     playbackEngine.play();
     set({ isPlaying: true });
   },
 
   togglePlayback: () => {
+    if (!get().currentFile) return;
     const { isPlaying } = get();
     if (isPlaying) get().pausePlayback();
     else get().resumePlayback();
   },
 
   seekTo: (time: number) => {
+    if (!get().currentFile) return;
     playbackEngine.seek(time);
     set({ currentTime: time });
   },

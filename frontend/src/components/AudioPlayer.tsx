@@ -200,6 +200,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     closePlayer,
     isPlayerFullscreen,
     setPlayerFullscreen,
+    currentEngineTrackId,
   } = usePlayerStore();
 
   const { files, playlists, addToPlaylist } = useLibraryStore();
@@ -246,6 +247,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
 
   useEffect(() => {
     if (!waveformRef.current || !currentFile) return;
+
+    // Only initialize WaveSurfer when the engine has actually loaded the track
+    if (currentFile.id !== currentEngineTrackId) return;
 
     if (wavesurferRef.current) {
       wavesurferRef.current.destroy();
@@ -295,7 +299,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
     return () => {
       ws.destroy();
     };
-  }, [currentFile, setCurrentTime, setDuration, fileUrl]);
+  }, [currentFile, setCurrentTime, setDuration, fileUrl, currentEngineTrackId]);
 
   useEffect(() => {
     if (wavesurferRef.current && duration > 0) {
