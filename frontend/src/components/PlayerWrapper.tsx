@@ -10,13 +10,18 @@ import VideoPlayer from './VideoPlayer';
 const PlayerWrapper = () => {
   const { currentFile, isPlayerFullscreen, currentTime, playbackEngine: pe } = usePlayerStore();
   const [showResume, setShowResume] = useState(false);
+  const [hasCheckedResume, setHasCheckedResume] = useState(false);
 
   useEffect(() => {
     // If we have a currentFile but it's not playing and we just restored it
-    if (currentFile && !pe.ctx && currentTime > 5) {
-      setShowResume(true);
+    if (currentFile && !hasCheckedResume) {
+      const { isPlaying } = usePlayerStore.getState();
+      if (!isPlaying && currentTime > 5) {
+        setShowResume(true);
+      }
+      setHasCheckedResume(true);
     }
-  }, [currentFile, pe.ctx, currentTime]);
+  }, [currentFile, hasCheckedResume, currentTime]);
 
   if (!currentFile) {
     return null;

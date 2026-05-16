@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { playbackEngine } from '@/lib/PlaybackEngine';
 import { queueManager } from '@/engines/QueueManager';
+import { mapIncomingTrackToMediaFile } from '@/store/useLibraryStore';
 import { MediaFile } from '@/types/media';
 import { API_BASE } from '@/lib/utils';
 
@@ -231,8 +232,9 @@ const store = create<PlayerState>((set, get) => ({
         if (Date.now() - data.timestamp < sevenDaysMs) {
           // Find track in library or fetch it
           const trackRes = await fetch(`${API_BASE}/api/tracks/${data.track_id}`);
-          const track = await trackRes.json();
-          if (track) {
+        const trackData = await trackRes.json();
+        if (trackData) {
+          const track = mapIncomingTrackToMediaFile(trackData);
             set({ currentFile: track });
             await playbackEngine.load(track);
             playbackEngine.seek(data.position_seconds);

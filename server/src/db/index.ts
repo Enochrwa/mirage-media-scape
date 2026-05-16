@@ -269,4 +269,42 @@ db.exec(`
     END;
 `);
 
+// Migration: Add new columns to existing tables
+const tablesInfo = {
+  tracks: [
+    'codec',
+    'gapless_disabled',
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
+    'preferred_speed',
+    'encoder_delay',
+    'encoder_padding',
+    'waveform_data',
+    'metadata_json',
+  ],
+  playlists: ['crossfade_duration_override'],
+};
+
+for (const [table, columns] of Object.entries(tablesInfo)) {
+  const info = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  const existingColumns = info.map((c) => c.name);
+  for (const col of columns) {
+    if (!existingColumns.includes(col)) {
+      try {
+        const type =
+          col.includes('gain') || col.includes('speed')
+            ? 'REAL'
+            : col.includes('delay') || col.includes('padding') || col.includes('disabled')
+              ? 'INTEGER'
+              : 'TEXT';
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      } catch (e) {
+        console.warn(`Migration failed for ${table}.${col}:`, e);
+      }
+    }
+  }
+}
+
 export default db;

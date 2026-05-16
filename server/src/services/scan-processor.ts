@@ -135,8 +135,8 @@ export function processFile(
   );
 
   // Save chapters to dedicated table
+  db.prepare('DELETE FROM track_chapters WHERE track_id = ?').run(id);
   if (metadata.chapters && metadata.chapters.length > 0) {
-    db.prepare('DELETE FROM track_chapters WHERE track_id = ?').run(id);
     const insertChapter = db.prepare(`
       INSERT INTO track_chapters (track_id, chapter_index, title, start_time_ms, end_time_ms)
       VALUES (?, ?, ?, ?, ?)

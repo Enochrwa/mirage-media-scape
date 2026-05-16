@@ -601,7 +601,7 @@ export class PlaybackEngine {
     if (this._preloadedFile) {
       const file = this._preloadedFile;
       this._preloadedFile = null;
-      await this.crossfadeTo(file);
+      await this.crossfadeTo(file, this._globalCrossfadeDuration);
       // After crossfade, update store with the new current file
       usePlayerStore.setState({ currentFile: file, isPlaying: true });
       return;
@@ -646,10 +646,19 @@ export class PlaybackEngine {
       currentChain.element.src = '';
       this.activeIndex = nextIndex;
       this._preloadStarted = false;
-      this.currentTrackId = file.id;
-      // Report previous ended
-      this.reportPlaybackEnd(true, false);
     }, durationMs + 100);
+
+    // Update currentTrackId to the new one and report the previous ended
+    // We do this BEFORE the timeout to ensure we don't end the newly started event
+    const oldId = this.currentTrackId;
+    this.currentTrackId = file.id;
+    if (oldId) {
+      // Temporarily swap trackId to report the correct one
+      const newId = this.currentTrackId;
+      this.currentTrackId = oldId;
+      this.reportPlaybackEnd(true, false);
+      this.currentTrackId = newId;
+    }
   }
 
   startPreload(file: MediaFile) {
@@ -719,14 +728,17 @@ export class PlaybackEngine {
     tempAudio.play();
     tempGain.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.1);
 
-    setTimeout(() => {
-      tempGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+    return new Promise<void>((resolve) => {
       setTimeout(() => {
-        tempAudio.pause();
-        tempSource.disconnect();
-        tempGain.disconnect();
-      }, 150);
-    }, durationMs);
+        tempGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+        setTimeout(() => {
+          tempAudio.pause();
+          tempSource.disconnect();
+          tempGain.disconnect();
+          resolve();
+        }, 150);
+      }, durationMs);
+    });
   }
 }
 
