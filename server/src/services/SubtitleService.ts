@@ -101,8 +101,7 @@ export class SubtitleService {
           .slice(9)
           .join(',')
           .replace(/\{[^}]*\}/g, '')
-          .replace(/\\N/g, '\n')
-          .replace(/\n/g, '\n');
+          .replace(/\\N/g, '\n');
 
         return {
           start: this.parseTime(start),

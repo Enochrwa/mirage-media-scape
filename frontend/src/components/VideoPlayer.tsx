@@ -29,6 +29,7 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { SubtitleCue } from '@/lib/utils';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -108,6 +109,7 @@ const VideoPlayer: React.FC = () => {
   const [scale, setScale] = useState(1.0);
   const [pinchStartScale, setPinchStartScale] = useState(1.0);
   const [isPinching, setIsPinching] = useState(false);
+  const [useFallbackPiP, setUseFallbackPiP] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -193,6 +195,9 @@ const VideoPlayer: React.FC = () => {
         await document.exitPictureInPicture();
       } else if (document.pictureInPictureEnabled) {
         await videoRef.current.requestPictureInPicture();
+      } else {
+        // Fallback to CSS PiP
+        setUseFallbackPiP(!useFallbackPiP);
       }
     } catch (error) {
       console.error('PiP error:', error);
@@ -336,7 +341,20 @@ const VideoPlayer: React.FC = () => {
   }, [brightness, contrast, saturation, hue]);
 
   return (
-    <div className="relative h-screen w-full bg-black flex flex-col overflow-hidden">
+    <div className={cn(
+      "relative w-full bg-black flex flex-col overflow-hidden",
+      useFallbackPiP
+        ? "fixed bottom-4 right-4 w-[280px] aspect-video z-[9999] shadow-2xl border border-white/20 rounded-lg animate-in slide-in-from-bottom-4"
+        : "h-screen"
+    )}>
+      {useFallbackPiP && (
+        <button
+          onClick={() => setUseFallbackPiP(false)}
+          className="absolute top-2 right-2 z-[10000] bg-black/50 p-1 rounded-full text-white hover:bg-black/80"
+        >
+          <X size={14} />
+        </button>
+      )}
       {/* Container with auto-hide controls */}
       <div
         ref={videoContainerRef}
