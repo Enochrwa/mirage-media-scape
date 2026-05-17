@@ -23,7 +23,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const requireCjs  = createRequire(__filename);
-const nativeDir   = path.resolve(__dirname, '../../../native');
+// Resolve native directory from built output location (dist/src/utils → 4 levels up to project root)
+const nativeDir   = path.resolve(__dirname, '../../../../native');
 const nativeIndex = path.join(nativeDir, 'index.js');
 const nativeStub  = path.join(nativeDir, 'stub-build.js');
 

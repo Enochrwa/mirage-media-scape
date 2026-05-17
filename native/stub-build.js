@@ -54,14 +54,11 @@ export function generateThumbnail(_path, _timeSeconds, _outputPath) {
 
 // ── Folder scanning ───────────────────────────────────────────────────────────
 export function scanFolders(folders) {
-  const results = [];
-  for (const folder of folders) {
-    try {
-      const stat = statSync(folder);
-      if (stat.isDirectory()) results.push({ path: folder, mtime: Date.now(), size: 0 });
-    } catch { /* ignore */ }
-  }
-  return results;
+  // Stub mode: return empty list instead of treating directories as tracks.
+  // In a real implementation, this would recursively walk directories and
+  // return media files. For now, returning empty prevents the directory
+  // itself from being inserted as a zero-duration track.
+  return [];
 }
 
 // ── Waveform / fingerprinting ─────────────────────────────────────────────────
