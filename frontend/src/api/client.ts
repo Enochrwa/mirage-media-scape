@@ -18,6 +18,24 @@ export class APIClient {
     return response.json();
   }
 
+  static get(endpoint: string) {
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  static patch(endpoint: string, body: unknown) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static post(endpoint: string, body: unknown) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
   static getTracks() {
     return this.request('/api/tracks');
   }
@@ -37,3 +55,5 @@ export class APIClient {
     return this.request(`/api/tracks/${trackId}/recommendations`);
   }
 }
+
+export const client = APIClient;

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sparkles, Play } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { queueManager } from '@/engines/QueueManager';
 import { API_BASE } from '@/lib/utils';
 
 const MoodMix: React.FC = () => {
@@ -14,13 +15,13 @@ const MoodMix: React.FC = () => {
   const generateMix = async () => {
     try {
       const res = await fetch(
-        `${API_BASE}/api/tracks/recommend/mood?energy=${energy[0]}&bpm=${tempo[0]}&limit=50`,
+        `${API_BASE}/api/tracks/recommendations/mood?energy=${energy[0]}&bpm=${tempo[0]}&limit=50`,
       );
       if (res.ok) {
-        const tracks = await res.json();
-        if (tracks.length > 0) {
+        const { data: tracks } = await res.json();
+        if (tracks && tracks.length > 0) {
+          queueManager.setQueue(tracks);
           playFile(tracks[0]);
-          // TODO: Replace queue with tracks
         }
       }
     } catch (e) {

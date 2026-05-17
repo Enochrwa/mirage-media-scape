@@ -164,6 +164,42 @@ export function processFile(
     }
   }
 
+  // Save audio streams to dedicated table
+  db.prepare('DELETE FROM track_audio_streams WHERE track_id = ?').run(id);
+  if (metadata.audioStreams && metadata.audioStreams.length > 0) {
+    const insertAudioStream = db.prepare(`
+      INSERT INTO track_audio_streams (track_id, stream_index, language, codec_name, channels, sample_rate)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    for (const stream of metadata.audioStreams) {
+      insertAudioStream.run(
+        id,
+        stream.index,
+        stream.language ?? null,
+        stream.codecName ?? null,
+        stream.channels ?? null,
+        stream.sampleRate ?? null,
+      );
+    }
+  }
+
+  // Save subtitle streams to dedicated table
+  db.prepare('DELETE FROM track_subtitle_streams WHERE track_id = ?').run(id);
+  if (metadata.subtitleStreams && metadata.subtitleStreams.length > 0) {
+    const insertSubtitleStream = db.prepare(`
+      INSERT INTO track_subtitle_streams (track_id, stream_index, language, codec_name)
+      VALUES (?, ?, ?, ?)
+    `);
+    for (const stream of metadata.subtitleStreams) {
+      insertSubtitleStream.run(
+        id,
+        stream.index,
+        stream.language ?? null,
+        stream.codecName ?? null,
+      );
+    }
+  }
+
   const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id) as ProcessedTrack;
   return track;
 }

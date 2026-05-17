@@ -69,6 +69,26 @@ db.exec(`
       FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS track_subtitle_streams (
+      track_id TEXT NOT NULL,
+      stream_index INTEGER NOT NULL,
+      language TEXT,
+      codec_name TEXT,
+      PRIMARY KEY (track_id, stream_index),
+      FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS track_audio_streams (
+      track_id TEXT NOT NULL,
+      stream_index INTEGER NOT NULL,
+      language TEXT,
+      codec_name TEXT,
+      channels INTEGER,
+      sample_rate INTEGER,
+      PRIMARY KEY (track_id, stream_index),
+      FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS playback_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       track_id TEXT,
@@ -289,6 +309,9 @@ const tablesInfo = {
     'camelot_key',
     'energy',
     'loudness',
+      'aspect_ratio_override',
+      'rotation_degrees',
+      'mirror_flip',
   ],
   playlists: ['crossfade_duration_override'],
 };
@@ -309,7 +332,9 @@ for (const [table, columns] of Object.entries(tablesInfo)) {
             : col.includes('delay') ||
                 col.includes('padding') ||
                 col.includes('disabled') ||
-                col.includes('version')
+                col.includes('version') ||
+                col.includes('degrees') ||
+                col.includes('flip')
               ? 'INTEGER'
               : 'TEXT';
         db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);

@@ -14,6 +14,22 @@ pub struct ChapterInfo {
 }
 
 #[napi(object)]
+pub struct AudioStreamInfo {
+    pub index: i32,
+    pub language: Option<String>,
+    pub codec_name: Option<String>,
+    pub channels: Option<i32>,
+    pub sample_rate: Option<i32>,
+}
+
+#[napi(object)]
+pub struct SubtitleStreamInfo {
+    pub index: i32,
+    pub language: Option<String>,
+    pub codec_name: Option<String>,
+}
+
+#[napi(object)]
 pub struct TrackMetadata {
     // ── tags ──────────────────────────────────────────────────────────────
     pub title: Option<String>,
@@ -63,6 +79,9 @@ pub struct TrackMetadata {
 
     // ── chapters ──────────────────────────────────────────────────────────
     pub chapters: Vec<ChapterInfo>,
+
+    pub audio_streams: Vec<AudioStreamInfo>,
+    pub subtitle_streams: Vec<SubtitleStreamInfo>,
 }
 
 fn detect_codec_by_magic_bytes(path: &Path) -> Option<String> {
@@ -200,26 +219,50 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
     let mut codec_name: Option<String> = detect_codec_by_magic_bytes(path_buf);
     let mut file_type = "audio".to_string();
     let mut attached_pic_stream_index: Option<usize> = None;
+    let mut audio_streams = Vec::new();
+    let mut subtitle_streams = Vec::new();
 
     for stream in context.streams() {
         let params = stream.parameters();
         match params.medium() {
             ffmpeg::media::Type::Audio => {
-                if sample_rate.is_none() {
-                    let acodec = params.id().name().to_string();
-                    audio_codec = Some(acodec.clone());
-                    if codec_name.is_none() {
-                        codec_name = Some(acodec);
-                    }
-                    if let Ok(codec_ctx) =
-                        ffmpeg::codec::context::Context::from_parameters(params)
-                    {
-                        if let Ok(audio) = codec_ctx.decoder().audio() {
-                            sample_rate = Some(audio.rate() as i32);
-                            channels = Some(audio.channels() as i32);
-                        }
+                let stream_codec_name = params.id().name().to_string();
+                let mut stream_channels = None;
+                let mut stream_sample_rate = None;
+
+                if let Ok(codec_ctx) =
+                    ffmpeg::codec::context::Context::from_parameters(params)
+                {
+                    if let Ok(audio) = codec_ctx.decoder().audio() {
+                        stream_sample_rate = Some(audio.rate() as i32);
+                        stream_channels = Some(audio.channels() as i32);
                     }
                 }
+
+                if sample_rate.is_none() {
+                    audio_codec = Some(stream_codec_name.clone());
+                    if codec_name.is_none() {
+                        codec_name = Some(stream_codec_name.clone());
+                    }
+                    sample_rate = stream_sample_rate;
+                    channels = stream_channels;
+                }
+
+                let mut language = None;
+                for (key, value) in stream.metadata().iter() {
+                    if key.to_lowercase() == "language" {
+                        language = Some(value.to_string());
+                        break;
+                    }
+                }
+
+                audio_streams.push(AudioStreamInfo {
+                    index: stream.index() as i32,
+                    language,
+                    codec_name: Some(stream_codec_name),
+                    channels: stream_channels,
+                    sample_rate: stream_sample_rate,
+                });
             }
             ffmpeg::media::Type::Video => {
                 if stream
@@ -241,6 +284,21 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
                         }
                     }
                 }
+            }
+            ffmpeg::media::Type::Subtitle => {
+                let stream_codec_name = params.id().name().to_string();
+                let mut language = None;
+                for (key, value) in stream.metadata().iter() {
+                    if key.to_lowercase() == "language" {
+                        language = Some(value.to_string());
+                        break;
+                    }
+                }
+                subtitle_streams.push(SubtitleStreamInfo {
+                    index: stream.index() as i32,
+                    language,
+                    codec_name: Some(stream_codec_name),
+                });
             }
             _ => {}
         }
@@ -326,5 +384,7 @@ pub fn extract_metadata(path: String) -> Result<TrackMetadata, napi::Error> {
         encoder_delay,
         encoder_padding,
         chapters,
+        audio_streams,
+        subtitle_streams,
     })
 }

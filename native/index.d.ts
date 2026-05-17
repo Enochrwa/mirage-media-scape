@@ -44,6 +44,18 @@ export interface ChapterInfo {
   startTimeMs: number
   endTimeMs: number
 }
+export interface AudioStreamInfo {
+  index: number
+  language?: string
+  codecName?: string
+  channels?: number
+  sampleRate?: number
+}
+export interface SubtitleStreamInfo {
+  index: number
+  language?: string
+  codecName?: string
+}
 export interface TrackMetadata {
   title?: string
   artist?: string
@@ -80,6 +92,8 @@ export interface TrackMetadata {
   encoderDelay?: number
   encoderPadding?: number
   chapters: Array<ChapterInfo>
+  audioStreams: Array<AudioStreamInfo>
+  subtitleStreams: Array<SubtitleStreamInfo>
 }
 export declare function extractMetadata(path: string): TrackMetadata
 export declare function generateThumbnail(path: string, timeSeconds: number, outputPath: string): void

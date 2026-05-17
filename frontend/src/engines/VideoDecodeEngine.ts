@@ -7,11 +7,16 @@ export class VideoDecodeEngine {
       vp9: 'vp09.00.10.08', // VP9 Profile 0
     };
 
-    const results: Record<string, boolean> = {};
+    const results: Record<string, boolean> = {
+        h264: false,
+        hevc: false,
+        av1: false,
+        vp9: false
+    };
 
     // Check for WebCodecs API
     if (!('VideoDecoder' in window)) {
-      return { supported: false };
+      return results;
     }
 
     for (const [name, codec] of Object.entries(codecs)) {
