@@ -15,5 +15,9 @@
     "sourceMap": true,
     "types": ["node", "jest"]
   },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  },
   "include": ["src/**/*", "tests/**/*", "zovyra-native.d.ts"]
 }

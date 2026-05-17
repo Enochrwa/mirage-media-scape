@@ -112,35 +112,38 @@ function main() {
     try {
       execSync('npm install', { cwd: NATIVE, stdio: 'inherit' });
     } catch (err) {
-      log.error('Failed to install native dependencies.');
-      log.error(err.message);
-      process.exit(1);
+      log.warn('Failed to install native deps – server will start in stub mode.');
+      log.step('Fix:  cd native && npm install');
+      return; // non-fatal
     }
   }
 
   // Verify napi CLI is available
   if (!hasNapiCli()) {
-    log.error('@napi-rs/cli not found after npm install.');
-    log.step('Try:  cd native && npm install');
-    process.exit(1);
+    log.warn('@napi-rs/cli not found – server will start in stub mode.');
+    log.step('Fix:  cd native && npm install');
+    return; // non-fatal
   }
 
-  // Build
+  // Build  (FFmpeg is downloaded + compiled automatically – no system install needed)
   log.step('Compiling Rust → .node binary (first build takes ~60–120 s)…');
+  log.step('FFmpeg source will be downloaded and compiled – no system-wide install needed.');
   try {
     execSync('npm run build', { cwd: NATIVE, stdio: 'inherit' });
   } catch (err) {
-    log.error('Native build failed.');
-    log.error(err.message ?? err);
-    log.step('Manual fix:  cd native && npm run build');
-    process.exit(1);
+    log.warn('Native build failed – server will start in stub mode (limited features).');
+    log.warn(err.message ?? err);
+    log.step('To retry:            cd native && npm run build');
+    log.step('macOS prereqs:       brew install nasm');
+    log.step('Linux prereqs:       apt-get install build-essential nasm yasm');
+    return; // non-fatal
   }
 
   // Verify the binary actually appeared
   if (!binaryExists()) {
-    log.error('Build finished but no .node binary was found in native/');
-    log.step('Check the NAPI-RS output above for errors.');
-    process.exit(1);
+    log.warn('Build finished but no .node binary found – starting in stub mode.');
+    log.step('Check the NAPI-RS output above for clues.');
+    return; // non-fatal
   }
 
   log.ok('Native addon built successfully.\n');
