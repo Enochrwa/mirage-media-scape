@@ -8,10 +8,10 @@ export class VideoDecodeEngine {
     };
 
     const results: Record<string, boolean> = {
-        h264: false,
-        hevc: false,
-        av1: false,
-        vp9: false
+      h264: false,
+      hevc: false,
+      av1: false,
+      vp9: false,
     };
 
     // Check for WebCodecs API

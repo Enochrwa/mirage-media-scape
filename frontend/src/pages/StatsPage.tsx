@@ -197,7 +197,9 @@ const StatsPage = () => {
                       id: track.id,
                       title: track.title,
                       artist: track.artist ?? undefined,
-                      file: track.file ?? `${API_BASE}/api/tracks/stream?id=${encodeURIComponent(track.id)}`,
+                      file:
+                        track.file ??
+                        `${API_BASE}/api/tracks/stream?id=${encodeURIComponent(track.id)}`,
                       type: 'audio',
                       cover: track.cover_cache_path
                         ? `${API_BASE}/api/tracks/cover/${track.id}`
@@ -241,7 +243,9 @@ const StatsPage = () => {
                       id: track.id,
                       title: track.title,
                       artist: track.artist ?? undefined,
-                      file: track.file ?? `${API_BASE}/api/tracks/stream?id=${encodeURIComponent(track.id)}`,
+                      file:
+                        track.file ??
+                        `${API_BASE}/api/tracks/stream?id=${encodeURIComponent(track.id)}`,
                       type: 'audio',
                       cover: track.cover_cache_path
                         ? `${API_BASE}/api/tracks/cover/${track.id}`

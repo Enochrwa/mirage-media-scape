@@ -56,7 +56,7 @@ const SubtitleManager: React.FC = () => {
     if (res.ok) {
       const { data: content } = await res.json();
       // Detect format from codec if possible, otherwise fallback
-      const track = tracks.find(t => t.index === index);
+      const track = tracks.find((t) => t.index === index);
       const format = track?.codec === 'ass' || track?.codec === 'ssa' ? 'ass' : 'srt';
 
       const parseRes = await fetch(`${API_BASE}/api/subtitles/parse`, {
@@ -207,16 +207,22 @@ const SubtitleManager: React.FC = () => {
               </label>
             </DropdownMenuItem>
             <div className="my-1 border-t border-zinc-800" />
-            <DropdownMenuItem onClick={async () => {
-               if (!currentFile) return;
-               const hashRes = await fetch(`${API_BASE}/api/subtitles/hash?id=${encodeURIComponent(currentFile.id)}`);
-               const { data: hash } = await hashRes.json();
-               const searchRes = await fetch(`${API_BASE}/api/subtitles/search?hash=${hash}&filename=${encodeURIComponent(currentFile.title || '')}`);
-               const { data: results } = await searchRes.json();
-               if (results.length > 0) {
-                 // In real app, show a dialog to pick. For now, take first.
-               }
-            }}>
+            <DropdownMenuItem
+              onClick={async () => {
+                if (!currentFile) return;
+                const hashRes = await fetch(
+                  `${API_BASE}/api/subtitles/hash?id=${encodeURIComponent(currentFile.id)}`,
+                );
+                const { data: hash } = await hashRes.json();
+                const searchRes = await fetch(
+                  `${API_BASE}/api/subtitles/search?hash=${hash}&filename=${encodeURIComponent(currentFile.title || '')}`,
+                );
+                const { data: results } = await searchRes.json();
+                if (results.length > 0) {
+                  // In real app, show a dialog to pick. For now, take first.
+                }
+              }}
+            >
               <Search className="mr-2 h-4 w-4" />
               <span>Search Online</span>
             </DropdownMenuItem>
