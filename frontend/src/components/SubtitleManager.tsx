@@ -38,7 +38,7 @@ const SubtitleManager: React.FC = () => {
 
     const fetchTracks = async () => {
       const res = await fetch(
-        `${API_BASE}/api/subtitles/tracks?path=${encodeURIComponent(currentFile.file_path || '')}`,
+        `${API_BASE}/api/subtitles/tracks?id=${encodeURIComponent(currentFile.id)}`,
       );
       if (res.ok) {
         const { data } = await res.json();
@@ -51,7 +51,7 @@ const SubtitleManager: React.FC = () => {
   const selectTrack = async (index: number) => {
     if (!currentFile) return;
     const res = await fetch(
-      `${API_BASE}/api/subtitles/extract?path=${encodeURIComponent(currentFile.file_path || '')}&index=${index}`,
+      `${API_BASE}/api/subtitles/extract?id=${encodeURIComponent(currentFile.id)}&index=${index}`,
     );
     if (res.ok) {
       const { data: content } = await res.json();
@@ -209,7 +209,7 @@ const SubtitleManager: React.FC = () => {
             <div className="my-1 border-t border-zinc-800" />
             <DropdownMenuItem onClick={async () => {
                if (!currentFile) return;
-               const hashRes = await fetch(`${API_BASE}/api/subtitles/hash?path=${encodeURIComponent(currentFile.file_path || '')}`);
+               const hashRes = await fetch(`${API_BASE}/api/subtitles/hash?id=${encodeURIComponent(currentFile.id)}`);
                const { data: hash } = await hashRes.json();
                const searchRes = await fetch(`${API_BASE}/api/subtitles/search?hash=${hash}&filename=${encodeURIComponent(currentFile.title || '')}`);
                const { data: results } = await searchRes.json();

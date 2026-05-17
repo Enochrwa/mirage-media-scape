@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { scannerService, ScannerService } from '../services/scanner.js';
 import { getOSMediaDirectories } from '../utils/os-defaults.js';
 import db from '../db/index.js';
+import { validatePath } from '../utils/path-utils.js';
 
 const router = Router();
 export { scannerService };
@@ -10,6 +11,7 @@ export { scannerService };
 router.post('/auto-scan-defaults', async (req, res) => {
   const dirs = getOSMediaDirectories();
   for (const dir of dirs) {
+    // We trust getOSMediaDirectories, but let's be safe
     db.prepare(
       'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, 1)',
     ).run(dir, Date.now());
@@ -20,7 +22,15 @@ router.post('/auto-scan-defaults', async (req, res) => {
 });
 
 router.post('/scan', async (req, res) => {
-  await scannerService.scanAll();
+  const { directory } = req.body;
+  if (directory) {
+    if (!validatePath(directory)) {
+      return res.status(403).json({ error: 'Access denied to directory' });
+    }
+    await scannerService.addFolder(directory);
+  } else {
+    await scannerService.scanAll();
+  }
   res.json({ data: { message: 'Scan started' } });
 });
 

@@ -133,9 +133,10 @@ const VideoPlayer: React.FC = () => {
   }, [resetControlsTimeout]);
 
   // Load per-file settings
+  const { autoPiP } = usePlayerStore();
+
   useEffect(() => {
     const handlePopState = () => {
-      const autoPiP = localStorage.getItem('ZOVYRA_auto_pip') === 'true';
       if (autoPiP && isPlaying && hasInteracted && videoRef.current && !document.pictureInPictureElement) {
         if (document.pictureInPictureEnabled) {
           videoRef.current.requestPictureInPicture().catch(console.error);
@@ -149,7 +150,7 @@ const VideoPlayer: React.FC = () => {
       // Also handle navigation via React Router by checking location change
       handlePopState();
     };
-  }, [location.pathname, isPlaying, hasInteracted]);
+  }, [location.pathname, isPlaying, hasInteracted, autoPiP]);
 
   useEffect(() => {
     if (currentFile?.id) {
@@ -305,13 +306,27 @@ const VideoPlayer: React.FC = () => {
     if (next) handleSeek(next.start_time_ms / 1000);
   };
   const prevChapter = () => {
-    const cur = [...chapters].reverse().find(c => c.start_time_ms <= currentTime * 1000);
-    if (cur) {
-      if (currentTime * 1000 > cur.start_time_ms + 2000) handleSeek(cur.start_time_ms / 1000);
-      else {
-        const idx = chapters.indexOf(cur);
-        if (idx > 0) handleSeek(chapters[idx-1].start_time_ms / 1000);
+    // Find current chapter
+    const curIdx = [...chapters].reverse().findIndex(c => c.start_time_ms <= currentTime * 1000 + 10);
+    const actualIdx = curIdx === -1 ? -1 : (chapters.length - 1 - curIdx);
+
+    if (actualIdx !== -1) {
+      const cur = chapters[actualIdx];
+      // If we are more than 2 seconds into the current chapter, restart it
+      if (currentTime * 1000 > cur.start_time_ms + 2000) {
+        handleSeek(cur.start_time_ms / 1000);
+      } else {
+        // Otherwise, go to the previous chapter start
+        if (actualIdx > 0) {
+          handleSeek(chapters[actualIdx - 1].start_time_ms / 1000);
+        } else {
+          // If first chapter and within 2s, just restart it
+          handleSeek(0);
+        }
       }
+    } else {
+      // Not in any chapter (before first), restart
+      handleSeek(0);
     }
   };
 

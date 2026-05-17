@@ -82,7 +82,7 @@ const Settings = () => {
   ]);
   const [newExt, setNewExt] = useState('');
   const [hwSupport, setHwSupport] = useState<Record<string, boolean>>({});
-  const [autoPiP, setAutoPiP] = useState(localStorage.getItem('ZOVYRA_auto_pip') === 'true');
+  const { autoPiP, setAutoPiP } = usePlayerStore();
   const canSendNativeNotifications = useCapability('canSendNativeNotifications');
 
   useEffect(() => {
@@ -157,7 +157,6 @@ const Settings = () => {
                     checked={autoPiP}
                     onCheckedChange={(v) => {
                       setAutoPiP(v);
-                      localStorage.setItem('ZOVYRA_auto_pip', v.toString());
                     }}
                   />
                 </div>

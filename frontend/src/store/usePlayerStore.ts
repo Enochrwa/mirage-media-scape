@@ -26,6 +26,7 @@ export interface PlayerState {
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
+  autoPiP: boolean;
   currentEngineTrackId: string | null;
   playbackEngine: typeof playbackEngine;
 
@@ -44,6 +45,7 @@ export interface PlayerState {
   setRepeat: (repeat: boolean) => void;
   setPlayerFullscreen: (fullscreen: boolean) => void;
   setShowMobilePlayer: (show: boolean) => void;
+  setAutoPiP: (enabled: boolean) => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   closePlayer: () => void;
@@ -61,6 +63,7 @@ const store = create<PlayerState>((set, get) => ({
   isPlayerFullscreen: false,
   showMobilePlayer: false,
   aiDjEnabled: false,
+  autoPiP: localStorage.getItem('ZOVYRA_auto_pip') === 'true',
   currentEngineTrackId: null,
   playbackEngine,
 
@@ -69,6 +72,18 @@ const store = create<PlayerState>((set, get) => ({
     const savedVolume = parseFloat(localStorage.getItem('ZOVYRA_volume') ?? '0.8');
     playbackEngine.setVolume(savedVolume);
     set({ volume: savedVolume });
+
+    // Fetch remote settings
+    fetch(`${API_BASE}/api/settings/auto_pip`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.value !== null) {
+          const enabled = data.value === 'true';
+          set({ autoPiP: enabled });
+          localStorage.setItem('ZOVYRA_auto_pip', data.value);
+        }
+      })
+      .catch(console.error);
 
     queueManager.load();
     get().restoreSession();
@@ -251,6 +266,15 @@ const store = create<PlayerState>((set, get) => ({
   setRepeat: (repeat: boolean) => set({ repeat }),
   setPlayerFullscreen: (isPlayerFullscreen: boolean) => set({ isPlayerFullscreen }),
   setShowMobilePlayer: (showMobilePlayer: boolean) => set({ showMobilePlayer }),
+  setAutoPiP: (autoPiP: boolean) => {
+    localStorage.setItem('ZOVYRA_auto_pip', autoPiP.toString());
+    fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'auto_pip', value: autoPiP.toString() }),
+    }).catch(console.error);
+    set({ autoPiP });
+  },
   setCurrentTime: (currentTime: number) => set({ currentTime }),
   setDuration: (duration: number) => set({ duration }),
   closePlayer: () => {

@@ -3,6 +3,7 @@ import db from '../db/index.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import crypto from 'crypto';
 import { spawn } from 'child_process';
 import native from '../utils/native-loader.js';
 import { Worker } from 'worker_threads';
@@ -11,11 +12,17 @@ import { RecommendationService } from '../services/RecommendationService.js';
 import { FingerprintService } from '../services/FingerprintService.js';
 import { DuplicateFinderService } from '../services/DuplicateFinderService.js';
 import { analysisService } from '../services/AnalysisService.js';
-import { validatePath } from '../utils/path-utils.js';
+import { sanitizeId, validatePath } from '../utils/path-utils.js';
 
 // ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Helper to extract string ID from params
+const getParamId = (req: Request): string => {
+    const id = req.params.id;
+    return Array.isArray(id) ? id[0] : (id as string);
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Library queries
@@ -46,33 +53,37 @@ export const getAllTracks = (_req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const streamTrack = (req: Request, res: Response): void => {
-  const { path: queryPath, id, audio_stream } = req.query;
-  let filePath: string | undefined;
+  const { id, audio_stream } = req.query;
 
-  const identifier = (id || queryPath) as string;
-
-  if (identifier && typeof identifier === 'string') {
-    // Try as track ID first
-    const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(identifier) as
-      | { file_path: string }
-      | undefined;
-
-    if (track) {
-      filePath = track.file_path;
-    } else if (validatePath(identifier)) {
-      // Fallback to direct path validation
-      filePath = identifier;
-    }
+  if (!id || typeof id !== 'string') {
+    res.status(400).send('Track ID is required');
+    return;
   }
 
-  if (!filePath) {
-    res.status(404).send('Track not found or access restricted');
+  const safeId = sanitizeId(id);
+  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(safeId) as
+    | { file_path: string }
+    | undefined;
+
+  if (!track || !track.file_path) {
+    res.status(404).send('Track not found');
+    return;
+  }
+
+  // Double-check the path is still valid and within library bounds
+  const filePath = track.file_path;
+  if (!validatePath(filePath)) {
+    res.status(403).send('Access denied to library file');
     return;
   }
 
   // Handle remuxing if specific audio stream requested
   if (audio_stream !== undefined) {
     const streamIndex = parseInt(audio_stream as string, 10);
+    if (isNaN(streamIndex) || streamIndex < 0) {
+        res.status(400).send('Invalid audio stream index');
+        return;
+    }
     res.writeHead(200, {
       'Content-Type': 'video/x-matroska',
       'Transfer-Encoding': 'chunked',
@@ -88,9 +99,7 @@ export const streamTrack = (req: Request, res: Response): void => {
     ]);
 
     ffmpeg.stdout.pipe(res);
-    ffmpeg.stderr.on('data', (data: Buffer) => {
-      // Optional: log ffmpeg progress
-    });
+    ffmpeg.stderr.on('data', () => {});
 
     req.on('close', () => ffmpeg.kill());
     return;
@@ -122,6 +131,12 @@ export const streamTrack = (req: Request, res: Response): void => {
     const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
     const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (isNaN(start) || isNaN(end) || start < 0 || end < 0 || start > end || start >= fileSize) {
+        res.status(416).send('Requested Range Not Satisfiable');
+        return;
+    }
+
     const chunksize = end - start + 1;
     const file = fs.createReadStream(filePath, { start, end });
     res.writeHead(206, {
@@ -176,10 +191,12 @@ export const searchTracks = (req: Request, res: Response): void => {
 
 export const getRecommendations = async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const limit = parseInt(req.query.limit as string, 10) || 20;
+    const id = getParamId(req);
+    const safeId = sanitizeId(id);
+    const limitQuery = req.query.limit;
+    const limit = parseInt(typeof limitQuery === 'string' ? limitQuery : '20', 10) || 20;
     const recommendationService = new RecommendationService(db);
-    const recommendations = await recommendationService.recommend(id, limit);
+    const recommendations = await recommendationService.recommend(safeId, limit);
     res.json(recommendations);
   } catch (error) {
     console.error('Recommendations error:', error);
@@ -192,12 +209,18 @@ export const getRecommendations = async (req: Request, res: Response): Promise<v
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const identifyTrack = async (req: Request, res: Response): Promise<void> => {
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
+  const safeId = sanitizeId(getParamId(req));
+  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(safeId) as
     | { file_path: string }
     | undefined;
 
-  if (!track) {
+  if (!track || !track.file_path) {
     res.status(404).json({ error: 'Track not found' });
+    return;
+  }
+
+  if (!validatePath(track.file_path)) {
+    res.status(403).json({ error: 'Access denied' });
     return;
   }
 
@@ -208,26 +231,6 @@ export const identifyTrack = async (req: Request, res: Response): Promise<void> 
       return;
     }
     res.json(metadata);
-  } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
-  }
-};
-
-export const getTrackAudioStreams = (req: Request, res: Response): void => {
-  const { id } = req.params;
-  try {
-    const streams = db.prepare('SELECT * FROM track_audio_streams WHERE track_id = ?').all(id);
-    res.json(streams);
-  } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
-  }
-};
-
-export const getTrackChapters = (req: Request, res: Response): void => {
-  const { id } = req.params;
-  try {
-    const chapters = db.prepare('SELECT * FROM track_chapters WHERE track_id = ? ORDER BY chapter_index ASC').all(id);
-    res.json(chapters);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
@@ -252,8 +255,8 @@ export const getDuplicateCandidates = async (_req: Request, res: Response): Prom
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getTrackCover = (req: Request, res: Response): void => {
-  const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id).replace(/[^a-z0-9_-]/gi, '');
-  const row = db.prepare('SELECT cover_cache_path FROM tracks WHERE id = ?').get(id) as
+  const safeId = sanitizeId(getParamId(req));
+  const row = db.prepare('SELECT cover_cache_path FROM tracks WHERE id = ?').get(safeId) as
     | { cover_cache_path?: string }
     | undefined;
 
@@ -263,16 +266,13 @@ export const getTrackCover = (req: Request, res: Response): void => {
   }
 
   const absolutePath = path.resolve(row.cover_cache_path);
-  if (!fs.existsSync(absolutePath)) {
-    res.status(404).end();
-    return;
-  }
+  // Optional: Check if absolutePath is inside a cache directory
   res.sendFile(absolutePath);
 };
 
 export const getTrackThumbnail = (req: Request, res: Response): void => {
-  const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id).replace(/[^a-z0-9_-]/gi, '');
-  const row = db.prepare('SELECT thumbnail_path FROM tracks WHERE id = ?').get(id) as
+  const safeId = sanitizeId(getParamId(req));
+  const row = db.prepare('SELECT thumbnail_path FROM tracks WHERE id = ?').get(safeId) as
     | { thumbnail_path?: string }
     | undefined;
 
@@ -282,10 +282,6 @@ export const getTrackThumbnail = (req: Request, res: Response): void => {
   }
 
   const absolutePath = path.resolve(row.thumbnail_path);
-  if (!fs.existsSync(absolutePath)) {
-    res.status(404).end();
-    return;
-  }
   res.sendFile(absolutePath);
 };
 
@@ -293,31 +289,39 @@ const thumbAtCache = new Map<string, Buffer>();
 const MAX_THUMB_CACHE = 100;
 
 export const getTrackThumbnailAt = (req: Request, res: Response): void => {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const at = Math.floor(parseFloat(req.query.at as string) || 0);
+  const safeId = sanitizeId(getParamId(req));
+  const atValue = req.query.at;
+  const atRaw = parseFloat(typeof atValue === 'string' ? atValue : '0');
+  const at = Math.floor(isNaN(atRaw) ? 0 : Math.abs(atRaw));
 
   const row = db
     .prepare('SELECT file_path, last_modified, file_size FROM tracks WHERE id = ?')
-    .get(id) as { file_path: string, last_modified: number, file_size: number } | undefined;
+    .get(safeId) as { file_path: string, last_modified: number, file_size: number } | undefined;
 
-  if (!row) {
+  if (!row || !row.file_path) {
     res.status(404).send('Track not found');
     return;
   }
 
-  const cacheKey = `${id}_${at}_${row.last_modified}_${row.file_size}`;
+  if (!validatePath(row.file_path)) {
+    res.status(403).send('Access denied');
+    return;
+  }
+
+  const cacheKey = `${safeId}_${at}_${row.last_modified}_${row.file_size}`;
   if (thumbAtCache.has(cacheKey)) {
     res.set('Content-Type', 'image/jpeg');
     res.send(thumbAtCache.get(cacheKey));
     return;
   }
 
-  const safeId = id.replace(/[^a-z0-9_-]/gi, '');
-  const safeAt = Math.floor(at);
-  const tempThumbPath = path.join(os.tmpdir(), `thumb_${safeId}_${safeAt}.jpg`);
+  const pathHash = crypto.createHash('md5').update(row.file_path).digest('hex');
+  const tempThumbPath = path.join(os.tmpdir(), `thumb_${pathHash}_${at}.jpg`);
+  const absoluteTempPath = path.resolve(tempThumbPath);
+
   try {
-    native.generateThumbnail(row.file_path, safeAt, tempThumbPath);
-    const buffer = fs.readFileSync(tempThumbPath);
+    native.generateThumbnail(row.file_path, at, absoluteTempPath);
+    const buffer = fs.readFileSync(absoluteTempPath);
 
     if (thumbAtCache.size >= MAX_THUMB_CACHE) {
       const firstKey = thumbAtCache.keys().next().value;
@@ -328,9 +332,43 @@ export const getTrackThumbnailAt = (req: Request, res: Response): void => {
     res.set('Content-Type', 'image/jpeg');
     res.send(buffer);
 
-    if (fs.existsSync(tempThumbPath)) {
-      fs.unlinkSync(tempThumbPath);
+    if (fs.existsSync(absoluteTempPath)) {
+      fs.unlinkSync(absoluteTempPath);
     }
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const reanalyzeTrack = async (req: Request, res: Response): Promise<void> => {
+  const safeId = sanitizeId(getParamId(req));
+  try {
+    const analysis = await analysisService.analyzeSingleTrack(safeId);
+    if (!analysis) {
+      res.status(404).json({ error: 'Track not found' });
+      return;
+    }
+    res.json(analysis);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const getTrackAudioStreams = (req: Request, res: Response): void => {
+  const safeId = sanitizeId(getParamId(req));
+  try {
+    const streams = db.prepare('SELECT * FROM track_audio_streams WHERE track_id = ?').all(safeId);
+    res.json(streams);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+};
+
+export const getTrackChapters = (req: Request, res: Response): void => {
+  const safeId = sanitizeId(getParamId(req));
+  try {
+    const chapters = db.prepare('SELECT * FROM track_chapters WHERE track_id = ? ORDER BY chapter_index ASC').all(safeId);
+    res.json(chapters);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
@@ -341,7 +379,8 @@ export const getTrackThumbnailAt = (req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getTrackById = (req: Request, res: Response): void => {
-  const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(req.params.id);
+  const safeId = sanitizeId(getParamId(req));
+  const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(safeId);
   if (!track) {
     res.status(404).json({ error: 'Track not found' });
     return;
@@ -378,7 +417,7 @@ export const getAlbumDetails = (req: Request, res: Response): void => {
 };
 
 export const updateTrackRating = (req: Request, res: Response): void => {
-  const { id } = req.params;
+  const safeId = sanitizeId(getParamId(req));
   const { rating } = req.body as { rating: unknown };
 
   const ratingNum = Number(rating);
@@ -388,7 +427,7 @@ export const updateTrackRating = (req: Request, res: Response): void => {
   }
 
   try {
-    const result = db.prepare('UPDATE tracks SET rating = ? WHERE id = ?').run(ratingNum, id);
+    const result = db.prepare('UPDATE tracks SET rating = ? WHERE id = ?').run(ratingNum, safeId);
     if (result.changes === 0) {
       res.status(404).json({ error: 'Track not found' });
       return;
@@ -404,12 +443,18 @@ export const updateTrackRating = (req: Request, res: Response): void => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getTrackWaveform = (req: Request, res: Response): void => {
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(req.params.id) as
+  const safeId = sanitizeId(getParamId(req));
+  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(safeId) as
     | { file_path: string }
     | undefined;
 
-  if (!track) {
+  if (!track || !track.file_path) {
     res.status(404).json({ error: 'Track not found' });
+    return;
+  }
+
+  if (!validatePath(track.file_path)) {
+    res.status(403).json({ error: 'Access denied' });
     return;
   }
 
@@ -443,7 +488,7 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
 };
 
 export const updateTrackMetadata = (req: Request, res: Response): void => {
-  const { id } = req.params;
+  const safeId = sanitizeId(getParamId(req));
   const {
     title, artist, album, bpm, key, camelot_key,
     aspect_ratio_override, rotation_degrees, mirror_flip
@@ -468,7 +513,7 @@ export const updateTrackMetadata = (req: Request, res: Response): void => {
       .run(
         title, artist, album, bpm, key, camelot_key,
         aspect_ratio_override, rotation_degrees, mirror_flip,
-        Date.now(), id
+        Date.now(), safeId
       );
 
     if (result.changes === 0) {
@@ -476,20 +521,6 @@ export const updateTrackMetadata = (req: Request, res: Response): void => {
       return;
     }
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
-  }
-};
-
-export const reanalyzeTrack = async (req: Request, res: Response): Promise<void> => {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  try {
-    const analysis = await analysisService.analyzeSingleTrack(id);
-    if (!analysis) {
-      res.status(404).json({ error: 'Track not found' });
-      return;
-    }
-    res.json(analysis);
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }

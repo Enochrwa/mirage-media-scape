@@ -32,6 +32,13 @@ export class QueueManager {
     this.notify();
   }
 
+  setQueue(files: MediaFile[]) {
+    this.queue = [...files];
+    this.currentIndex = files.length > 0 ? 0 : -1;
+    this.save();
+    this.notify();
+  }
+
   reorder(fromIndex: number, toIndex: number) {
     const [item] = this.queue.splice(fromIndex, 1);
     this.queue.splice(toIndex, 0, item);

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { validatePath } from '../utils/path-utils.js';
 
 export interface SubtitleCue {
@@ -9,21 +10,26 @@ export interface SubtitleCue {
 
 export class SubtitleService {
   static async calculateOpenSubtitlesHash(filePath: string): Promise<string> {
-    if (!validatePath(filePath)) throw new Error('Access denied');
-    const stats = fs.statSync(filePath);
+    const absolutePath = path.resolve(filePath);
+    if (!validatePath(absolutePath)) throw new Error('Access denied');
+
+    const stats = fs.statSync(absolutePath);
     const fileSize = stats.size;
     const CHUNK_SIZE = 65536; // 64KB
 
     if (fileSize < CHUNK_SIZE) return '';
 
     const buffer = Buffer.alloc(CHUNK_SIZE * 2);
-    const fd = fs.openSync(filePath, 'r');
+    const fd = fs.openSync(absolutePath, 'r');
 
-    // Read first 64KB
-    fs.readSync(fd, buffer, 0, CHUNK_SIZE, 0);
-    // Read last 64KB
-    fs.readSync(fd, buffer, CHUNK_SIZE, CHUNK_SIZE, Math.max(0, fileSize - CHUNK_SIZE));
-    fs.closeSync(fd);
+    try {
+        // Read first 64KB
+        fs.readSync(fd, buffer, 0, CHUNK_SIZE, 0);
+        // Read last 64KB
+        fs.readSync(fd, buffer, CHUNK_SIZE, CHUNK_SIZE, Math.max(0, fileSize - CHUNK_SIZE));
+    } finally {
+        fs.closeSync(fd);
+    }
 
     let hash = BigInt(fileSize);
     for (let i = 0; i < buffer.length; i += 8) {
@@ -96,7 +102,7 @@ export class SubtitleService {
           .join(',')
           .replace(/\{[^}]*\}/g, '')
           .replace(/\\N/g, '\n')
-          .replace(/\\n/g, '\n');
+          .replace(/\n/g, '\n');
 
         return {
           start: this.parseTime(start),
