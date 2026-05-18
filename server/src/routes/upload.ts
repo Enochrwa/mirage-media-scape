@@ -19,7 +19,8 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    const safeName = path.basename(file.originalname).replace(/[^a-z0-9._-]/gi, '_');
+    cb(null, `${Date.now()}-${safeName}`);
   }
 });
 
@@ -43,7 +44,8 @@ router.post('/', authMiddleware, upload.single('file'), async (req: Request, res
 
     // Security: validate that the file is within the 'uploads' directory
     const uploadsDir = path.resolve('uploads');
-    if (!filePath.startsWith(uploadsDir)) {
+    const relative = path.relative(uploadsDir, filePath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
       fs.unlinkSync(filePath);
       return res.status(403).json({ error: 'Forbidden' });
     }
