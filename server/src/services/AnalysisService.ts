@@ -33,14 +33,14 @@ export class AnalysisService {
       )
       .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
-    // Priority 2: Rest of the library
+    // Priority 2: Rest of the library  (reduced batch to keep RAM usage low)
     const remaining = db
       .prepare(
         `
       SELECT id, file_path FROM tracks
       WHERE (analysis_version IS NULL OR analysis_version < ?)
       AND missing = 0 AND file_type = 'audio'
-      LIMIT 500
+      LIMIT 50
     `,
       )
       .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
@@ -103,8 +103,9 @@ export class AnalysisService {
         console.error(`Analysis failed for ${track.file_path}`, e);
       }
 
-      // Yield
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Yield back to the event loop after each track so we never block the
+      // main thread during a long synchronous analyzeAudio() decode call.
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
 
     this.isAnalyzing = false;

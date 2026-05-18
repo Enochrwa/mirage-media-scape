@@ -126,16 +126,7 @@ export function processFile(
     metadata.replaygainAlbumPeak ?? null,
     metadata.encoderDelay ?? null,
     metadata.encoderPadding ?? null,
-    metadata.fileType === 'audio'
-      ? (() => {
-          try {
-            return JSON.stringify(native.generateWaveform(filePath));
-          } catch (e) {
-            console.warn(`Waveform generation failed for ${filePath}`, e);
-            return null;
-          }
-        })()
-      : null,
+    null,  // waveform_data — deferred to async background waveform worker
     chaptersJson,
     coverCachePath,
     thumbnailPath,

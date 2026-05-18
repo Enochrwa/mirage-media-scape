@@ -99,10 +99,12 @@ async function loadNative(): Promise<typeof NativeTypes> {
   // Stub: prefer pre-compiled js, then on-the-fly TS compile, then require.js helper
   // 1. Pre-compiled stub-build.js (produced by cd native && npm run build)
   const jsPath = pathToFileURL(nativeStub).href;
-  try {
-    return await import(jsPath) as Promise<typeof NativeTypes>;
-  } catch {
-    // continue
+  if (existsSync(nativeStub)) {
+    try {
+      return await import(jsPath) as Promise<typeof NativeTypes>;
+    } catch {
+      // file exists but failed to load; fall through to recompile
+    }
   }
 
   // 2. Transpile stub-build.ts on the fly so the server can boot in stub-only mode
@@ -110,11 +112,19 @@ async function loadNative(): Promise<typeof NativeTypes> {
     const { execSync } = await import('node:child_process');
     execSync(
       'npx --yes tsc --project ' + nativeDir.replace(/\\/g, '/') + '/tsconfig.stub.json',
-      { stdio: 'ignore', cwd: repoRoot }
+      { stdio: 'pipe', cwd: repoRoot }
     );
-    return await import(jsPath) as Promise<typeof NativeTypes>;
+    // Verify the file was actually written before importing
+    if (existsSync(nativeStub)) {
+      return await import(jsPath) as Promise<typeof NativeTypes>;
+    } else {
+      console.error(
+        '\x1b[31m[zovyra-native]\x1b[0m tsc completed but stub-build.js was not written.\n' +
+        '  Run: cd native && npm install && npm run build'
+      );
+    }
   } catch {
-    // continue
+    // fall through to loader.js
   }
 
   throw new Error(

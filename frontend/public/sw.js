@@ -11,6 +11,9 @@ self.addEventListener('fetch', (event) => {
   // Radio streams - NEVER cache
   if (url.pathname.includes('/api/radio/proxy')) return;
 
+  // Never intercept POST requests — mutations must reach the server directly
+  if (event.request.method !== 'GET') return;
+
   // Cover art - Cache first
   if (url.pathname.includes('/api/tracks/cover')) {
     event.respondWith(
