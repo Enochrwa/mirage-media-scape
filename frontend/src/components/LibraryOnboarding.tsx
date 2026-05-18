@@ -46,15 +46,15 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
     }
   };
 
-   const chooseFolder = async () => {
-     if (!folderPath.trim()) {
-       toast({ title: 'Enter a folder path', variant: 'destructive' });
-       return;
-     }
-     // Store the full path for scanning
-     setSelectedFolders((prev) => [...prev, folderPath.trim()]);
-     setFolderPath('');
-   };
+  const chooseFolder = async () => {
+    if (!folderPath.trim()) {
+      toast({ title: 'Enter a folder path', variant: 'destructive' });
+      return;
+    }
+    // Store the full path for scanning
+    setSelectedFolders((prev) => [...prev, folderPath.trim()]);
+    setFolderPath('');
+  };
 
   const startScan = async () => {
     setBusy('folder');
