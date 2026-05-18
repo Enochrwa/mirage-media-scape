@@ -72,6 +72,7 @@ router.post('/parse', (req, res) => {
   if (format === 'srt') cues = SubtitleService.parseSRT(content);
   else if (format === 'vtt') cues = SubtitleService.parseVTT(content);
   else if (format === 'ass') cues = SubtitleService.parseASS(content);
+  else return res.status(400).send('Unsupported format');
   res.json({ data: cues });
 });
 

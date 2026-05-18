@@ -1,6 +1,7 @@
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import { Server } from 'socket.io';
 import db from '../db/index.js';
 import native from '../utils/native-loader.js';
@@ -36,19 +37,38 @@ export class ScannerService {
 
     this.isScanning = true;
 
-    return new Promise<void>((resolve, reject) => {
-      // In production, __dirname points to dist/src/services/ and .js files exist there.
-      // In dev (tsx), __dirname points to src/services/ where only .ts files exist.
-      // When running from dist, .js must always be used since Node.js ESM Worker threads
-      // cannot load .ts files even when the main process is run via tsx.
-      const isDev =
-        !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-      // tsx compiles src/… into dist/src/… so the dist worker is one level above src/.
-      // In production __dirname already points at dist/src/services.
-      const baseDir = isDev
-        ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
-        : __dirname;
-      const workerPath = path.resolve(baseDir, './scan-worker.js');
+    return new Promise<void>((resolve) => {
+      // ── Worker path resolution ────────────────────────────────────────────
+      // Directory layout:
+      //   server/
+      //   server/src/services/scanner.ts   ← __dirname here (dev, tsx watch)
+      //   server/dist/src/services/        ← compiled worker output
+      //
+      // From __dirname (/…/server/src/services/) go UP TWO levels to server/:
+      //   services/..  → server/src
+      //   ../dist/src/services/  → server/dist/src/services/  ✓
+      const srcServicesDir = path.resolve(__dirname);
+      const serverRoot     = path.resolve(srcServicesDir, '..', '..');
+      const distWorkerDir  = path.join(serverRoot, 'dist', 'src', 'services');
+      const distWorkerPath = path.join(distWorkerDir, 'scan-worker.js');
+
+      // In production (main process is dist/src/index.js) __dirname is already
+      // dist/src/services/ so the worker is simply __dirname/scan-worker.js.
+      const isProd = process.env.NODE_ENV === 'production';
+      const workerPath = isProd
+        ? path.join(__dirname, 'scan-worker.js')
+        : distWorkerPath;
+
+      if (!isProd && !existsSync(workerPath)) {
+        const msg =
+          `[scanner] Compiled worker not found at ${workerPath}\n` +
+          '  Run: npm run build  (from server/), then start the dev server\n' +
+          '  again.  (npx tsc --noEmit false --outDir dist)';
+        console.error(msg);
+        this.isScanning = false;
+        resolve();           // resolve(undefined) — scan is already in reset state
+        return;
+      }
 
       const dbPath = getDatabasePath();
       const coversDir = path.resolve(path.dirname(dbPath), 'cache/covers');
@@ -62,7 +82,6 @@ export class ScannerService {
           this.io.emit(msg.type, msg);
         }
         if (msg.type === 'SCAN_COMPLETE') {
-          this.isScanning = false;
           // Background analysis is now handled inside the scan worker (scan-worker.ts)
           // and marked with analysis_version=1 to avoid duplicate work here.
           // We call it here only as a fallback for any missed tracks.
@@ -71,19 +90,18 @@ export class ScannerService {
         }
       });
 
+      // log the GS), do NOT reject: isScanning is already false and the caller
+      // already received SCAN_ERROR / SCAN_PROGRESS via Socket.IO.
       worker.on('error', (err) => {
         console.error('Scanner worker error:', err);
         this.isScanning = false;
-        reject(err);
       });
 
       worker.on('exit', (code) => {
-        this.isScanning = false;
         if (code !== 0) {
           console.error(`Scanner worker exited with code ${code}`);
-          // Resolve rather than reject so callers don't crash on partial scans
-          resolve();
         }
+        this.isScanning = false;
       });
     });
   }

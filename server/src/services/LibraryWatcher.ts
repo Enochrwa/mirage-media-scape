@@ -5,19 +5,64 @@ import db from '../db/index.js';
 import { scannerService } from './scanner.js';
 
 let watcher: FSWatcher | null = null;
-let debounceTimer: NodeJS.Timeout | null = null;
 let ioRef: Server | null = null;
 
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS     = 2_000;   // normal debounce after library changes
+const BACKOFF_INITIAL = 15_000;  // delay after a failed scan
+const BACKOFF_MAX     = 60_000;  // maximum backoff cap
+
+let lastScanFailed  = false;
+let backoffMs       = BACKOFF_INITIAL;
+let isScanning      = false;
+
+let debounceTimerRef: NodeJS.Timeout | null = null;
 
 function scheduleRescan(): void {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
-    scannerService
-      .scanAll()
-      .catch((e: unknown) => console.error('LibraryWatcher rescan failed:', e));
-  }, DEBOUNCE_MS);
+  // If the last scan failed, advance the backoff timer so the *next* attempt
+  // always waits the full backoff delay regardless of how many events fire in
+  // the meantime.
+  if (lastScanFailed && debounceTimerRef) {
+    clearTimeout(debounceTimerRef);
+    debounceTimerRef = null;
+  }
+
+  // ── Scanning in progress ──────────────────────────────────────────
+  // A scan is already running (runScan is active, isScanning === true).
+  // Drop the event: if any overlooked changes exist the finally handler in
+  // runScan will fire another scan when this one completes and isScanning
+  // flips to false.
+  if (isScanning) return;
+
+  const delay = lastScanFailed ? backoffMs : DEBOUNCE_MS;
+  debounceTimerRef = setTimeout(runScan, delay);
+}
+
+function runScan(): void {
+  debounceTimerRef = null;          // consume the timer slot
+  isScanning      = true;            // guard: drop all events until this finishes
+  lastScanFailed  = false;           // optimistic — will flip back if the scan throws
+  backoffMs       = BACKOFF_INITIAL;
+
+  (async () => {
+    try {
+      await scannerService.scanAll();   // scan — OR SCAN_COMPLETE resolves
+      // success: leave isScanning = true until finally resets it below
+    } catch (e: unknown) {
+      lastScanFailed = true;
+      backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX);
+      console.error('LibraryWatcher rescan failed:', e);
+    } finally {
+      isScanning = false;
+      // If a tree-change arrived just as we finished (scheduleRescan ran
+      // while isScanning was still true it would have returned early), allow
+      // one more scan after IN_PROGRESS_GRACE so nothing slips through the
+      // cracks when the watcher and scan completion don't quite line up.
+      debounceTimerRef = setTimeout(() => {
+        debounceTimerRef = null;
+        if (!isScanning) runScan();  // double-check — scan may restarted by another thread
+      }, 5_000);
+    }
+  })();
 }
 
 function markTrackMissing(filePath: string): void {
@@ -47,6 +92,11 @@ export function refreshLibraryWatcherPaths(): void {
     watcher = null;
   }
 
+  // Cancel any pending timers and reset scan state
+  if (debounceTimerRef) clearTimeout(debounceTimerRef);
+  debounceTimerRef = null;
+  isScanning = false;   // abandon any in-flight scan — paths are about to be rebuilt
+
   if (rows.length === 0) return;
 
   const paths = rows.map((r) => r.path);
@@ -54,7 +104,19 @@ export function refreshLibraryWatcherPaths(): void {
     ignoreInitial: true,
     persistent: true,
     awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
-    ignored: [/^.*[/\\]systemd-private-.*$/, /^\/tmp[/\\]$/],
+    ignored: [
+      /^.*[/\\]systemd-private-.*$/,
+      /^\/tmp[/\\]$/,
+      // Ignore common non-media directories
+      '**/node_modules/**',
+      '**/.*/**',
+      // Ignore known non-media file patterns
+      '**/*.{jpg,jpeg,png,gif,bmp,tiff,ico,webp,svg}',
+      '**/*.{db,sqlite,sqlite3}',
+      '**/*.{log,tmp,temp}',
+      '**/Thumbs.db',
+      '**/desktop.ini',
+    ],
   });
 
   watcher.on('unlink', (filePath: string) => {

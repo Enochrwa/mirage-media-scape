@@ -11,15 +11,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const { dbPath, folders, coversDir } = workerData;
 
-// In production the script runs from dist/src/services/ and .js files are present.
-// In dev (tsx) __dirname points to src/services/ where only .ts files exist.
-// Node.js ESM Worker threads cannot load .ts workers directly, so only .js is used.
-const isDev =
-  !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-const baseDir = isDev
-  ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
-  : __dirname;
-const chunkWorkerPath = path.resolve(baseDir, './scan-chunk-worker.js');
+// Directory layout (same logic as scanner.ts):
+//   src/services/scan-worker.ts  ← __dirname here in dev
+//   server/dist/src/services/scan-chunk-worker.js  ← compiled output in dist/
+//
+// From __dirname (/…/server/src/services/) go UP TWO levels to server/:
+//   services/..  → server/src
+//   ../dist/src/services/  → server/dist/src/services/  ✓
+const srcServicesDir  = path.resolve(__dirname);
+const serverRoot      = path.resolve(srcServicesDir, '..', '..');
+const distWorkerDir   = path.join(serverRoot, 'dist', 'src', 'services');
+const chunkWorkerPath = path.join(distWorkerDir, 'scan-chunk-worker.js');
 
 async function scan() {
   const allFiles = native.scanFolders(folders);
