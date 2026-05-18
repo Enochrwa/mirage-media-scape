@@ -36,7 +36,7 @@ the server.  It wraps FFmpeg **statically** – end users never install FFmpeg.
 | Platform | Command |
 |----------|---------|
 | macOS    | `xcode-select --install && brew install nasm` |
-| Linux    | `apt-get install build-essential nasm yasm pkg-config` |
+| Linux    | `sudo apt-get install build-essential clang libclang-dev nasm yasm pkg-config` |
 | Windows  | MSVC 2019 + `choco install nasm` or `winget install nasm` |
 | All      | Rust: `curl https://sh.rustup.rs -sSf \| sh` |
 
@@ -208,8 +208,17 @@ brew install nasm
 
 ### Linux: `linker cc not found`
 ```bash
-apt-get install build-essential
+sudo apt-get install build-essential
 ```
+
+### `'limits.h' file not found` (bindgen/clang error on Linux)
+`build.rs` detects and fixes this automatically by finding your GCC version
+at compile time. If it still fails, it means `libclang-dev` is missing:
+```bash
+sudo apt-get install clang libclang-dev
+```
+The build output will print a `cargo:warning=bindgen:` line showing exactly
+which include path it detected — check that if you're still stuck.
 
 ### Native built but server still says stub mode
 The binary filename must match your platform.  Check:

@@ -1,36 +1,10 @@
-# ─── Zovyra Native – Cargo configuration ───────────────────────────────────
-#
-# This file tells ffmpeg-sys-next to compile FFmpeg from source rather than
-# looking for a system-wide installation.  This means:
-#
-#   • Developers do NOT need `brew install ffmpeg` / `apt install ffmpeg-dev`
-#   • CI and Docker environments work out of the box
-#   • The resulting .node binary links FFmpeg statically (no runtime .so/.dylib)
-#   • End-users of the packaged app never see FFmpeg because it is embedded
-#
-# How it works:
-#   ffmpeg-sys-next's build.rs checks for the FFMPEG_BUILD env var.  When set
-#   it downloads the FFmpeg source tarball, runs `./configure` + `make`, and
-#   links the resulting static libraries – all inside Cargo's build directory.
-#
-# Prerequisite build tools (always needed to compile C from Rust):
-#   macOS  : Xcode CLI tools (`xcode-select --install`), nasm
-#            → brew install nasm
-#   Linux  : build-essential, nasm, pkg-config, yasm
-#            → apt-get install build-essential nasm pkg-config yasm
-#   Windows: MSVC 2019+, nasm in PATH, cargo-vcpkg
-#
-# ─────────────────────────────────────────────────────────────────────────────
+[build]
+target = "x86_64-unknown-linux-gnu"
 
 [env]
-# Tell ffmpeg-sys-next to download and build FFmpeg from source.
-# This is the key that makes zero-system-ffmpeg work for native devs.
+# ffmpeg-sys build configuration: download and statically link FFmpeg.
+# Without these, cargo tries to find system FFmpeg dev libraries (libavcodec-dev, …)
+# and the build fails on clean / CI machines.
 FFMPEG_DOWNLOAD_BUILD = "1"
-
-# Use a static link so the final .node file is fully self-contained.
-# The shipped app bundles this binary, so no dylib needs to travel with it.
 FFMPEG_STATIC = "1"
-
-# Pin the exact FFmpeg version compiled into the binary.
-# Changing this requires clearing Cargo's build cache: `cargo clean`
-FFMPEG_VERSION = "6.1.1"
+FFMPEG_VERSION = "7.1.1"

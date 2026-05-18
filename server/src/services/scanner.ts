@@ -37,8 +37,19 @@ export class ScannerService {
     this.isScanning = true;
 
     return new Promise<void>((resolve, reject) => {
-      // The compiled scan-worker.js sits in dist/src/services/ after tsc.
-      const workerPath = path.resolve(__dirname, './scan-worker.js');
+      // In production, __dirname points to dist/src/services/ and .js files exist there.
+      // In dev (tsx), __dirname points to src/services/ where only .ts files exist.
+      // When running from dist, .js must always be used since Node.js ESM Worker threads
+      // cannot load .ts files even when the main process is run via tsx.
+      const isDev =
+        !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+      // tsx compiles src/… into dist/src/… so the dist worker is one level above src/.
+      // In production __dirname already points at dist/src/services.
+      const baseDir = isDev
+        ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
+        : __dirname;
+      const workerPath = path.resolve(baseDir, './scan-worker.js');
+
       const dbPath = getDatabasePath();
       const coversDir = path.resolve(path.dirname(dbPath), 'cache/covers');
 

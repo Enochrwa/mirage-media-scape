@@ -43,7 +43,17 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match(event.request)),
+        .catch(async () => {
+          const cachedResponse = await caches.match(event.request);
+          return (
+            cachedResponse ||
+            new Response('Network error', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' },
+            })
+          );
+        }),
     );
     return;
   }

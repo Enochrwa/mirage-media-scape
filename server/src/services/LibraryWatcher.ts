@@ -54,6 +54,7 @@ export function refreshLibraryWatcherPaths(): void {
     ignoreInitial: true,
     persistent: true,
     awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+    ignored: [/^.*[/\\]systemd-private-.*$/, /^\/tmp[/\\]$/],
   });
 
   watcher.on('unlink', (filePath: string) => {
@@ -70,5 +71,10 @@ export function refreshLibraryWatcherPaths(): void {
   watcher.on('change', () => scheduleRescan());
   watcher.on('addDir', () => scheduleRescan());
 
-  watcher.on('error', (err: unknown) => console.error('LibraryWatcher error:', err));
+  watcher.on('error', (err: unknown) => {
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'EACCES') {
+      return;
+    }
+    console.error('LibraryWatcher error:', err);
+  });
 }

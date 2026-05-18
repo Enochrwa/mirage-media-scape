@@ -1,7 +1,7 @@
 import { parentPort, workerData, Worker } from 'node:worker_threads';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import native from '../utils/native-loader.js';
 import type { AudioAnalysis } from '../../zovyra-native.js';
@@ -9,11 +9,19 @@ import type { Db } from './scan-processor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const { dbPath, folders, coversDir } = workerData;
 
+// In production the script runs from dist/src/services/ and .js files are present.
+// In dev (tsx) __dirname points to src/services/ where only .ts files exist.
+// Node.js ESM Worker threads cannot load .ts workers directly, so only .js is used.
+const isDev =
+  !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+const baseDir = isDev
+  ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
+  : __dirname;
+const chunkWorkerPath = path.resolve(baseDir, './scan-chunk-worker.js');
+
 async function scan() {
-  // Perform file discovery (this remains single-threaded, but fast because Rust parallel)
   const allFiles = native.scanFolders(folders);
   const totalFiles = allFiles.length;
 
@@ -24,7 +32,6 @@ async function scan() {
     return;
   }
 
-  // Configure worker pool size
   const concurrency = Math.max(
     1,
     Math.min(parseInt(process.env.WORKER_THREADS || '4', 10), allFiles.length),
@@ -41,8 +48,7 @@ async function scan() {
     if (start >= allFiles.length) break;
     const chunk = allFiles.slice(start, end);
 
-    const workerPath = path.resolve(__dirname, './scan-chunk-worker.js');
-    const worker = new Worker(workerPath, {
+    const worker = new Worker(chunkWorkerPath, {
       workerData: { files: chunk, dbPath, coversDir },
     });
 
@@ -111,7 +117,6 @@ async function scan() {
       )
       .all() as { id: string; file_path: string }[];
 
-    // Use setImmediate to yield to event loop first
     setImmediate(async () => {
       for (const track of unanalyzed) {
         try {
@@ -127,7 +132,6 @@ async function scan() {
             Date.now(),
             track.id,
           );
-          // Small delay to avoid saturating CPU
           await new Promise((r) => setTimeout(r, 50));
         } catch (e) {
           console.error(`Analysis failed for ${track.file_path}`, e);

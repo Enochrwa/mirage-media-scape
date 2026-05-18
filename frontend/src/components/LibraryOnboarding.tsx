@@ -51,9 +51,8 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
       toast({ title: 'Enter a folder path', variant: 'destructive' });
       return;
     }
-    // Extract folder name from path for confirmation display
-    const folderName = folderPath.split(/[\\/]/).pop() || folderPath;
-    setSelectedFolders((prev) => [...prev, folderName]);
+    // Store the full path for scanning
+    setSelectedFolders((prev) => [...prev, folderPath.trim()]);
     setFolderPath('');
   };
 

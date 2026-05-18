@@ -9,9 +9,50 @@ pub struct HardwareCodecSupport {
     pub vp9: bool,
 }
 
+/// Probe for hardware-accelerated decoder availability by checking known
+/// platform-specific codec names via `avcodec_find_decoder_by_name`.
+///
+/// Hardware decoder naming conventions:
+///   macOS  : h264_videotoolbox, hevc_videotoolbox
+///   Windows: h264_d3d11va, hevc_d3d11va, h264_dxva2, av1_d3d11va
+///   Linux  : h264_vaapi, hevc_vaapi, av1_vaapi, vp9_vaapi,
+///             h264_nvdec, hevc_nvdec, av1_nvdec, vp9_nvdec,
+///             h264_vdpau, hevc_vdpau
+///
+/// `find_all()` does not exist in ffmpeg-next; we probe by name instead.
 #[napi]
 pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, napi::Error> {
-    ffmpeg::init().map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+    ffmpeg::init()
+        .map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    // Each tuple: (codec_name, affects_h264, affects_hevc, affects_av1, affects_vp9)
+    let hw_decoders: &[(&str, bool, bool, bool, bool)] = &[
+        // macOS – VideoToolbox
+        ("h264_videotoolbox",  true,  false, false, false),
+        ("hevc_videotoolbox",  false, true,  false, false),
+        // Windows – D3D11VA / DXVA2
+        ("h264_d3d11va",       true,  false, false, false),
+        ("h264_d3d11va2",      true,  false, false, false),
+        ("h264_dxva2",         true,  false, false, false),
+        ("hevc_d3d11va",       false, true,  false, false),
+        ("hevc_d3d11va2",      false, true,  false, false),
+        ("av1_d3d11va",        false, false, true,  false),
+        ("av1_d3d11va2",       false, false, true,  false),
+        ("vp9_d3d11va",        false, false, false, true),
+        // Linux – VAAPI
+        ("h264_vaapi",         true,  false, false, false),
+        ("hevc_vaapi",         false, true,  false, false),
+        ("av1_vaapi",          false, false, true,  false),
+        ("vp9_vaapi",          false, false, false, true),
+        // Linux – NVDEC (NVIDIA)
+        ("h264_nvdec",         true,  false, false, false),
+        ("hevc_nvdec",         false, true,  false, false),
+        ("av1_nvdec",          false, false, true,  false),
+        ("vp9_nvdec",          false, false, false, true),
+        // Linux – VDPAU
+        ("h264_vdpau",         true,  false, false, false),
+        ("hevc_vdpau",         false, true,  false, false),
+    ];
 
     let mut support = HardwareCodecSupport {
         h264: false,
@@ -20,23 +61,13 @@ pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, napi::Error> {
         vp9: false,
     };
 
-    // Check for hardware decoders by name
-    for decoder in ffmpeg::decoder::find_all() {
-        let name = decoder.name();
-        // macOS: videotoolbox
-        // Windows: d3d11va, dxva2
-        // Linux: vaapi, nvdec, vdpau
-        if name.contains("videotoolbox") || name.contains("d3d11va") || name.contains("dxva2") || name.contains("vaapi") || name.contains("nvdec") {
-            if name.contains("h264") { support.h264 = true; }
-            if name.contains("hevc") || name.contains("h265") { support.hevc = true; }
-            if name.contains("av1") { support.av1 = true; }
-            if name.contains("vp9") { support.vp9 = true; }
+    for &(name, h264, hevc, av1, vp9) in hw_decoders {
+        if ffmpeg::decoder::find_by_name(name).is_some() {
+            if h264 { support.h264 = true; }
+            if hevc { support.hevc = true; }
+            if av1  { support.av1  = true; }
+            if vp9  { support.vp9  = true; }
         }
-    }
-
-    // Fallback/Simulated support if no explicit HW decoders found in this environment
-    if !support.h264 && !support.hevc && !support.av1 && !support.vp9 {
-         // In CI/Sandbox we might not see them, but we should return what we probed
     }
 
     Ok(support)

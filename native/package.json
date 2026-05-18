@@ -12,12 +12,15 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "^2.18.4"
+    "@napi-rs/cli": "^2.18.4",
+    "@types/node": "^25.8.0",
+    "typescript": "^5.4.5"
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --release && npm run build:stub",
+    "build:debug": "napi build --platform && npm run build:stub",
+    "build:stub": "tsc --project tsconfig.stub.json",
     "version": "napi version"
   }
 }
