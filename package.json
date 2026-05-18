@@ -5,29 +5,25 @@
   "type": "module",
   "scripts": {
     "install:all": "npm install && cd native && npm install && cd ../frontend && npm install && cd ../server && npm install",
-
-    "postinstall": "node scripts/check-native.js",
-
+    "postinstall": "ZOVYRA_ROOT=$(pwd) npx tsx scripts/check-native.ts",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:server":   "cd server && npm run dev",
-
-    "dev": "concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"npm run dev:frontend\" \"npm run dev:server\"",
-
-    "build:native":   "cd native && npm install && npm run build",
+    "dev:server": "ZOVYRA_ROOT=$(pwd) cd server && npm run dev",
+    "dev": "ZOVYRA_ROOT=$(pwd) concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"npm run dev:frontend\" \"npm run dev:server\"",
+    "build:native": "ZOVYRA_ROOT=$(pwd) cd native && npm install && npm run build",
     "build:frontend": "cd frontend && npm run build",
-    "build:server":   "cd server && npm run build",
-
-    "build":         "npm run build:native && npm run build:server && npm run build:frontend",
+    "build:server": "ZOVYRA_ROOT=$(pwd) cd server && npm run build",
+    "build": "npm run build:native && npm run build:server && npm run build:frontend",
     "build:no-native": "npm run build:server && npm run build:frontend",
-
-    "start": "concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"cd frontend && npm run preview\" \"cd server && npm start\"",
-
-    "lint":      "cd frontend && npm run lint && cd ../server && npm run lint",
-    "test":      "cd server && npm test",
-    "clean":     "cd frontend && npm run clean; cd ../server && npm run clean; cd ../native && rm -f *.node",
+    "start": "ZOVYRA_ROOT=$(pwd) concurrently --names \"frontend,server\" --prefix-colors \"cyan,green\" \"cd frontend && npm run preview\" \"cd server && npm start\"",
+    "lint": "cd frontend && npm run lint && cd ../server && npm run lint",
+    "test": "cd server && npm test",
+    "clean": "cd frontend && npm run clean; cd ../server && npm run clean; cd ../native && rm -f *.node",
     "reinstall": "npm run clean && npm run install:all"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@types/node": "25.8.0",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.4.5"
   }
 }

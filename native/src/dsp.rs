@@ -110,11 +110,9 @@ pub fn analyze_audio(path: String) -> Result<AudioAnalysis, napi::Error> {
         -96.0
     };
 
-    // BPM detection using spectral flux and autocorrelation via stratum-dsp
-    // Key detection using chromagram + Krumhansl-Schmuckler via stratum-dsp
-    let mut config = AnalysisConfig::default();
-    config.detect_bpm = true;
-    config.detect_key = true;
+    // BPM + key detection via stratum-dsp.
+    // Both are always enabled in AnalysisConfig::default() — no opt-in fields needed.
+    let config = AnalysisConfig::default();
 
     let result = stratum_analyze(&samples_f32, sample_rate, config)
         .map_err(|e| napi::Error::from_reason(format!("Analysis error: {:?}", e)))?;

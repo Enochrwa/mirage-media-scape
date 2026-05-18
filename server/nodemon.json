@@ -1,0 +1,8 @@
+{
+  "exec": "node --loader ts-node/esm",
+  "ext": "ts,json",
+  "watch": ["src"],
+  "events": {
+    "restart": "echo nodemon restarted"
+  }
+}
