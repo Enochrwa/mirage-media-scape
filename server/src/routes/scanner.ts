@@ -13,6 +13,8 @@ router.post('/onboarding/home', postOnboardingHome);
 router.post('/onboarding/choose-folder', postOnboardingChooseFolder);
 router.post('/onboarding/dismiss', postOnboardingDismiss);
 router.get('/onboarding/bootstrap', getBootstrap);
+// Alias so the web client (which calls /api/scanner/bootstrap) works too
+router.get('/bootstrap', getBootstrap);
 
 // Auto-scan OS default media directories (called by desktop app on startup)
 router.post('/auto-scan-defaults', async (req, res) => {

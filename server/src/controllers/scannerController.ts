@@ -65,7 +65,11 @@ export const postOnboardingChooseFolder = async (req: Request, res: Response) =>
   if (trimmed === '/tmp' || trimmed.startsWith('/tmp/')) {
     return res.status(400).json({ error: '/tmp cannot be added as a watched folder' });
   }
-  const normalized = trimmed.replace(/[/\\]+$/, '');
+  // Remove trailing slashes while preserving filesystem roots (e.g. '/' and 'C:')
+  let normalized = trimmed;
+  while (normalized.length > 1 && /[/\\]/.test(normalized[normalized.length - 1])) {
+    normalized = normalized.slice(0, -1);
+  }
   db.prepare(
     'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, 0)',
   ).run(normalized, Date.now());

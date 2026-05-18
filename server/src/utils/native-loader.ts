@@ -95,7 +95,32 @@ async function loadNative(): Promise<typeof NativeTypes> {
       );
     }
   }
-  return import(pathToFileURL(nativeStub).href) as Promise<typeof NativeTypes>;
+
+  // Stub: prefer pre-compiled js, then on-the-fly TS compile, then require.js helper
+  // 1. Pre-compiled stub-build.js (produced by cd native && npm run build)
+  const jsPath = pathToFileURL(nativeStub).href;
+  try {
+    return await import(jsPath) as Promise<typeof NativeTypes>;
+  } catch {
+    // continue
+  }
+
+  // 2. Transpile stub-build.ts on the fly so the server can boot in stub-only mode
+  try {
+    const { execSync } = await import('node:child_process');
+    execSync(
+      'npx --yes tsc --project ' + nativeDir.replace(/\\/g, '/') + '/tsconfig.stub.json',
+      { stdio: 'ignore', cwd: repoRoot }
+    );
+    return await import(jsPath) as Promise<typeof NativeTypes>;
+  } catch {
+    // continue
+  }
+
+  throw new Error(
+    '[zovyra-native] Could not load stub build.\n' +
+    '  Run: cd native && npm install && npm run build'
+  );
 }
 
 const native = await loadNative();

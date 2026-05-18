@@ -17,7 +17,7 @@ const { dbPath, folders, coversDir } = workerData;
 const isDev =
   !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
 const baseDir = isDev
-  ? path.resolve(__dirname, '../dist/src/services')
+  ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
   : __dirname;
 const chunkWorkerPath = path.resolve(baseDir, './scan-chunk-worker.js');
 

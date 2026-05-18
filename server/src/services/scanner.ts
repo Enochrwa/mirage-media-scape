@@ -43,8 +43,10 @@ export class ScannerService {
       // cannot load .ts files even when the main process is run via tsx.
       const isDev =
         !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+      // tsx compiles src/… into dist/src/… so the dist worker is one level above src/.
+      // In production __dirname already points at dist/src/services.
       const baseDir = isDev
-        ? path.resolve(__dirname, '../dist/src/services')
+        ? path.resolve(__dirname, '..', 'dist', 'src', 'services')
         : __dirname;
       const workerPath = path.resolve(baseDir, './scan-worker.js');
 

@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import fetch from 'node-fetch';
-import native from '../utils/native-loader.js';
+import { execFile, execFileSync } from 'node:child_process';
 
 interface AcoustidRelease {
   title?: string;
@@ -38,14 +38,51 @@ interface TrackMetadata {
 export class FingerprintService {
   private static ACOUSTID_CLIENT_KEY = process.env.ACOUSTID_CLIENT_KEY ?? '8XaZ6ST0';
 
+  private static async findFpcalc(): Promise<string | null> {
+    try {
+      execFileSync('which', ['fpcalc'], { stdio: 'ignore' });
+      return 'fpcalc';
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Compute a Chromaprint fingerprint using the fpcalc binary.
+   * Returns { fingerprint, duration } on success, or null if fpcalc is not available.
+   */
+  private static async fpcalc(filePath: string): Promise<{ fingerprint: string; duration: number } | null> {
+    const bin = await this.findFpcalc();
+    if (!bin) return null;
+    try {
+      const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) =>
+        execFile(bin, ['-json', filePath], (err, stdout, stderr) =>
+          err ? reject(err) : resolve({ stdout: stdout.trim(), stderr: stderr.trim() })
+        )
+      );
+      // fpcalc -json output: {"fingerprint":"AQAA...","duration":123.4}
+      const data = JSON.parse(stdout) as { fingerprint: string; duration: number };
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
   static async identifyTrack(filePath: string, db: Database): Promise<TrackMetadata | null> {
-    const { fingerprint, duration } = native.generateFingerprint(filePath);
+    // fingerprint: AcoustID requires a Chromaprint fingerprint.
+    // Use fpcalc (the official Chromaprint CLI) so the query hits the AcoustID database.
+    const fp = await this.fpcalc(filePath);
+    const { fingerprint, duration } = fp ?? { fingerprint: '', duration: 0 };
 
     // Check cache first
     const cached = db
       .prepare('SELECT result FROM fingerprint_cache WHERE fingerprint = ?')
-      .get(fingerprint) as { result: string } | undefined;
+      .get(fp ? fingerprint : `NOFP:${filePath}`) as { result: string } | undefined;
     if (cached) return JSON.parse(cached.result) as TrackMetadata;
+
+    if (!fp) {
+      return null;
+    }
 
     const url =
       `https://api.acoustid.org/v2/lookup` +

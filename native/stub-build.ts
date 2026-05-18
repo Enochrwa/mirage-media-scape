@@ -74,16 +74,9 @@ export function generateThumbnail(_path: string, _timeSeconds: number, _outputPa
 
 // ── Folder scanning ───────────────────────────────────────────────────────────
 export function scanFolders(folders: string[]): ScannedFile[] {
-  const results: ScannedFile[] = [];
-  for (const folder of folders) {
-    try {
-      const stat = statSync(folder);
-      if (stat.isDirectory()) {
-        results.push({ path: folder, mtime: stat.mtimeMs, size: 0 });
-      }
-    } catch { /* ignore missing dirs */ }
-  }
-  return results;
+  // Stub mode: we cannot enumerate real media files without FFmpeg.
+  // Return [] to prevent the scan worker from treating directories as tracks.
+  return [];
 }
 
 // ── Waveform / fingerprinting ─────────────────────────────────────────────────
