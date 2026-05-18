@@ -104,7 +104,19 @@ export function refreshLibraryWatcherPaths(): void {
     ignoreInitial: true,
     persistent: true,
     awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
-    ignored: [/^.*[/\\]systemd-private-.*$/, /^\/tmp[/\\]$/],
+    ignored: [
+      /^.*[/\\]systemd-private-.*$/,
+      /^\/tmp[/\\]$/,
+      // Ignore common non-media directories
+      '**/node_modules/**',
+      '**/.*/**',
+      // Ignore known non-media file patterns
+      '**/*.{jpg,jpeg,png,gif,bmp,tiff,ico,webp,svg}',
+      '**/*.{db,sqlite,sqlite3}',
+      '**/*.{log,tmp,temp}',
+      '**/Thumbs.db',
+      '**/desktop.ini',
+    ],
   });
 
   watcher.on('unlink', (filePath: string) => {

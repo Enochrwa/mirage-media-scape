@@ -267,7 +267,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
       socket.on('SCAN_COMPLETE', () => {
         set({ scanProgress: null });
-        void get().fetchTracks();
+        // Files are already added incrementally via NEW_TRACKS events
+        // Only fetch if we have no tracks yet (edge case)
+        if (get().files.length === 0) {
+          void get().fetchTracks();
+        }
       });
 
       socket.on('LIBRARY_CHANGE', () => {
