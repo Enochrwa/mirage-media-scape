@@ -53,7 +53,7 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     if (file.type.startsWith('audio/')) setMediaType('audio');
     else if (file.type.startsWith('video/')) setMediaType('video');
     setSelectedFile(file);
-    if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ""));
+    if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
   const handleUpload = async () => {
@@ -70,9 +70,11 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     try {
       await axios.post(`${API_BASE}/api/upload`, formData, {
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 100),
+          );
           setProgress(percentCompleted);
-        }
+        },
       });
 
       toast({ title: 'Success', description: 'File uploaded successfully' });
@@ -86,7 +88,7 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
       toast({
         title: 'Upload failed',
         description: err.response?.data?.error || 'Unknown error',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setUploading(false);
@@ -97,7 +99,9 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
     <div className={cn('space-y-6', className)}>
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Upload Media</h1>
-        <p className="mt-2 text-muted-foreground">Add your own music and video files to your library.</p>
+        <p className="mt-2 text-muted-foreground">
+          Add your own music and video files to your library.
+        </p>
       </div>
 
       <Card className="space-y-6 p-6">
@@ -107,17 +111,32 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
             dragActive ? 'border-accent bg-accent/10' : 'border-muted',
             selectedFile ? 'bg-secondary/30' : 'hover:bg-secondary/30',
           )}
-          onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
           {selectedFile ? (
             <div className="flex flex-col items-center gap-2">
-              {mediaType === 'audio' ? <FileAudio className="h-12 w-12 text-accent" /> : <FileVideo className="h-12 w-12 text-accent" />}
+              {mediaType === 'audio' ? (
+                <FileAudio className="h-12 w-12 text-accent" />
+              ) : (
+                <FileVideo className="h-12 w-12 text-accent" />
+              )}
               <div className="flex items-center gap-2">
                 <p className="text-lg font-medium">{selectedFile.name}</p>
-                <X className="h-4 w-4 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }} />
+                <X
+                  className="h-4 w-4 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(null);
+                  }}
+                />
               </div>
-              <p className="text-sm text-muted-foreground">{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+              <p className="text-sm text-muted-foreground">
+                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -126,34 +145,66 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
               <p className="text-sm text-muted-foreground">or click to browse</p>
             </div>
           )}
-          <input type="file" ref={fileInputRef} className="hidden" accept="audio/*,video/*" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="audio/*,video/*"
+            onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter media title" />
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter media title"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="artist">Artist</Label>
-              <Input id="artist" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Enter artist name" />
+              <Input
+                id="artist"
+                value={artist}
+                onChange={(e) => setArtist(e.target.value)}
+                placeholder="Enter artist name"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="album">Album</Label>
-              <Input id="album" value={album} onChange={(e) => setAlbum(e.target.value)} placeholder="Enter album name" />
+              <Input
+                id="album"
+                value={album}
+                onChange={(e) => setAlbum(e.target.value)}
+                placeholder="Enter album name"
+              />
             </div>
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="media-type">Type</Label>
               <Select value={mediaType} onValueChange={(v) => setMediaType(v as MediaType)}>
-                <SelectTrigger id="media-type"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="audio">Audio</SelectItem><SelectItem value="video">Video</SelectItem></SelectContent>
+                <SelectTrigger id="media-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="audio">Audio</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div className="flex items-center space-x-2 pt-8">
-              <input type="checkbox" id="public" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-800" />
+              <input
+                type="checkbox"
+                id="public"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-700 bg-zinc-800"
+              />
               <Label htmlFor="public">Make Public (share with other users)</Label>
             </div>
           </div>
@@ -161,8 +212,11 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
 
         {uploading && (
           <div className="space-y-2">
-            <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
             </div>
             <p className="text-center text-xs text-zinc-400">Uploading: {progress}%</p>
           </div>

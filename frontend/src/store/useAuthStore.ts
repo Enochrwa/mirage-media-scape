@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ accessToken });
 
       const userRes = await axios.get(`${API_BASE}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       set({ user: userRes.data.user, isLoading: false });
     } catch (e) {

@@ -21,46 +21,59 @@ export default function Register() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-zinc-100">
-      <form onSubmit={handleSubmit} className="p-8 bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md border border-zinc-800">
-        <h1 className="text-3xl font-bold mb-6 text-center">Join Zovyra</h1>
-        {error && <div className="p-3 mb-4 bg-red-900/50 border border-red-500 text-red-200 rounded text-sm">{error}</div>}
+    <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl"
+      >
+        <h1 className="mb-6 text-center text-3xl font-bold">Join Zovyra</h1>
+        {error && (
+          <div className="mb-4 rounded border border-red-500 bg-red-900/50 p-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
+            <label className="mb-1 block text-sm font-medium">Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-2.5 bg-zinc-800 border border-zinc-700 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full rounded border border-zinc-700 bg-zinc-800 p-2.5 outline-none focus:ring-2 focus:ring-indigo-500"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Email (Optional)</label>
+            <label className="mb-1 block text-sm font-medium">Email (Optional)</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2.5 bg-zinc-800 border border-zinc-700 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full rounded border border-zinc-700 bg-zinc-800 p-2.5 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
+            <label className="mb-1 block text-sm font-medium">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2.5 bg-zinc-800 border border-zinc-700 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full rounded border border-zinc-700 bg-zinc-800 p-2.5 outline-none focus:ring-2 focus:ring-indigo-500"
               required
             />
           </div>
-          <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded font-bold transition-colors">
+          <button
+            type="submit"
+            className="w-full rounded bg-indigo-600 py-3 font-bold transition-colors hover:bg-indigo-500"
+          >
             Create Account
           </button>
         </div>
-        <p className="mt-6 text-center text-zinc-400 text-sm">
-          Already have an account? <Link to="/login" className="text-indigo-400 hover:underline">Login</Link>
+        <p className="mt-6 text-center text-sm text-zinc-400">
+          Already have an account?{' '}
+          <Link to="/login" className="text-indigo-400 hover:underline">
+            Login
+          </Link>
         </p>
       </form>
     </div>

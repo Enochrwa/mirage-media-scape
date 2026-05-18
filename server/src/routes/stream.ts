@@ -26,7 +26,7 @@ router.get('/:trackId', async (req, res) => {
   const { trackId } = req.params;
   const transcode = req.query.transcode === '1';
 
-  const track = db.prepare('SELECT file_path, codec, owner_id, is_public FROM tracks WHERE id = ?').get(trackId) as any;
+  const track = db.prepare('SELECT file_path, codec, owner_id, is_public FROM tracks WHERE id = ?').get(trackId) as { file_path: string, codec: string | null, owner_id: string | null, is_public: number } | undefined;
 
   if (!track) {
     return res.status(404).json({ error: 'Track not found' });
@@ -95,11 +95,12 @@ router.get('/:trackId', async (req, res) => {
 
 router.get('/:trackId/can-play', (req, res) => {
     const { trackId } = req.params;
-    const track = db.prepare('SELECT codec FROM tracks WHERE id = ?').get(trackId) as any;
+    const track = db.prepare('SELECT codec FROM tracks WHERE id = ?').get(trackId) as { codec: string | null } | undefined;
     if (!track) return res.status(404).json({ error: 'Track not found' });
 
     // Simplified logic: browsers generally play mp3, aac, opus, vp9, h264
-    const nativePlayable = ['mp3', 'aac', 'opus', 'flac', 'h264', 'vp9'].includes(track.codec?.toLowerCase());
+    const codec = track.codec?.toLowerCase() || '';
+    const nativePlayable = ['mp3', 'aac', 'opus', 'flac', 'h264', 'vp9'].includes(codec);
     res.json({ nativePlayable, codec: track.codec });
 });
 

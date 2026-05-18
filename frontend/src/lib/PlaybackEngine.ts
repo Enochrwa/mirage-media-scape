@@ -60,7 +60,7 @@ export class PlaybackEngine {
 
   private bridgeSource: AudioBufferSourceNode | null = null;
   private bridgeGain: GainNode | null = null;
-  private bridgeTimeout: any = null;
+  private bridgeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private _abLoop: {
     pointA: number | null;
@@ -89,7 +89,9 @@ export class PlaybackEngine {
       return;
     }
 
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new AudioContextClass();
 
     // Shared tail of the graph
@@ -196,12 +198,16 @@ export class PlaybackEngine {
     el.addEventListener('timeupdate', () => {
       const currentTime = el.currentTime;
       const duration = el.duration || 0;
-      if (this._abLoop.isActive && this._abLoop.pointB !== null && currentTime >= this._abLoop.pointB) {
+      if (
+        this._abLoop.isActive &&
+        this._abLoop.pointB !== null &&
+        currentTime >= this._abLoop.pointB
+      ) {
         el.currentTime = this._abLoop.pointA ?? 0;
       }
       this._onTimeUpdate?.(currentTime, duration);
       if (duration > 0 && duration - currentTime < 10 && !this._preloadStarted) {
-         this.prepareGaplessBridge();
+        void this.prepareGaplessBridge();
       }
     });
 
@@ -211,12 +217,12 @@ export class PlaybackEngine {
   private async resolveTrackUrl(track: MediaFile): Promise<string> {
     const platform = this.capabilities;
     if (platform.host === 'mobile') {
-        const { MobileMediaService } = await import('../services/mobileMedia/MobileMediaService');
-        return MobileMediaService.getPlayableUri(track);
+      const { MobileMediaService } = await import('../services/mobileMedia/MobileMediaService');
+      return MobileMediaService.getPlayableUri(track);
     }
     if (platform.host === 'desktop') {
-        const { invoke } = await import('@tauri-apps/api/core');
-        return await invoke<string>('get_file_url', { path: track.file_path });
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke<string>('get_file_url', { path: track.file_path });
     }
     return `${API_BASE}/api/stream/${track.id}`;
   }
@@ -224,8 +230,18 @@ export class PlaybackEngine {
   async load(file: MediaFile, startNext: boolean = false) {
     this.initContext();
     if (!startNext) {
-        if (this.bridgeTimeout) { clearTimeout(this.bridgeTimeout); this.bridgeTimeout = null; }
-        if (this.bridgeSource) { try { this.bridgeSource.stop(); } catch(e) {} this.bridgeSource = null; }
+      if (this.bridgeTimeout) {
+        clearTimeout(this.bridgeTimeout);
+        this.bridgeTimeout = null;
+      }
+      if (this.bridgeSource) {
+        try {
+          this.bridgeSource.stop();
+        } catch (e) {
+          console.error('Failed to stop bridge source', e);
+        }
+        this.bridgeSource = null;
+      }
     }
     if (!startNext && this.currentEventId && this.currentTrackId) {
       await this.reportPlaybackEnd(false, true);
@@ -257,7 +273,11 @@ export class PlaybackEngine {
   async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
     this.initContext();
     const chain = this.chains[this.activeIndex];
-    try { chain.source.disconnect(); } catch(e) {}
+    try {
+      chain.source.disconnect();
+    } catch (e) {
+      console.error('Failed to disconnect source', e);
+    }
     const source = this.ctx.createMediaElementSource(videoElement);
     chain.element = videoElement;
     chain.source = source;
@@ -267,55 +287,83 @@ export class PlaybackEngine {
     videoElement.load();
     this.currentTrackId = file.id;
     if (this.capabilities.canControlMediaKeys) {
-        this.mediaKeys.updateMetadata(file);
+      this.mediaKeys.updateMetadata(file);
     }
   }
 
   private async prepareGaplessBridge() {
-     if (this._preloadStarted) return;
-     const freeMB = (navigator as any).deviceMemory ? (navigator as any).deviceMemory * 1024 : 1024;
-     if (freeMB < 500) return;
-     this._preloadStarted = true;
-     window.dispatchEvent(new CustomEvent('zovyra-preload-next'));
+    if (this._preloadStarted) return;
+    const freeMB = navigator.deviceMemory || 4;
+    if (freeMB < 0.5) return;
+    this._preloadStarted = true;
+    window.dispatchEvent(new CustomEvent('zovyra-preload-next'));
   }
 
-  async startPreload(file: MediaFile) { this.preloadNextForGapless(file); }
+  async startPreload(file: MediaFile) {
+    await this.preloadNextForGapless(file);
+  }
 
   async preloadNextForGapless(file: MediaFile) {
-     this._preloadedFile = file;
-     try {
-       const url = await this.resolveTrackUrl(file);
-       const res = await fetch(url, { headers: { Range: 'bytes=0-524288' } });
-       const buffer = await res.arrayBuffer();
-       const audioBuffer = await this.ctx.decodeAudioData(buffer);
-       this.bridgeSource = this.ctx.createBufferSource();
-       this.bridgeSource.buffer = audioBuffer;
-       this.bridgeGain = this.ctx.createGain();
-       this.bridgeGain.gain.value = 0;
-       this.bridgeSource.connect(this.bridgeGain);
-       this.bridgeGain.connect(this.compressor);
-       const currentEl = this.chains[this.activeIndex].element;
-       const remaining = currentEl.duration - currentEl.currentTime;
-       const startTime = this.ctx.currentTime + remaining;
-       this.bridgeSource.start(startTime);
-       this.bridgeGain.gain.setValueAtTime(1, startTime);
-       setTimeout(() => {
-          this.load(file);
-          this.play();
-       }, remaining * 1000);
-     } catch(e) {}
+    this._preloadedFile = file;
+    try {
+      const url = await this.resolveTrackUrl(file);
+      const res = await fetch(url, { headers: { Range: 'bytes=0-524288' } });
+      const buffer = await res.arrayBuffer();
+      const audioBuffer = await this.ctx.decodeAudioData(buffer);
+      this.bridgeSource = this.ctx.createBufferSource();
+      this.bridgeSource.buffer = audioBuffer;
+      this.bridgeGain = this.ctx.createGain();
+      this.bridgeGain.gain.value = 0;
+      this.bridgeSource.connect(this.bridgeGain);
+      this.bridgeGain.connect(this.compressor);
+      const currentEl = this.chains[this.activeIndex].element;
+      const remaining = currentEl.duration - currentEl.currentTime;
+      const startTime = this.ctx.currentTime + remaining;
+      this.bridgeSource.start(startTime);
+      this.bridgeGain.gain.setValueAtTime(1, startTime);
+      this.bridgeTimeout = setTimeout(() => {
+        void this.load(file);
+        this.play();
+        this.bridgeTimeout = null;
+      }, remaining * 1000);
+    } catch (e) {
+      console.error('Gapless bridge failed', e);
+    }
   }
 
-  play() { this.initContext(); this.ctx.resume(); this.chains[this.activeIndex].element.play(); this.setState('PLAYING'); }
-  pause() { this.chains[this.activeIndex].element.pause(); this.setState('PAUSED'); }
-  resume() { this.play(); }
-  togglePlayback() { this.state === 'PLAYING' ? this.pause() : this.play(); }
-  seek(s: number) { this.chains[this.activeIndex].element.currentTime = s; }
-  setVolume(v: number) { this.initContext(); this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1); }
+  play() {
+    this.initContext();
+    void this.ctx.resume();
+    void this.chains[this.activeIndex].element.play();
+    this.setState('PLAYING');
+  }
+  pause() {
+    this.chains[this.activeIndex].element.pause();
+    this.setState('PAUSED');
+  }
+  resume() {
+    this.play();
+  }
+  togglePlayback() {
+    if (this.state === 'PLAYING') {
+      this.pause();
+    } else {
+      this.play();
+    }
+  }
+  seek(s: number) {
+    this.chains[this.activeIndex].element.currentTime = s;
+  }
+  setVolume(v: number) {
+    this.initContext();
+    this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
+  }
 
   setEQBand(i: number, g: number) {
     this.initContext();
-    this.chains.forEach(c => { if(c.eq[i]) c.eq[i].gain.setTargetAtTime(g, this.ctx.currentTime, 0.1); });
+    this.chains.forEach((c) => {
+      if (c.eq[i]) c.eq[i].gain.setTargetAtTime(g, this.ctx.currentTime, 0.1);
+    });
   }
 
   setSpatialAudioEnabled(e: boolean) {
@@ -323,7 +371,9 @@ export class PlaybackEngine {
     this.panner.panningModel = e ? 'HRTF' : 'equalpower';
   }
 
-  isSpatialAudioEnabled() { return this.panner?.panningModel === 'HRTF'; }
+  isSpatialAudioEnabled() {
+    return this.panner?.panningModel === 'HRTF';
+  }
 
   setSpatialPosition(x: number, y: number, z: number) {
     this.initContext();
@@ -333,33 +383,47 @@ export class PlaybackEngine {
   }
 
   setSpatialMonoMerge(e: boolean) {
-      this.initContext();
-      this.pannerInput.channelCount = e ? 1 : 2;
+    this.initContext();
+    this.pannerInput.channelCount = e ? 1 : 2;
   }
 
-  updateListenerOrientation(f: any, u: any) {
-      this.initContext();
-      if (this.ctx.listener.forwardX) {
-          this.ctx.listener.forwardX.setValueAtTime(f.x, this.ctx.currentTime);
-          this.ctx.listener.forwardY.setValueAtTime(f.y, this.ctx.currentTime);
-          this.ctx.listener.forwardZ.setValueAtTime(f.z, this.ctx.currentTime);
-          this.ctx.listener.upX.setValueAtTime(u.x, this.ctx.currentTime);
-          this.ctx.listener.upY.setValueAtTime(u.y, this.ctx.currentTime);
-          this.ctx.listener.upZ.setValueAtTime(u.z, this.ctx.currentTime);
-      }
+  updateListenerOrientation(
+    f: { x: number; y: number; z: number },
+    u: { x: number; y: number; z: number },
+  ) {
+    this.initContext();
+    if (this.ctx.listener.forwardX) {
+      this.ctx.listener.forwardX.setValueAtTime(f.x, this.ctx.currentTime);
+      this.ctx.listener.forwardY.setValueAtTime(f.y, this.ctx.currentTime);
+      this.ctx.listener.forwardZ.setValueAtTime(f.z, this.ctx.currentTime);
+      this.ctx.listener.upX.setValueAtTime(u.x, this.ctx.currentTime);
+      this.ctx.listener.upY.setValueAtTime(u.y, this.ctx.currentTime);
+      this.ctx.listener.upZ.setValueAtTime(u.z, this.ctx.currentTime);
+    }
   }
 
-  setCompressorParams(p: any) {
+  setCompressorParams(p: {
+    enabled?: boolean;
+    threshold?: number;
+    ratio?: number;
+    attack?: number;
+    release?: number;
+  }) {
     this.initContext();
     const now = this.ctx.currentTime;
-    if (p.enabled === false) { this.compressor.ratio.setTargetAtTime(1, now, 0.1); return; }
+    if (p.enabled === false) {
+      this.compressor.ratio.setTargetAtTime(1, now, 0.1);
+      return;
+    }
     if (p.threshold !== undefined) this.compressor.threshold.setTargetAtTime(p.threshold, now, 0.1);
     if (p.ratio !== undefined) this.compressor.ratio.setTargetAtTime(p.ratio, now, 0.1);
     if (p.attack !== undefined) this.compressor.attack.setTargetAtTime(p.attack, now, 0.1);
     if (p.release !== undefined) this.compressor.release.setTargetAtTime(p.release, now, 0.1);
   }
 
-  getCompressorReduction() { return this.compressor?.reduction || 0; }
+  getCompressorReduction() {
+    return this.compressor?.reduction || 0;
+  }
 
   setStereoWidth(w: number) {
     this.initContext();
@@ -367,22 +431,40 @@ export class PlaybackEngine {
     this.widenerSideGain.gain.setTargetAtTime(w, this.ctx.currentTime, 0.1);
   }
 
-  setTimeUpdateCallback(cb: any) { this._onTimeUpdate = cb; }
-  getActiveElement() { return this.chains[this.activeIndex].element; }
-  get analyserNode() { this.initContext(); return this.analyser; }
-  getAnalyser() { return this.analyserNode; }
-  get currentTime() { return this.chains[this.activeIndex].element.currentTime; }
+  setTimeUpdateCallback(cb: (time: number, duration: number) => void) {
+    this._onTimeUpdate = cb;
+  }
+  getActiveElement() {
+    return this.chains[this.activeIndex].element;
+  }
+  get analyserNode() {
+    this.initContext();
+    return this.analyser;
+  }
+  getAnalyser() {
+    return this.analyserNode;
+  }
+  get currentTime() {
+    return this.chains[this.activeIndex].element.currentTime;
+  }
 
-  getFrequencyResponse(f: any) {
-      const mag = new Float32Array(f.length);
-      const phase = new Float32Array(f.length);
-      (this.chains[this.activeIndex].eq[0] as any).getFrequencyResponse(f, mag, phase);
-      return mag;
+  getFrequencyResponse(f: Float32Array) {
+    const mag = new Float32Array(f.length);
+    const phase = new Float32Array(f.length);
+    (
+      this.chains[this.activeIndex].eq[0] as unknown as {
+        getFrequencyResponse: (f: Float32Array, mag: Float32Array, phase: Float32Array) => void;
+      }
+    ).getFrequencyResponse(f, mag, phase);
+    return mag;
   }
 
   setState(s: PlaybackState) {
     this.state = s;
-    usePlayerStore.setState({ isPlaying: s === 'PLAYING', currentEngineTrackId: this.currentTrackId });
+    usePlayerStore.setState({
+      isPlaying: s === 'PLAYING',
+      currentEngineTrackId: this.currentTrackId,
+    });
   }
 
   private async handlePlay() {
@@ -394,13 +476,17 @@ export class PlaybackEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trackId: this.currentTrackId, source: 'player' }),
       });
-      const { data } = await res.json();
+      const { data } = (await res.json()) as { data: { eventId: string } };
       this.currentEventId = data?.eventId;
       this.playbackStartTime = Date.now();
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to handle play event', e);
+    }
   }
 
-  private handlePause() { this.setState('PAUSED'); }
+  private handlePause() {
+    this.setState('PAUSED');
+  }
 
   private async handleEnded() {
     this.setState('ENDED');
@@ -408,7 +494,8 @@ export class PlaybackEngine {
     window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
   }
 
-  private async handleError(e: any) {
+  private async handleError(e: unknown) {
+    console.error('Playback error', e);
     this.setState('ERROR');
     await this.reportPlaybackEnd(false, true);
   }
@@ -422,34 +509,71 @@ export class PlaybackEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventId: this.currentEventId, secondsPlayed, completed, skipped }),
       });
-    } catch (e) {} finally {
+    } catch (e) {
+      console.error('Failed to report playback end', e);
+    } finally {
       this.currentEventId = null;
       this.currentTrackId = null;
     }
   }
 
-  async skipTrack() { await this.reportPlaybackEnd(false, true); }
+  async skipTrack() {
+    await this.reportPlaybackEnd(false, true);
+  }
 
   get abLoop() {
     return {
       pointA: this._abLoop.pointA,
       pointB: this._abLoop.pointB,
       isActive: this._abLoop.isActive,
-      setA: (t: number) => { this._abLoop.pointA = t; this._abLoop.isActive = t !== null && this._abLoop.pointB !== null; },
-      setB: (t: number) => { this._abLoop.pointB = t; this._abLoop.isActive = t !== null && this._abLoop.pointA !== null; },
-      toggle: () => { this._abLoop.isActive = !this._abLoop.isActive; },
+      setA: (t: number) => {
+        this._abLoop.pointA = t;
+        this._abLoop.isActive = t !== null && this._abLoop.pointB !== null;
+      },
+      setB: (t: number) => {
+        this._abLoop.pointB = t;
+        this._abLoop.isActive = t !== null && this._abLoop.pointA !== null;
+      },
+      toggle: () => {
+        this._abLoop.isActive = !this._abLoop.isActive;
+      },
     };
   }
 
-  setReplayGain(mode: string) { localStorage.setItem('ZOVYRA_replaygain_mode', mode); }
-  setCrossfadeDuration(d: number) { this._globalCrossfadeDuration = d; }
-  setGlobalCrossfadeDuration(d: number) { this._globalCrossfadeDuration = d; }
-  setPreAmp(g: number) { this.initContext(); this.preAmp.gain.setTargetAtTime(Math.pow(10, g/20), this.ctx.currentTime, 0.1); }
-  setBassEnhancerEnabled(e: boolean) { this.setEQBand(0, e ? 6 : 0); }
-  setNightModeEnabled(e: boolean) { this.setCompressorParams({ enabled: e, threshold: -24, ratio: 12 }); }
-  setPlaybackRate(r: number) { this.chains.forEach(c => c.element.playbackRate = r); }
-  preview(t: number) { this.seek(t); this.play(); setTimeout(() => this.pause(), 3000); }
-  async samplePreview(f: MediaFile, p: number, d: number) { this.preview(p); }
+  setReplayGain(mode: string) {
+    localStorage.setItem('ZOVYRA_replaygain_mode', mode);
+  }
+  setCrossfadeDuration(d: number) {
+    this._globalCrossfadeDuration = d;
+  }
+  setGlobalCrossfadeDuration(d: number) {
+    this._globalCrossfadeDuration = d;
+  }
+  setPreAmp(g: number) {
+    this.initContext();
+    this.preAmp.gain.setTargetAtTime(Math.pow(10, g / 20), this.ctx.currentTime, 0.1);
+  }
+  setBassEnhancerEnabled(e: boolean) {
+    this.setEQBand(0, e ? 6 : 0);
+  }
+  setNightModeEnabled(e: boolean) {
+    this.setCompressorParams({ enabled: e, threshold: -24, ratio: 12 } as {
+      enabled: boolean;
+      threshold: number;
+      ratio: number;
+    });
+  }
+  setPlaybackRate(r: number) {
+    this.chains.forEach((c) => (c.element.playbackRate = r));
+  }
+  preview(t: number) {
+    this.seek(t);
+    this.play();
+    setTimeout(() => this.pause(), 3000);
+  }
+  async samplePreview(f: MediaFile, p: number, d: number) {
+    this.preview(p);
+  }
 }
 
 export const playbackEngine = new PlaybackEngine();

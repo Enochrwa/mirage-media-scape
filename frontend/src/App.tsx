@@ -32,15 +32,19 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Discover = lazy(() => import('./pages/Discover'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
-const ArtistProfile = lazy(() => import('./pages/ArtistProfile').then(m => ({ default: m.ArtistProfile })));
-const ZovyraLayout = lazy(() => import('./components/ZovyraLayout').then(m => ({ default: m.ZovyraLayout })));
-const AlbumView = lazy(() => import('./pages/AlbumView').then(m => ({ default: m.AlbumView })));
+const ArtistProfile = lazy(() =>
+  import('./pages/ArtistProfile').then((m) => ({ default: m.ArtistProfile })),
+);
+const ZovyraLayout = lazy(() =>
+  import('./components/ZovyraLayout').then((m) => ({ default: m.ZovyraLayout })),
+);
+const AlbumView = lazy(() => import('./pages/AlbumView').then((m) => ({ default: m.AlbumView })));
 const Login = lazy(() => import('./pages/Auth/Login'));
 const Register = lazy(() => import('./pages/Auth/Register'));
 
 const PageSkeleton = () => (
   <div className="flex h-full w-full items-center justify-center bg-background">
-    <div className="h-32 w-32 animate-pulse bg-secondary rounded-lg flex items-center justify-center">
+    <div className="flex h-32 w-32 animate-pulse items-center justify-center rounded-lg bg-secondary">
       <Loader2 className="h-8 w-8 animate-spin text-accent" />
     </div>
   </div>
@@ -69,7 +73,7 @@ const App = () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [initLibrary, canSyncInBackground]);
+  }, [initLibrary, initAuth, canSyncInBackground]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

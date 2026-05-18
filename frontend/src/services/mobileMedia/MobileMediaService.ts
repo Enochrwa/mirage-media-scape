@@ -93,10 +93,10 @@ export class MobileMediaService {
     let all = [...audio, ...video];
 
     // Performance optimization for low-RAM devices (Task 11)
-    const memory = (navigator as any).deviceMemory || 4;
+    const memory = navigator.deviceMemory || 4;
     if (memory < 1.5 && all.length > 5000) {
-        console.warn('[MobileMedia] Low memory device detected. Limiting scan to 5000 tracks.');
-        all = all.slice(0, 5000);
+      console.warn('[MobileMedia] Low memory device detected. Limiting scan to 5000 tracks.');
+      all = all.slice(0, 5000);
     }
 
     return all;

@@ -72,13 +72,16 @@ const store = create<PlayerState>((set, get) => ({
     const { playFile } = get();
 
     // Load all settings from server if authenticated
-    let settings: any = {};
+    let settings: Record<string, string> = {};
     try {
-        const res = await axios.get(`${API_BASE}/api/settings/user`);
-        settings = res.data.settings;
-    } catch(e) {}
+      const res = await axios.get(`${API_BASE}/api/settings/user`);
+      settings = res.data.settings;
+    } catch (e) {
+      console.error(e);
+    }
 
-    const getS = (key: string, def: string) => settings[key] || localStorage.getItem(`ZOVYRA_${key}`) || def;
+    const getS = (key: string, def: string) =>
+      settings[key] || localStorage.getItem(`ZOVYRA_${key}`) || def;
 
     const savedVolume = parseFloat(getS('volume', '0.8'));
     playbackEngine.setVolume(savedVolume);
@@ -93,7 +96,9 @@ const store = create<PlayerState>((set, get) => ({
       try {
         const bands = JSON.parse(savedEQ);
         bands.forEach((g: number, i: number) => playbackEngine.setEQBand(i, g));
-      } catch (e) {}
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     // Restore Compressor settings
@@ -102,7 +107,9 @@ const store = create<PlayerState>((set, get) => ({
       try {
         const { params, enabled } = JSON.parse(savedCompressor);
         playbackEngine.setCompressorParams({ ...params, enabled });
-      } catch (e) {}
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     // Restore Spatial/Widening settings
@@ -114,7 +121,9 @@ const store = create<PlayerState>((set, get) => ({
         playbackEngine.setSpatialMonoMerge(s.monoMerge || false);
         playbackEngine.setStereoWidth(s.stereoWidth ?? 1.0);
         playbackEngine.setSpatialPosition(s.pos.x, s.pos.y, s.pos.z);
-      } catch (e) {}
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     queueManager.setOnQueueExhausted(async () => {
@@ -251,7 +260,7 @@ const store = create<PlayerState>((set, get) => ({
   setVolume: (v: number) => {
     playbackEngine.setVolume(v);
     axios.put(`${API_BASE}/api/settings/user`, { key: 'volume', value: String(v) }).catch(() => {
-        localStorage.setItem('ZOVYRA_volume', String(v));
+      localStorage.setItem('ZOVYRA_volume', String(v));
     });
     set({ volume: v });
   },
@@ -262,9 +271,11 @@ const store = create<PlayerState>((set, get) => ({
   setPlayerFullscreen: (isPlayerFullscreen: boolean) => set({ isPlayerFullscreen }),
   setShowMobilePlayer: (showMobilePlayer: boolean) => set({ showMobilePlayer }),
   setAutoPiP: (autoPiP: boolean) => {
-    axios.put(`${API_BASE}/api/settings/user`, { key: 'auto_pip', value: autoPiP.toString() }).catch(() => {
+    axios
+      .put(`${API_BASE}/api/settings/user`, { key: 'auto_pip', value: autoPiP.toString() })
+      .catch(() => {
         localStorage.setItem('ZOVYRA_auto_pip', autoPiP.toString());
-    });
+      });
     set({ autoPiP });
   },
   setCurrentTime: (currentTime: number) => set({ currentTime }),

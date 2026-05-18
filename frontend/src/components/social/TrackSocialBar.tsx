@@ -25,7 +25,11 @@ const TrackSocialBar: React.FC<TrackSocialBarProps> = ({ trackId }) => {
       setLiked(res.data.liked);
       setLikeCount(res.data.count);
     } catch (e) {
-      toast({ title: 'Auth required', description: 'Log in to like tracks', variant: 'destructive' });
+      toast({
+        title: 'Auth required',
+        description: 'Log in to like tracks',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -36,9 +40,14 @@ const TrackSocialBar: React.FC<TrackSocialBarProps> = ({ trackId }) => {
   };
 
   return (
-    <div className="flex items-center gap-4 py-2 border-t border-zinc-800 mt-4">
-      <Button variant="ghost" size="sm" onClick={handleLike} className={liked ? "text-red-500" : ""}>
-        <Heart className="mr-2 h-4 w-4" fill={liked ? "currentColor" : "none"} />
+    <div className="mt-4 flex items-center gap-4 border-t border-zinc-800 py-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleLike}
+        className={liked ? 'text-red-500' : ''}
+      >
+        <Heart className="mr-2 h-4 w-4" fill={liked ? 'currentColor' : 'none'} />
         {likeCount > 0 && <span>{likeCount}</span>}
       </Button>
       <Button variant="ghost" size="sm">

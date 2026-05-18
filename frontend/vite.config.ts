@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [
     react(),
     viteCompression({ algorithm: 'gzip', ext: '.gz' }),
-    viteCompression({ algorithm: 'brotliCompress', ext: '.br' })
+    viteCompression({ algorithm: 'brotliCompress', ext: '.br' }),
   ],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   build: {
@@ -24,8 +24,8 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-player': ['axios', 'zustand', 'socket.io-client'],
           'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 });

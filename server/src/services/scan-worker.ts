@@ -5,7 +5,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import native from '../utils/native-loader.js';
-import type { AudioAnalysis } from '../../zovyra-native.js';
 import type { Db } from './scan-processor.js';
 
 const __filename = fileURLToPath(import.meta.url);

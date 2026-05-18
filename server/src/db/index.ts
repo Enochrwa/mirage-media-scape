@@ -424,7 +424,7 @@ for (const [table, columns] of Object.entries(tablesInfo)) {
 try {
   db.exec('CREATE INDEX IF NOT EXISTS idx_tracks_owner ON tracks(owner_id);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_tracks_fingerprint ON tracks(fingerprint);');
-} catch (e) {
+} catch (_e) {
   // Column might not exist yet if migration failed
 }
 

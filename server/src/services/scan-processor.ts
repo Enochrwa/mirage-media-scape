@@ -68,7 +68,7 @@ export function processFile(
   if (!fingerprint && metadata.fileType === 'audio') {
     try {
       fingerprint = native.generateWaveformFingerprint(filePath);
-    } catch (e) {}
+    } catch (e) { console.error(e); }
   }
 
   const id = existing?.id ?? (() => {

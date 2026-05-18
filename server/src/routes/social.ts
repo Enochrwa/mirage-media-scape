@@ -17,7 +17,7 @@ router.post('/tracks/:trackId/like', authMiddleware, (req: AuthRequest, res) => 
       .run(userId, trackId, Date.now());
   }
 
-  const count = (db.prepare('SELECT COUNT(*) as count FROM track_likes WHERE track_id = ?').get(trackId) as any).count;
+  const count = (db.prepare('SELECT COUNT(*) as count FROM track_likes WHERE track_id = ?').get(trackId) as { count: number }).count;
   res.json({ liked: !existing, count });
 });
 
@@ -68,12 +68,12 @@ router.post('/users/:userId/follow', authMiddleware, (req: AuthRequest, res) => 
 
 router.get('/users/:userId/profile', optionalAuth, (req: AuthRequest, res) => {
     const { userId } = req.params;
-    const user = db.prepare('SELECT id, username, bio, avatar_path, created_at FROM users WHERE id = ?').get(userId) as any;
+    const user = db.prepare('SELECT id, username, bio, avatar_path, created_at FROM users WHERE id = ?').get(userId) as { id: string, username: string, bio: string | null, avatar_path: string | null, created_at: number } | undefined;
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const trackCount = (db.prepare('SELECT COUNT(*) as count FROM tracks WHERE owner_id = ? AND is_public = 1').get(userId) as any).count;
-    const followerCount = (db.prepare('SELECT COUNT(*) as count FROM follows WHERE followed_id = ?').get(userId) as any).count;
-    const followingCount = (db.prepare('SELECT COUNT(*) as count FROM follows WHERE follower_id = ?').get(userId) as any).count;
+    const trackCount = (db.prepare('SELECT COUNT(*) as count FROM tracks WHERE owner_id = ? AND is_public = 1').get(userId) as { count: number }).count;
+    const followerCount = (db.prepare('SELECT COUNT(*) as count FROM follows WHERE followed_id = ?').get(userId) as { count: number }).count;
+    const followingCount = (db.prepare('SELECT COUNT(*) as count FROM follows WHERE follower_id = ?').get(userId) as { count: number }).count;
 
     const recentTracks = db.prepare('SELECT * FROM tracks WHERE owner_id = ? AND is_public = 1 ORDER BY added_at DESC LIMIT 5').all(userId);
 

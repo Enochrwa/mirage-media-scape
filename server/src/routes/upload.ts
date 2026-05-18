@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -12,8 +12,9 @@ const router = Router();
 const storage = multer.diskStorage({
   destination: (req: AuthRequest, file, cb) => {
     const userId = req.user?.id || 'anonymous';
+    const safeUserId = userId.replace(/[^a-z0-9_-]/gi, '');
     const now = new Date();
-    const dir = path.join('uploads', userId, now.getFullYear().toString(), (now.getMonth() + 1).toString());
+    const dir = path.join('uploads', safeUserId, now.getFullYear().toString(), (now.getMonth() + 1).toString());
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -29,7 +30,7 @@ const upload = multer({
 
 const uploadCounts = new Map<string, number>();
 
-router.post('/', authMiddleware, upload.single('file'), async (req: any, res) => {
+router.post('/', authMiddleware, upload.single('file'), async (req: Request, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const userId = (req as AuthRequest).user!.id;
@@ -42,7 +43,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: any, res) =>
     const stats = fs.statSync(filePath);
 
     // Disk quota check (10 GB)
-    const userStorage = db.prepare('SELECT SUM(file_size) as total FROM tracks WHERE owner_id = ?').get(userId) as any;
+    const userStorage = db.prepare('SELECT SUM(file_size) as total FROM tracks WHERE owner_id = ?').get(userId) as { total: number | null } | undefined;
     if ((userStorage?.total || 0) + stats.size > 10 * 1024 * 1024 * 1024) {
         fs.unlinkSync(filePath);
         return res.status(413).json({ error: 'Disk quota exceeded' });
@@ -67,11 +68,11 @@ router.post('/', authMiddleware, upload.single('file'), async (req: any, res) =>
 
     // Async waveform generation
     setImmediate(() => {
-        try { native.generateWaveform(filePath); } catch(e) {}
+        try { native.generateWaveform(filePath); } catch(_e) { console.error(_e); }
     });
 
     res.json({ track });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Upload processing failed', err);
     res.status(500).json({ error: 'Failed to process upload' });
   } finally {
@@ -80,7 +81,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: any, res) =>
 });
 
 router.delete('/:trackId', authMiddleware, (req: AuthRequest, res) => {
-    const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(req.params.trackId) as any;
+    const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(req.params.trackId) as { owner_id: string, upload_path: string | null } | undefined;
     if (!track) return res.status(404).json({ error: 'Track not found' });
     if (track.owner_id !== req.user?.id && req.user?.role !== 'admin') {
         return res.status(403).json({ error: 'Unauthorized' });

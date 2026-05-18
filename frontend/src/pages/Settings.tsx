@@ -59,7 +59,11 @@ const Settings = () => {
   const [notifications, setNotifications] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
   const [downloadQuality, setDownloadQuality] = useState('high');
-  const [analysisStatus, setAnalysisStatus] = useState<any>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<{
+    isAnalyzing: boolean;
+    isPaused: boolean;
+    queued: number;
+  } | null>(null);
 
   const [bassEnhancer, setBassEnhancer] = useState(false);
   const [nightMode, setNightMode] = useState(false);
@@ -90,7 +94,10 @@ const Settings = () => {
   useEffect(() => {
     VideoDecodeEngine.probeHardwareDecode().then(setHwSupport);
     const fetchAnalysis = () => {
-      axios.get(`${API_BASE}/api/maintenance/analysis/status`).then(res => setAnalysisStatus(res.data)).catch(() => {});
+      axios
+        .get(`${API_BASE}/api/maintenance/analysis/status`)
+        .then((res) => setAnalysisStatus(res.data))
+        .catch(() => {});
     };
     fetchAnalysis();
     const interval = setInterval(fetchAnalysis, 5000);
@@ -615,25 +622,40 @@ const Settings = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Background Analysis</CardTitle>
-                <CardDescription>Server-side audio analysis for BPM, Key, and Energy</CardDescription>
+                <CardDescription>
+                  Server-side audio analysis for BPM, Key, and Energy
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {analysisStatus && (
-                  <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-lg border border-zinc-800">
+                  <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={analysisStatus.isAnalyzing ? "default" : "secondary"}>
-                          {analysisStatus.isAnalyzing ? "Analyzing" : "Idle"}
+                        <Badge variant={analysisStatus.isAnalyzing ? 'default' : 'secondary'}>
+                          {analysisStatus.isAnalyzing ? 'Analyzing' : 'Idle'}
                         </Badge>
                         {analysisStatus.isPaused && <Badge variant="destructive">Paused</Badge>}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-2">{analysisStatus.queued} tracks in queue</p>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {analysisStatus.queued} tracks in queue
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       {analysisStatus.isPaused ? (
-                        <Button size="sm" onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/resume`)}>Resume</Button>
+                        <Button
+                          size="sm"
+                          onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/resume`)}
+                        >
+                          Resume
+                        </Button>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/pause`)}>Pause</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/pause`)}
+                        >
+                          Pause
+                        </Button>
                       )}
                     </div>
                   </div>
