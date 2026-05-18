@@ -55,15 +55,29 @@ export function processFile(
   const fileSize = Number(file.size);
 
   const existing = db
-    .prepare('SELECT last_modified, id, file_size FROM tracks WHERE file_path = ?')
-    .get(filePath) as { last_modified: number; id: string; file_size: number } | undefined;
+    .prepare('SELECT last_modified, id, file_size, fingerprint FROM tracks WHERE file_path = ?')
+    .get(filePath) as { last_modified: number; id: string; file_size: number; fingerprint?: string } | undefined;
 
   if (existing && existing.last_modified === mtime && existing.file_size === fileSize) {
     return null; // unchanged
   }
 
   const metadata: TrackMetadata = native.extractMetadata(filePath);
-  const id = existing?.id ?? crypto.createHash('md5').update(filePath).digest('hex');
+
+  let fingerprint: string | null = existing?.fingerprint || null;
+  if (!fingerprint && metadata.fileType === 'audio') {
+    try {
+      fingerprint = native.generateWaveformFingerprint(filePath);
+    } catch (e) {}
+  }
+
+  const id = existing?.id ?? (() => {
+    if (fingerprint) {
+      const match = db.prepare('SELECT id FROM tracks WHERE fingerprint = ?').get(fingerprint) as { id: string } | undefined;
+      if (match) return match.id;
+    }
+    return crypto.randomUUID();
+  })();
 
   const fileType = metadata.fileType === 'video' ? 'video' : 'audio';
   const bitRate = metadata.bitRate != null ? Number(metadata.bitRate) : null;
@@ -101,8 +115,9 @@ export function processFile(
       encoder_delay, encoder_padding,
       waveform_data, metadata_json,
       cover_cache_path, thumbnail_path,
+      fingerprint,
       last_modified, mtime, file_size, added_at, updated_at, missing
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   ).run(
     id,
     filePath,
@@ -130,6 +145,7 @@ export function processFile(
     chaptersJson,
     coverCachePath,
     thumbnailPath,
+    fingerprint,
     mtime,
     mtime,
     fileSize,

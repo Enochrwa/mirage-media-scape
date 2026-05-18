@@ -16,9 +16,62 @@ const db: Database.Database = new Database(dbPath);
 // Enable WAL mode for high-performance concurrent access
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -16000');
+db.pragma('temp_store = MEMORY');
+db.pragma('mmap_size = 134217728');
 
 // Initialize schema
 db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      email TEXT UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user' CHECK(role IN ('admin','user','guest')),
+      avatar_path TEXT,
+      bio TEXT,
+      created_at INTEGER NOT NULL,
+      last_seen INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      device_info TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS track_likes (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      track_id TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+      liked_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, track_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS track_comments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      track_id TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      parent_id TEXT REFERENCES track_comments(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      followed_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      followed_at INTEGER NOT NULL,
+      PRIMARY KEY (follower_id, followed_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_likes_track ON track_likes(track_id);
+    CREATE INDEX IF NOT EXISTS idx_comments_track ON track_comments(track_id);
+    CREATE INDEX IF NOT EXISTS idx_follows_followed ON follows(followed_id);
+
     CREATE TABLE IF NOT EXISTS watched_folders (
       path TEXT PRIMARY KEY,
       added_at INTEGER NOT NULL,
@@ -28,6 +81,14 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, key)
     );
 
     CREATE TABLE IF NOT EXISTS tracks (
@@ -50,6 +111,10 @@ db.exec(`
       waveform_data TEXT,
       metadata_json TEXT,
       cover_cache_path TEXT, thumbnail_path TEXT,
+      fingerprint TEXT,
+      owner_id TEXT,
+      is_public INTEGER DEFAULT 0,
+      upload_path TEXT,
       last_modified INTEGER, mtime INTEGER, file_size INTEGER,
       missing INTEGER DEFAULT 0,
       rating INTEGER DEFAULT 0,
@@ -267,6 +332,12 @@ db.exec(`
     );
 
     CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
+    CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album);
+    CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
+    CREATE INDEX IF NOT EXISTS idx_tracks_added ON tracks(added_at);
+    CREATE INDEX IF NOT EXISTS idx_tracks_missing ON tracks(missing, file_type);
+    CREATE INDEX IF NOT EXISTS idx_tracks_play_count ON tracks(play_count);
+
     CREATE VIRTUAL TABLE IF NOT EXISTS tracks_fts USING fts5(
         id UNINDEXED,
         title, artist, album, genre,
@@ -312,6 +383,10 @@ const tablesInfo = {
       'aspect_ratio_override',
       'rotation_degrees',
       'mirror_flip',
+      'fingerprint',
+      'owner_id',
+      'is_public',
+      'upload_path',
   ],
   playlists: ['crossfade_duration_override'],
 };
@@ -343,6 +418,14 @@ for (const [table, columns] of Object.entries(tablesInfo)) {
       }
     }
   }
+}
+
+// Add late-binding indexes for columns added via migrations
+try {
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tracks_owner ON tracks(owner_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tracks_fingerprint ON tracks(fingerprint);');
+} catch (e) {
+  // Column might not exist yet if migration failed
 }
 
 export default db;

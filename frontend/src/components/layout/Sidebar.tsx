@@ -8,6 +8,7 @@ import {
   Mic2,
   Radio,
   LayoutGrid,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -20,7 +21,8 @@ const menuItems = [
 ];
 
 const discoverItems = [
-  { icon: LayoutGrid, label: 'Discover', path: '/dashboard' },
+  { icon: Globe, label: 'Discover', path: '/discover' },
+  { icon: LayoutGrid, label: 'Dashboard', path: '/dashboard' },
   { icon: Radio, label: 'Radio', path: '/radio' },
   { icon: Music2, label: 'Songs', path: '/music' },
   { icon: Mic2, label: 'Artists', path: '/artist' },

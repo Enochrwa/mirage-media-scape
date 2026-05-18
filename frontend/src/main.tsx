@@ -5,6 +5,12 @@ import './i18n';
 import { initPlatform, PlatformProvider } from './platform';
 import { usePlayerStore } from './store/usePlayerStore';
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js');
+  });
+}
+
 async function bootstrap() {
   const capabilities = await initPlatform();
   usePlayerStore.getState().init();

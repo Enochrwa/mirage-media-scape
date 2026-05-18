@@ -55,19 +55,11 @@ export class ScannerService {
       // In production (main process is dist/src/index.js) __dirname is already
       // dist/src/services/ so the worker is simply __dirname/scan-worker.js.
       const isProd = process.env.NODE_ENV === 'production';
-      const workerPath = isProd
-        ? path.join(__dirname, 'scan-worker.js')
-        : distWorkerPath;
+      let workerPath = isProd ? path.join(__dirname, 'scan-worker.js') : distWorkerPath;
 
-      if (!isProd && !existsSync(workerPath)) {
-        const msg =
-          `[scanner] Compiled worker not found at ${workerPath}\n` +
-          '  Run: npm run build  (from server/), then start the dev server\n' +
-          '  again.  (npx tsc --noEmit false --outDir dist)';
-        console.error(msg);
-        this.isScanning = false;
-        resolve();           // resolve(undefined) — scan is already in reset state
-        return;
+      const useTsx = !isProd && !existsSync(workerPath);
+      if (useTsx) {
+        workerPath = path.join(__dirname, 'scan-worker.ts');
       }
 
       const dbPath = getDatabasePath();
@@ -75,6 +67,7 @@ export class ScannerService {
 
       const worker = new Worker(workerPath, {
         workerData: { dbPath, folders, coversDir },
+        execArgv: useTsx ? ['--import', 'tsx'] : [],
       });
 
       worker.on('message', (msg: { type: string; [key: string]: unknown }) => {

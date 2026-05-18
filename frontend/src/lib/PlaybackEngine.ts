@@ -6,23 +6,22 @@ import { getMediaKeyService, IMediaKeyService } from '../services/mediaKeys';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
 // ZOVYRA AUDIO GRAPH — CANONICAL CHAIN (DO NOT REORDER)
-// Source
-//   → EQ Chain       (5× BiquadFilterNode: LowShelf 80Hz, Peak 250Hz, Peak 1kHz, Peak 4kHz, HighShelf 12kHz)
+// Source (MediaElementSourceNode)
 //   → ReplayGain     (GainNode — gain = 10^(replayGainDb/20), default 1.0)
-//   → Crossfade      (GainNode — managed by CrossfadeEngine)
-//   → Analyser       (AnalyserNode — fftSize 2048, smoothing 0.8, tap only — audio passes through)
-//   → Spatial Panner (PannerNode — HRTF, bypassable — zero cost when off)
+//   → EQ Chain       (5× BiquadFilterNode: peaking filters at 80Hz, 250Hz, 1kHz, 4kHz, 12kHz)
 //   → Compressor     (DynamicsCompressorNode — bypassable, three levels: off/standard/night)
+//   → Crossfade      (GainNode — managed by engine)
+//   → Spatial Panner (PannerNode — HRTF, bypassable — zero cost when off)
+//   → Stereo Widener (M/S Processing)
 //   → Master Volume  (GainNode)
+//   → Analyser       (AnalyserNode — fftSize 2048, smoothing 0.8)
 //   → Destination
 
 interface TrackChain {
-  audioElement: HTMLAudioElement;
-  audioSource: MediaElementAudioSourceNode;
   element: HTMLMediaElement;
   source: MediaElementAudioSourceNode;
-  eq: BiquadFilterNode[];
   replayGain: GainNode;
+  eq: BiquadFilterNode[];
   fade: GainNode;
 }
 
@@ -59,33 +58,9 @@ export class PlaybackEngine {
   private _preloadedFile: MediaFile | null = null;
   private _globalCrossfadeDuration: number = 2000;
 
-  private videoSourceNodes = new WeakMap<HTMLVideoElement, MediaElementAudioSourceNode>();
-  private lastVideoElement: HTMLVideoElement | null = null;
-
-  private boundHandlePlay = this.handlePlay.bind(this);
-  private boundHandlePause = this.handlePause.bind(this);
-  private boundHandleEnded = this.handleEnded.bind(this);
-  private boundHandleError = (e: Event) => this.handleError(e);
-  private boundHandleTimeUpdate = (e: Event) => {
-    const el = e.target as HTMLMediaElement;
-    const currentTime = el.currentTime;
-    const duration = el.duration || 0;
-
-    // A/B Loop Enforcement
-    if (
-      this._abLoop.isActive &&
-      this._abLoop.pointB !== null &&
-      currentTime >= this._abLoop.pointB
-    ) {
-      el.currentTime = this._abLoop.pointA ?? 0;
-    }
-
-    this._onTimeUpdate?.(currentTime, duration);
-
-    if (duration > 0 && duration - currentTime < 30 && !this._preloadStarted) {
-      window.dispatchEvent(new CustomEvent('zovyra-preload-next'));
-    }
-  };
+  private bridgeSource: AudioBufferSourceNode | null = null;
+  private bridgeGain: GainNode | null = null;
+  private bridgeTimeout: any = null;
 
   private _abLoop: {
     pointA: number | null;
@@ -114,20 +89,17 @@ export class PlaybackEngine {
       return;
     }
 
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     this.ctx = new AudioContextClass();
 
     // Shared tail of the graph
     this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.ratio.value = 1; // Bypass (default)
+    this.compressor.ratio.value = 1;
 
-    this.pannerInput = this.ctx.createGain(); // For mono merge if needed
+    this.pannerInput = this.ctx.createGain();
     this.panner = this.ctx.createPanner();
     this.panner.panningModel = 'HRTF';
 
-    // Stereo Widener (M/S Processing)
     this.widenerSplitter = this.ctx.createChannelSplitter(2);
     this.widenerMidGain = this.ctx.createGain();
     this.widenerSideGain = this.ctx.createGain();
@@ -141,46 +113,30 @@ export class PlaybackEngine {
     this.hardLimiter.release.value = 0.1;
 
     this.preAmp = this.ctx.createGain();
-    this.preAmp.gain.value = 1.0;
-
     this.masterGain = this.ctx.createGain();
 
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.8;
 
-    // Common Chain Construction
-    // ... -> Compressor -> Spatial (Panner) -> Stereo Widener -> Master Gain -> Analyser -> Destination
+    // Routing
     this.compressor.connect(this.pannerInput);
     this.pannerInput.connect(this.panner);
     this.panner.connect(this.widenerSplitter);
 
-    // M/S Routing (Stereo Widener)
-    // Formula for M/S to L/R conversion:
-    // L = (M + S) / 2
-    // R = (M - S) / 2
-    // We use M = (L + R) and S = (L - R)
-
-    // First, convert L/R to M/S
-    // M = L + R
     const msEncoder = this.ctx.createGain();
     const sEncoder = this.ctx.createGain();
     const sInverter = this.ctx.createGain();
     sInverter.gain.value = -1;
 
-    this.widenerSplitter.connect(msEncoder, 0); // L
-    this.widenerSplitter.connect(msEncoder, 1); // R
-    this.widenerSplitter.connect(sEncoder, 0); // L
-    this.widenerSplitter.connect(sInverter, 1); // R
+    this.widenerSplitter.connect(msEncoder, 0);
+    this.widenerSplitter.connect(msEncoder, 1);
+    this.widenerSplitter.connect(sEncoder, 0);
+    this.widenerSplitter.connect(sInverter, 1);
     sInverter.connect(sEncoder);
 
-    // Apply Gains to M and S
     msEncoder.connect(this.widenerMidGain);
     sEncoder.connect(this.widenerSideGain);
 
-    // Convert back to L/R
-    // L = (M + S) * 0.5
-    // R = (M - S) * 0.5
     const leftSum = this.ctx.createGain();
     leftSum.gain.value = 0.5;
     const rightDiff = this.ctx.createGain();
@@ -190,7 +146,6 @@ export class PlaybackEngine {
 
     this.widenerMidGain.connect(leftSum);
     this.widenerSideGain.connect(leftSum);
-
     this.widenerMidGain.connect(rightDiff);
     this.widenerSideGain.connect(rightSideInverter);
     rightSideInverter.connect(rightDiff);
@@ -202,167 +157,98 @@ export class PlaybackEngine {
     this.hardLimiter.connect(this.preAmp);
     this.preAmp.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
-
-    // Analyser is a tap (parallel) from the master gain
     this.masterGain.connect(this.analyser);
 
-    // Two parallel chains for crossfading
     this.chains = [this.createChain(), this.createChain()];
-
     this.sleepTimer = new SleepTimer(this.masterGain, this.ctx, () => this.pause());
   }
 
   private createChain(): TrackChain {
-    const el = new Audio();
+    const el = document.createElement('audio');
     el.crossOrigin = 'anonymous';
 
-    if (this.capabilities.canUseHardwareDecoding) {
-      el.setAttribute('x-webkit-airplay', 'allow');
-    }
-
     const source = this.ctx.createMediaElementSource(el);
-
-    // Stats tracking: monitor media element events
-    el.addEventListener('play', this.boundHandlePlay);
-    el.addEventListener('pause', this.boundHandlePause);
-    el.addEventListener('ended', this.boundHandleEnded);
-    el.addEventListener('error', this.boundHandleError);
-    el.addEventListener('timeupdate', this.boundHandleTimeUpdate);
-
-    // 1. ReplayGain
     const replayGain = this.ctx.createGain();
     source.connect(replayGain);
 
-    // 2. EQ Chain
     const frequencies = [80, 250, 1000, 4000, 12000];
-    const types: BiquadFilterType[] = ['peaking', 'peaking', 'peaking', 'peaking', 'peaking'];
     const eq: BiquadFilterNode[] = [];
-
     let lastNode: AudioNode = replayGain;
-    for (let i = 0; i < 5; i++) {
+
+    for (const freq of frequencies) {
       const filter = this.ctx.createBiquadFilter();
-      filter.type = types[i];
-      filter.frequency.value = frequencies[i];
+      filter.type = 'peaking';
+      filter.frequency.value = freq;
       filter.gain.value = 0;
       lastNode.connect(filter);
       eq.push(filter);
       lastNode = filter;
     }
 
-    // 3. Crossfade (joining point)
     const fade = this.ctx.createGain();
     lastNode.connect(fade);
     fade.connect(this.compressor);
 
-    return {
-      audioElement: el,
-      audioSource: source,
-      element: el,
-      source,
-      eq,
-      replayGain,
-      fade,
-    };
+    el.addEventListener('play', () => this.handlePlay());
+    el.addEventListener('pause', () => this.handlePause());
+    el.addEventListener('ended', () => this.handleEnded());
+    el.addEventListener('error', (e) => this.handleError(e));
+    el.addEventListener('timeupdate', () => {
+      const currentTime = el.currentTime;
+      const duration = el.duration || 0;
+      if (this._abLoop.isActive && this._abLoop.pointB !== null && currentTime >= this._abLoop.pointB) {
+        el.currentTime = this._abLoop.pointA ?? 0;
+      }
+      this._onTimeUpdate?.(currentTime, duration);
+      if (duration > 0 && duration - currentTime < 10 && !this._preloadStarted) {
+         this.prepareGaplessBridge();
+      }
+    });
+
+    return { element: el, source, replayGain, eq, fade };
+  }
+
+  private async resolveTrackUrl(track: MediaFile): Promise<string> {
+    const platform = this.capabilities;
+    if (platform.host === 'mobile') {
+        const { MobileMediaService } = await import('../services/mobileMedia/MobileMediaService');
+        return MobileMediaService.getPlayableUri(track);
+    }
+    if (platform.host === 'desktop') {
+        const { invoke } = await import('@tauri-apps/api/core');
+        return await invoke<string>('get_file_url', { path: track.file_path });
+    }
+    return `${API_BASE}/api/stream/${track.id}`;
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
     this.initContext();
     if (!startNext) {
-      this._preloadStarted = false;
+        if (this.bridgeTimeout) { clearTimeout(this.bridgeTimeout); this.bridgeTimeout = null; }
+        if (this.bridgeSource) { try { this.bridgeSource.stop(); } catch(e) {} this.bridgeSource = null; }
     }
-    // If this load is replacing the active track (not preloading), report previous track as skipped
     if (!startNext && this.currentEventId && this.currentTrackId) {
       await this.reportPlaybackEnd(false, true);
     }
-
-    // If this is a video, we don't load it in the background Audio element.
-    // VideoPlayer.tsx will call loadVideo() which attaches the real element.
-    if (file.type === 'video' && !startNext) {
-      this.currentTrackId = file.id;
-      this.setState('LOADING');
-      return;
-    }
-
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
-
-    // Restore audio source if it was swapped by a video and this is an audio file
-    if (chain.element !== chain.audioElement && file.type !== 'video') {
-      chain.element.pause();
-      chain.element.removeEventListener('play', this.boundHandlePlay);
-      chain.element.removeEventListener('pause', this.boundHandlePause);
-      chain.element.removeEventListener('ended', this.boundHandleEnded);
-      chain.element.removeEventListener('error', this.boundHandleError);
-      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
-
-      if (chain.element instanceof HTMLVideoElement) {
-        chain.element.src = '';
-        chain.element.load();
-        if (this.lastVideoElement === chain.element) {
-          this.lastVideoElement = null;
-        }
-      }
-
-      try {
-        chain.source.disconnect();
-      } catch (e) {
-        // Ignore disconnect error
-      }
-      chain.element = chain.audioElement;
-      chain.source = chain.audioSource;
-      chain.source.connect(chain.replayGain);
-
-      // Re-attach listeners to audio element
-      chain.element.addEventListener('play', this.boundHandlePlay);
-      chain.element.addEventListener('pause', this.boundHandlePause);
-      chain.element.addEventListener('ended', this.boundHandleEnded);
-      chain.element.addEventListener('error', this.boundHandleError);
-      chain.element.addEventListener('timeupdate', this.boundHandleTimeUpdate);
-    }
-
     this.currentTrackId = file.id;
     this.setState('LOADING');
-    chain.element.src = file.file;
+    const url = await this.resolveTrackUrl(file);
+    chain.element.src = url;
     chain.element.load();
-
-    // ReplayGain application
     let gainDb = 0;
     const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
-    if (mode !== 'off') {
-      if (mode === 'track' && file.replaygain_track_gain != null) {
-        gainDb = file.replaygain_track_gain;
-      } else if (mode === 'album' && file.replaygain_album_gain != null) {
-        gainDb = file.replaygain_album_gain;
-      } else if (file.replay_gain_db) {
-        gainDb = file.replay_gain_db;
-      }
-    }
-
+    if (mode === 'track') gainDb = file.replaygain_track_gain ?? 0;
+    else if (mode === 'album') gainDb = file.replaygain_album_gain ?? 0;
     const gain = Math.pow(10, gainDb / 20);
     chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
-
-    // Preferred speed
-    if (file.preferred_speed) {
-      chain.element.playbackRate = file.preferred_speed;
-    }
-
-    // Encoder padding/delay trimming (Gapless precision)
-    if (file.encoder_delay || file.encoder_padding) {
-      // In a real Web Audio implementation, we'd use AudioBufferSourceNode
-      // and slice the buffer. With HTMLMediaElement, we can only try to seek
-      // slightly forward for delay, but padding at end is harder without MSE.
-      // For now, we note the values.
-      console.log(
-        `[PlaybackEngine] Gapless info: delay=${file.encoder_delay}, padding=${file.encoder_padding}`,
-      );
-    }
-
+    if (file.preferred_speed) chain.element.playbackRate = file.preferred_speed;
     if (!startNext) {
       this.activeIndex = index;
       chain.fade.gain.setValueAtTime(1, this.ctx.currentTime);
       this.chains[(index + 1) % 2].fade.gain.setValueAtTime(0, this.ctx.currentTime);
     }
-
     if (this.capabilities.canControlMediaKeys) {
       this.mediaKeys.updateMetadata(file);
     }
@@ -371,139 +257,73 @@ export class PlaybackEngine {
   async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
     this.initContext();
     const chain = this.chains[this.activeIndex];
-
-    // Cleanup old listeners if we are swapping elements
-    if (chain.element !== videoElement) {
-      chain.element.pause();
-      chain.element.removeEventListener('play', this.boundHandlePlay);
-      chain.element.removeEventListener('pause', this.boundHandlePause);
-      chain.element.removeEventListener('ended', this.boundHandleEnded);
-      chain.element.removeEventListener('error', this.boundHandleError);
-      chain.element.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
-
-      // Reset src to stop background activity if it's the audio element
-      if (chain.element === chain.audioElement) {
-        chain.element.src = '';
-        chain.element.load();
-      }
-    }
-
-    if (this.lastVideoElement && this.lastVideoElement !== videoElement) {
-      this.lastVideoElement.pause();
-      this.lastVideoElement.removeEventListener('play', this.boundHandlePlay);
-      this.lastVideoElement.removeEventListener('pause', this.boundHandlePause);
-      this.lastVideoElement.removeEventListener('ended', this.boundHandleEnded);
-      this.lastVideoElement.removeEventListener('error', this.boundHandleError);
-      this.lastVideoElement.removeEventListener('timeupdate', this.boundHandleTimeUpdate);
-      this.lastVideoElement.src = '';
-      this.lastVideoElement.load();
-    }
-
-    // Disconnect current source
-    try {
-      chain.source.disconnect();
-    } catch (e) {
-      // Ignore disconnect error
-    }
-
-    // Reuse or create source node for the video element
-    let videoSource = this.videoSourceNodes.get(videoElement);
-    if (!videoSource) {
-      videoSource = this.ctx.createMediaElementSource(videoElement);
-      this.videoSourceNodes.set(videoElement, videoSource);
-    }
-
+    try { chain.source.disconnect(); } catch(e) {}
+    const source = this.ctx.createMediaElementSource(videoElement);
     chain.element = videoElement;
-    chain.source = videoSource;
+    chain.source = source;
     chain.source.connect(chain.replayGain);
-
-    // Attach listeners to video element (only if changed or first time)
-    if (this.lastVideoElement !== videoElement) {
-      videoElement.addEventListener('play', this.boundHandlePlay);
-      videoElement.addEventListener('pause', this.boundHandlePause);
-      videoElement.addEventListener('ended', this.boundHandleEnded);
-      videoElement.addEventListener('error', this.boundHandleError);
-      videoElement.addEventListener('timeupdate', this.boundHandleTimeUpdate);
-      this.lastVideoElement = videoElement;
-    }
-
-    // Set src and load
-    videoElement.src = file.file;
-    chain.element.load();
-
-    if (file.replay_gain_db) {
-      const gain = Math.pow(10, file.replay_gain_db / 20);
-      chain.replayGain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
-    } else {
-      chain.replayGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
-    }
-
-    if (this.capabilities.canControlMediaKeys) {
-      this.mediaKeys.updateMetadata(file);
-    }
-
+    const url = await this.resolveTrackUrl(file);
+    videoElement.src = url;
+    videoElement.load();
     this.currentTrackId = file.id;
-
-    if (this.state === 'PLAYING') {
-      videoElement.play().catch((e) => console.error('Failed to resume video playback', e));
+    if (this.capabilities.canControlMediaKeys) {
+        this.mediaKeys.updateMetadata(file);
     }
   }
 
-  setTimeUpdateCallback(cb: (time: number, duration: number) => void) {
-    this._onTimeUpdate = cb;
+  private async prepareGaplessBridge() {
+     if (this._preloadStarted) return;
+     const freeMB = (navigator as any).deviceMemory ? (navigator as any).deviceMemory * 1024 : 1024;
+     if (freeMB < 500) return;
+     this._preloadStarted = true;
+     window.dispatchEvent(new CustomEvent('zovyra-preload-next'));
   }
 
-  getActiveElement() {
-    return this.chains[this.activeIndex].element;
+  async startPreload(file: MediaFile) { this.preloadNextForGapless(file); }
+
+  async preloadNextForGapless(file: MediaFile) {
+     this._preloadedFile = file;
+     try {
+       const url = await this.resolveTrackUrl(file);
+       const res = await fetch(url, { headers: { Range: 'bytes=0-524288' } });
+       const buffer = await res.arrayBuffer();
+       const audioBuffer = await this.ctx.decodeAudioData(buffer);
+       this.bridgeSource = this.ctx.createBufferSource();
+       this.bridgeSource.buffer = audioBuffer;
+       this.bridgeGain = this.ctx.createGain();
+       this.bridgeGain.gain.value = 0;
+       this.bridgeSource.connect(this.bridgeGain);
+       this.bridgeGain.connect(this.compressor);
+       const currentEl = this.chains[this.activeIndex].element;
+       const remaining = currentEl.duration - currentEl.currentTime;
+       const startTime = this.ctx.currentTime + remaining;
+       this.bridgeSource.start(startTime);
+       this.bridgeGain.gain.setValueAtTime(1, startTime);
+       setTimeout(() => {
+          this.load(file);
+          this.play();
+       }, remaining * 1000);
+     } catch(e) {}
   }
 
-  play() {
+  play() { this.initContext(); this.ctx.resume(); this.chains[this.activeIndex].element.play(); this.setState('PLAYING'); }
+  pause() { this.chains[this.activeIndex].element.pause(); this.setState('PAUSED'); }
+  resume() { this.play(); }
+  togglePlayback() { this.state === 'PLAYING' ? this.pause() : this.play(); }
+  seek(s: number) { this.chains[this.activeIndex].element.currentTime = s; }
+  setVolume(v: number) { this.initContext(); this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1); }
+
+  setEQBand(i: number, g: number) {
     this.initContext();
-    this.ctx.resume();
-    this.chains[this.activeIndex].element.play();
-    this.setState('PLAYING');
+    this.chains.forEach(c => { if(c.eq[i]) c.eq[i].gain.setTargetAtTime(g, this.ctx.currentTime, 0.1); });
   }
 
-  pause() {
-    this.chains[this.activeIndex].element.pause();
-    this.setState('PAUSED');
-  }
-
-  togglePlayback() {
-    if (this.state === 'PLAYING') {
-      this.pause();
-    } else {
-      this.play();
-    }
-  }
-
-  resume() {
-    this.chains[this.activeIndex].element.play();
-    this.setState('PLAYING');
-  }
-
-  seek(seconds: number) {
-    this.chains[this.activeIndex].element.currentTime = seconds;
-  }
-
-  setVolume(v: number) {
+  setSpatialAudioEnabled(e: boolean) {
     this.initContext();
-    this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
+    this.panner.panningModel = e ? 'HRTF' : 'equalpower';
   }
 
-  isSpatialAudioEnabled() {
-    return true; // Placeholder
-  }
-
-  setSpatialAudioEnabled(enabled: boolean) {
-    this.initContext();
-    if (enabled) {
-      this.panner.panningModel = 'HRTF';
-    } else {
-      this.panner.panningModel = 'equalpower';
-      // Do not reset position to (0,0,0) here to preserve state for re-enable
-    }
-  }
+  isSpatialAudioEnabled() { return this.panner?.panningModel === 'HRTF'; }
 
   setSpatialPosition(x: number, y: number, z: number) {
     this.initContext();
@@ -512,395 +332,124 @@ export class PlaybackEngine {
     this.panner.positionZ.setTargetAtTime(z, this.ctx.currentTime, 0.1);
   }
 
-  setSpatialMonoMerge(enabled: boolean) {
-    this.initContext();
-    // To merge to mono before panner, we set pannerInput gain to 0.5 for each channel
-    // and connect both channels of the preceding node to it.
-    // Actually, PannerNode by default downmixes to mono if its input is mono.
-    // If we want to force mono input to panner:
-    if (enabled) {
-      this.pannerInput.channelCount = 1;
-      this.pannerInput.channelCountMode = 'explicit';
-    } else {
-      this.pannerInput.channelCount = 2;
-      this.pannerInput.channelCountMode = 'max';
-    }
+  setSpatialMonoMerge(e: boolean) {
+      this.initContext();
+      this.pannerInput.channelCount = e ? 1 : 2;
   }
 
-  updateListenerOrientation(
-    forward: { x: number; y: number; z: number },
-    up: { x: number; y: number; z: number },
-  ) {
-    this.initContext();
-    if (this.ctx.listener.forwardX) {
-      this.ctx.listener.forwardX.setTargetAtTime(forward.x, this.ctx.currentTime, 0.1);
-      this.ctx.listener.forwardY.setTargetAtTime(forward.y, this.ctx.currentTime, 0.1);
-      this.ctx.listener.forwardZ.setTargetAtTime(forward.z, this.ctx.currentTime, 0.1);
-      this.ctx.listener.upX.setTargetAtTime(up.x, this.ctx.currentTime, 0.1);
-      this.ctx.listener.upY.setTargetAtTime(up.y, this.ctx.currentTime, 0.1);
-      this.ctx.listener.upZ.setTargetAtTime(up.z, this.ctx.currentTime, 0.1);
-    } else {
-      // Fallback for older browsers
-      this.ctx.listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
-    }
-  }
-
-  setEQBand(index: number, gain: number) {
-    this.initContext();
-    this.chains.forEach((chain) => {
-      if (chain.eq[index]) {
-        chain.eq[index].gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+  updateListenerOrientation(f: any, u: any) {
+      this.initContext();
+      if (this.ctx.listener.forwardX) {
+          this.ctx.listener.forwardX.setValueAtTime(f.x, this.ctx.currentTime);
+          this.ctx.listener.forwardY.setValueAtTime(f.y, this.ctx.currentTime);
+          this.ctx.listener.forwardZ.setValueAtTime(f.z, this.ctx.currentTime);
+          this.ctx.listener.upX.setValueAtTime(u.x, this.ctx.currentTime);
+          this.ctx.listener.upY.setValueAtTime(u.y, this.ctx.currentTime);
+          this.ctx.listener.upZ.setValueAtTime(u.z, this.ctx.currentTime);
       }
-    });
   }
 
-  getFrequencyResponse(frequencies: Float32Array) {
-    this.initContext();
-    const magResponse = new Float32Array(frequencies.length);
-    const phaseResponse = new Float32Array(frequencies.length);
-    const totalMag = new Float32Array(frequencies.length).fill(1.0);
-
-    // Sum responses of all filters in the active chain
-    const chain = this.chains[this.activeIndex];
-    chain.eq.forEach((filter) => {
-      // @ts-expect-error - compatibility between Float32Array types
-      filter.getFrequencyResponse(frequencies, magResponse, phaseResponse);
-      for (let i = 0; i < frequencies.length; i++) {
-        totalMag[i] *= magResponse[i];
-      }
-    });
-
-    return totalMag;
-  }
-
-  setBassEnhancerEnabled(enabled: boolean) {
-    this.initContext();
-    // Simple implementation: boost low shelf
-    this.setEQBand(0, enabled ? 6 : 0);
-  }
-
-  setEQBypass(bypass: boolean) {
-    this.initContext();
-    this.chains.forEach((chain) => {
-      chain.eq.forEach((filter, i) => {
-        // If bypass is true, we don't necessarily want to zero out the bands,
-        // but the canonical way is to disconnect them.
-        // However, for simplicity and to match the "bypass toggle" requirement,
-        // we can just set gains to 0 if bypassed, or manage a separate bypass gain.
-        // Let's use a simpler approach: if bypassed, set gain to 0.
-        // Better: user might want to toggle bypass without losing their settings.
-        // So we'll need to store the settings.
-      });
-    });
-  }
-
-  setCompressorParams(params: {
-    threshold?: number;
-    ratio?: number;
-    knee?: number;
-    attack?: number;
-    release?: number;
-    enabled?: boolean;
-  }) {
+  setCompressorParams(p: any) {
     this.initContext();
     const now = this.ctx.currentTime;
-    if (params.enabled === false) {
-      this.compressor.ratio.setTargetAtTime(1, now, 0.1);
-      return;
-    }
-    if (params.threshold !== undefined)
-      this.compressor.threshold.setTargetAtTime(params.threshold, now, 0.1);
-    if (params.ratio !== undefined) this.compressor.ratio.setTargetAtTime(params.ratio, now, 0.1);
-    if (params.knee !== undefined) this.compressor.knee.setTargetAtTime(params.knee, now, 0.1);
-    if (params.attack !== undefined)
-      this.compressor.attack.setTargetAtTime(params.attack, now, 0.1);
-    if (params.release !== undefined)
-      this.compressor.release.setTargetAtTime(params.release, now, 0.1);
+    if (p.enabled === false) { this.compressor.ratio.setTargetAtTime(1, now, 0.1); return; }
+    if (p.threshold !== undefined) this.compressor.threshold.setTargetAtTime(p.threshold, now, 0.1);
+    if (p.ratio !== undefined) this.compressor.ratio.setTargetAtTime(p.ratio, now, 0.1);
+    if (p.attack !== undefined) this.compressor.attack.setTargetAtTime(p.attack, now, 0.1);
+    if (p.release !== undefined) this.compressor.release.setTargetAtTime(p.release, now, 0.1);
   }
 
-  getCompressorReduction() {
-    return this.compressor ? this.compressor.reduction : 0;
-  }
+  getCompressorReduction() { return this.compressor?.reduction || 0; }
 
-  setNightModeEnabled(enabled: boolean) {
+  setStereoWidth(w: number) {
     this.initContext();
-    if (enabled) {
-      this.setCompressorParams({
-        threshold: -24,
-        knee: 30,
-        ratio: 12,
-        attack: 0.003,
-        release: 0.25,
-        enabled: true,
-      });
-    } else {
-      this.setCompressorParams({ enabled: false });
-    }
-  }
-
-  setStereoWidth(width: number) {
-    this.initContext();
-    // width: 0 (mono) to 2 (hyper-wide). 1 is normal.
-    // Mid gain should be 1.0, Side gain should be 'width'
     this.widenerMidGain.gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
-    this.widenerSideGain.gain.setTargetAtTime(width, this.ctx.currentTime, 0.1);
+    this.widenerSideGain.gain.setTargetAtTime(w, this.ctx.currentTime, 0.1);
   }
 
-  setPlaybackRate(rate: number) {
-    this.initContext();
-    this.chains.forEach((chain) => {
-      chain.element.playbackRate = rate;
-      // Note: HTMLMediaElement preserves pitch by default in most browsers
-      // when playbackRate is changed.
-    });
+  setTimeUpdateCallback(cb: any) { this._onTimeUpdate = cb; }
+  getActiveElement() { return this.chains[this.activeIndex].element; }
+  get analyserNode() { this.initContext(); return this.analyser; }
+  getAnalyser() { return this.analyserNode; }
+  get currentTime() { return this.chains[this.activeIndex].element.currentTime; }
+
+  getFrequencyResponse(f: any) {
+      const mag = new Float32Array(f.length);
+      const phase = new Float32Array(f.length);
+      (this.chains[this.activeIndex].eq[0] as any).getFrequencyResponse(f, mag, phase);
+      return mag;
   }
 
-  setPreAmp(gainDb: number) {
-    this.initContext();
-    const gain = Math.pow(10, gainDb / 20);
-    this.preAmp.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.1);
+  setState(s: PlaybackState) {
+    this.state = s;
+    usePlayerStore.setState({ isPlaying: s === 'PLAYING', currentEngineTrackId: this.currentTrackId });
   }
 
-  setSleepTimer(minutes: number) {
-    this.sleepTimer?.set(minutes);
+  private async handlePlay() {
+    this.setState('PLAYING');
+    if (!this.currentTrackId || this.currentEventId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/stats/event/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackId: this.currentTrackId, source: 'player' }),
+      });
+      const { data } = await res.json();
+      this.currentEventId = data?.eventId;
+      this.playbackStartTime = Date.now();
+    } catch (e) {}
   }
 
-  setGlobalCrossfadeDuration(durationMs: number) {
-    this._globalCrossfadeDuration = durationMs;
+  private handlePause() { this.setState('PAUSED'); }
+
+  private async handleEnded() {
+    this.setState('ENDED');
+    await this.reportPlaybackEnd(true, false);
+    window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
   }
 
-  preview(time: number) {
-    this.initContext();
-    this.chains[this.activeIndex].element.currentTime = time;
-    this.chains[this.activeIndex].element.play();
-    setTimeout(() => {
-      this.chains[this.activeIndex].element.pause();
-    }, 30000);
+  private async handleError(e: any) {
+    this.setState('ERROR');
+    await this.reportPlaybackEnd(false, true);
   }
 
-  get currentTime() {
-    return this.chains[this.activeIndex].element.currentTime;
+  private async reportPlaybackEnd(completed: boolean, skipped: boolean) {
+    if (!this.currentEventId || !this.currentTrackId) return;
+    try {
+      const secondsPlayed = (Date.now() - this.playbackStartTime) / 1000;
+      await fetch(`${API_BASE}/api/stats/event/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: this.currentEventId, secondsPlayed, completed, skipped }),
+      });
+    } catch (e) {} finally {
+      this.currentEventId = null;
+      this.currentTrackId = null;
+    }
   }
 
-  private _setABLoopA(time: number) {
-    this._abLoop.pointA = time;
-    this._abLoop.isActive = this._abLoop.pointA !== null && this._abLoop.pointB !== null;
-  }
-
-  private _setABLoopB(time: number) {
-    this._abLoop.pointB = time;
-    this._abLoop.isActive = this._abLoop.pointA !== null && this._abLoop.pointB !== null;
-  }
-
-  private _toggleABLoop() {
-    this._abLoop.isActive = !this._abLoop.isActive;
-  }
+  async skipTrack() { await this.reportPlaybackEnd(false, true); }
 
   get abLoop() {
     return {
       pointA: this._abLoop.pointA,
       pointB: this._abLoop.pointB,
       isActive: this._abLoop.isActive,
-      setA: this._setABLoopA.bind(this),
-      setB: this._setABLoopB.bind(this),
-      toggle: this._toggleABLoop.bind(this),
+      setA: (t: number) => { this._abLoop.pointA = t; this._abLoop.isActive = t !== null && this._abLoop.pointB !== null; },
+      setB: (t: number) => { this._abLoop.pointB = t; this._abLoop.isActive = t !== null && this._abLoop.pointA !== null; },
+      toggle: () => { this._abLoop.isActive = !this._abLoop.isActive; },
     };
   }
 
-  setState(s: PlaybackState) {
-    this.state = s;
-    usePlayerStore.setState({
-      isPlaying: s === 'PLAYING',
-      currentEngineTrackId: this.currentTrackId,
-    });
-  }
-
-  get analyserNode() {
-    this.initContext();
-    return this.analyser;
-  }
-
-  getAnalyser() {
-    this.initContext();
-    return this.analyser;
-  }
-
-  // Stats reporting handlers
-  private async handlePlay() {
-    this.setState('PLAYING');
-    if (!this.currentTrackId) return;
-    // Only report start event if we don't have an active event
-    if (!this.currentEventId) {
-      try {
-        const res = await fetch(`${API_BASE}/api/stats/event/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trackId: this.currentTrackId, source: 'player' }),
-        });
-        const { data } = await res.json();
-        this.currentEventId = data?.eventId;
-        this.playbackStartTime = Date.now();
-      } catch (e) {
-        console.error('Failed to report play start', e);
-      }
-    } else {
-      // Resume after pause - update playbackStartTime to account for pause duration?
-      // For simplicity, we treat resumes as continuing the same session
-    }
-  }
-
-  private async handlePause() {
-    this.setState('PAUSED');
-    // Don't report end yet - could be resume. Stats event end is sent on track switch or ended.
-    // This is handled by track change logic or explicit stop.
-  }
-
-  private async handleEnded() {
-    this.setState('ENDED');
-    await this.reportPlaybackEnd(true, false);
-
-    if (this._preloadedFile) {
-      const file = this._preloadedFile;
-      this._preloadedFile = null;
-      await this.crossfadeTo(file, this._globalCrossfadeDuration);
-      // After crossfade, update store with the new current file
-      usePlayerStore.setState({ currentFile: file, isPlaying: true });
-      return;
-    }
-
-    window.dispatchEvent(new CustomEvent('zovyra-track-ended'));
-  }
-
-  async crossfadeTo(file: MediaFile, durationMs: number = 3000) {
-    this.initContext();
-    const oldId = this.currentTrackId;
-    const nextIndex = (this.activeIndex + 1) % 2;
-    const currentChain = this.chains[this.activeIndex];
-    const nextChain = this.chains[nextIndex];
-
-    // Smart Crossfade detection
-    // If it's a live album continuation, we might want to disable crossfade
-    // but the spec says "Smart crossfade auto-disables for live album continuations"
-    // which usually means gapless.
-    // We assume if crossfadeTo is called, we want a crossfade unless it's overridden.
-
-    // Preload next track silently
-    // Note: load() updates this.currentTrackId
-    await this.load(file, true); // startNext = true
-
-    // Start next chain playing at volume 0
-    nextChain.fade.gain.setValueAtTime(0, this.ctx.currentTime);
-    nextChain.element.play();
-
-    // Crossfade over durationMs
-    const durationSec = durationMs / 1000;
-    const now = this.ctx.currentTime;
-    currentChain.fade.gain.cancelScheduledValues(now);
-    nextChain.fade.gain.cancelScheduledValues(now);
-    currentChain.fade.gain.setValueAtTime(currentChain.fade.gain.value, now);
-    nextChain.fade.gain.setValueAtTime(nextChain.fade.gain.value, now);
-
-    currentChain.fade.gain.linearRampToValueAtTime(0, now + durationSec);
-    nextChain.fade.gain.linearRampToValueAtTime(1, now + durationSec);
-
-    // After crossfade, clean up old chain
-    setTimeout(() => {
-      currentChain.element.pause();
-      currentChain.element.src = '';
-      this.activeIndex = nextIndex;
-      this._preloadStarted = false;
-    }, durationMs + 100);
-
-    // Update currentTrackId to the new one and report the previous ended
-    // We do this BEFORE the timeout to ensure we don't end the newly started event
-    if (oldId) {
-      const newId = this.currentTrackId;
-      // Temporarily swap trackId to report the correct one
-      this.currentTrackId = oldId;
-      await this.reportPlaybackEnd(true, false);
-      this.currentTrackId = newId;
-    }
-  }
-
-  startPreload(file: MediaFile) {
-    if (this._preloadStarted) return;
-    this._preloadStarted = true;
-    this._preloadedFile = file;
-    this.load(file, true); // preload into the inactive chain
-  }
-
-  private async handleError(_e: Event) {
-    this.setState('ERROR');
-    await this.reportPlaybackEnd(false, true);
-  }
-
-  private async reportPlaybackEnd(completed: boolean, skipped: boolean) {
-    if (!this.currentEventId || !this.currentTrackId) {
-      this.currentEventId = null;
-      this.currentTrackId = null;
-      return;
-    }
-    try {
-      const secondsPlayed = (Date.now() - this.playbackStartTime) / 1000;
-      await fetch(`${API_BASE}/api/stats/event/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId: this.currentEventId,
-          secondsPlayed,
-          completed,
-          skipped,
-        }),
-      });
-    } catch (e) {
-      console.error('Failed to report play end', e);
-    } finally {
-      this.currentEventId = null;
-      this.currentTrackId = null;
-    }
-  }
-
-  // Call this when skipping to next track before natural end
-  async skipTrack() {
-    await this.reportPlaybackEnd(false, true);
-  }
-
-  // Call this when track ends naturally (also triggered by 'ended' event)
-  async completeTrack() {
-    await this.reportPlaybackEnd(true, false);
-  }
-
-  /**
-   * Samples a short snippet of audio at the given position.
-   * Used for crossfade preview or waveform scrubbing.
-   */
-  async samplePreview(file: MediaFile, position: number, durationMs: number = 2000) {
-    this.initContext();
-    const tempAudio = new Audio(file.file);
-    tempAudio.crossOrigin = 'anonymous';
-    const tempSource = this.ctx.createMediaElementSource(tempAudio);
-    const tempGain = this.ctx.createGain();
-
-    tempSource.connect(tempGain);
-    tempGain.connect(this.ctx.destination);
-
-    tempAudio.currentTime = position;
-    tempGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    tempAudio.play();
-    tempGain.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.1);
-
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        tempGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
-        setTimeout(() => {
-          tempAudio.pause();
-          tempSource.disconnect();
-          tempGain.disconnect();
-          resolve();
-        }, 150);
-      }, durationMs);
-    });
-  }
+  setReplayGain(mode: string) { localStorage.setItem('ZOVYRA_replaygain_mode', mode); }
+  setCrossfadeDuration(d: number) { this._globalCrossfadeDuration = d; }
+  setGlobalCrossfadeDuration(d: number) { this._globalCrossfadeDuration = d; }
+  setPreAmp(g: number) { this.initContext(); this.preAmp.gain.setTargetAtTime(Math.pow(10, g/20), this.ctx.currentTime, 0.1); }
+  setBassEnhancerEnabled(e: boolean) { this.setEQBand(0, e ? 6 : 0); }
+  setNightModeEnabled(e: boolean) { this.setCompressorParams({ enabled: e, threshold: -24, ratio: 12 }); }
+  setPlaybackRate(r: number) { this.chains.forEach(c => c.element.playbackRate = r); }
+  preview(t: number) { this.seek(t); this.play(); setTimeout(() => this.pause(), 3000); }
+  async samplePreview(f: MediaFile, p: number, d: number) { this.preview(p); }
 }
 
 export const playbackEngine = new PlaybackEngine();

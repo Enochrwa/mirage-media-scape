@@ -20,6 +20,11 @@ import eqPresetsRouter from './routes/eq-presets.js';
 import settingsRouter from './routes/settings.js';
 import downloadsRouter from './routes/downloads.js';
 import maintenanceRouter from './routes/maintenance.js';
+import streamRouter from './routes/stream.js';
+import authRouter from './routes/auth.js';
+import uploadRouter from './routes/upload.js';
+import socialRouter from './routes/social.js';
+import coversRouter from './routes/covers.js';
 
 import { LocalSyncServer } from './services/LocalSyncServer.js';
 import { RemoteControlServer } from './services/RemoteControlServer.js';
@@ -84,9 +89,13 @@ app.use('/api/eq-presets', eqPresetsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/downloads', downloadsRouter);
 app.use('/api/maintenance', maintenanceRouter);
+app.use('/api/stream', streamRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/upload', uploadRouter);
+app.use('/api/social', socialRouter);
 
 // Serve covers
-app.use('/api/covers', express.static(path.join(__dirname, '../cache/covers')));
+app.use('/api/covers', coversRouter);
 
 const PORT = process.env.PORT || 3001;
 

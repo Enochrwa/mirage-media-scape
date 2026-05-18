@@ -1,5 +1,6 @@
 import { parentPort, workerData, Worker } from 'node:worker_threads';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
@@ -34,10 +35,9 @@ async function scan() {
     return;
   }
 
-  const concurrency = Math.max(
-    1,
-    Math.min(parseInt(process.env.WORKER_THREADS || '4', 10), allFiles.length),
-  );
+  const freeMB = os.freemem() / 1024 / 1024;
+  const maxConcurrency = freeMB < 400 ? 1 : freeMB < 900 ? 2 : 4;
+  const concurrency = Math.max(1, Math.min(maxConcurrency, allFiles.length));
   const chunkSize = Math.ceil(allFiles.length / concurrency);
 
   let totalScanned = 0;
@@ -71,7 +71,11 @@ async function scan() {
         completedChunks++;
         if (completedChunks === concurrency) {
           markMissingFiles();
-          runBackgroundAnalysis();
+          parentPort?.postMessage({
+            type: 'SCAN_COMPLETE',
+            scanned: totalScanned,
+            total: totalFiles,
+          });
         }
       }
     });
@@ -81,7 +85,11 @@ async function scan() {
       completedChunks++;
       if (completedChunks === concurrency) {
         markMissingFiles();
-        runBackgroundAnalysis();
+        parentPort?.postMessage({
+          type: 'SCAN_COMPLETE',
+          scanned: totalScanned,
+          total: totalFiles,
+        });
       }
     });
 
@@ -109,40 +117,6 @@ async function scan() {
     db.close();
   }
 
-  function runBackgroundAnalysis() {
-    const db = new Database(dbPath) as unknown as Db;
-    db.pragma('journal_mode = WAL');
-
-    const unanalyzed = db
-      .prepare(
-        `SELECT id, file_path FROM tracks WHERE analysis_version IS NULL AND file_type = 'audio' AND missing = 0`,
-      )
-      .all() as { id: string; file_path: string }[];
-
-    setImmediate(async () => {
-      for (const track of unanalyzed) {
-        try {
-          const analysis: AudioAnalysis = native.analyzeAudio(track.file_path);
-          db.prepare(
-            `UPDATE tracks SET bpm = ?, key = ?, camelot_key = ?, energy = ?, loudness = ?, analysis_version = 1, updated_at = ? WHERE id = ?`,
-          ).run(
-            analysis.bpm,
-            analysis.key,
-            analysis.camelotKey,
-            analysis.energy,
-            analysis.loudness,
-            Date.now(),
-            track.id,
-          );
-          await new Promise((r) => setTimeout(r, 50));
-        } catch (e) {
-          console.error(`Analysis failed for ${track.file_path}`, e);
-        }
-      }
-      db.close();
-      parentPort?.postMessage({ type: 'SCAN_COMPLETE', scanned: totalScanned, total: totalFiles });
-    });
-  }
 }
 
 scan();
