@@ -3,7 +3,7 @@ interface UserProfileData {
   trackCount: number;
   followerCount: number;
   followingCount: number;
-  recentTracks: any[];
+  recentTracks: MediaFile[];
 }
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { API_BASE } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Play, UserPlus, UserMinus } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { MediaFile } from '@/types/media';
 
 export default function UserProfile() {
   const { userId } = useParams();
@@ -61,7 +62,7 @@ export default function UserProfile() {
       <section>
         <h2 className="mb-6 border-b border-zinc-800 pb-2 text-2xl font-bold">Public Tracks</h2>
         <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-6">
-          {profile.recentTracks.map((track: any) => (
+          {profile.recentTracks.map((track: MediaFile) => (
             <div key={track.id} className="group cursor-pointer" onClick={() => playFile(track)}>
               <div className="relative mb-3 aspect-square overflow-hidden rounded-lg">
                 <img

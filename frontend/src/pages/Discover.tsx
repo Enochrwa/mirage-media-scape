@@ -40,7 +40,7 @@ export default function Discover() {
       <section>
         <h2 className="mb-6 text-3xl font-bold">Recently Uploaded</h2>
         <div className="grid grid-cols-2 gap-6 md:grid-cols-4 lg:grid-cols-5">
-          {recent.map((track: any) => (
+          {recent.map((track: MediaFile) => (
             <Card
               key={track.id}
               className="group relative overflow-hidden border-zinc-800 bg-zinc-900 transition-all hover:border-zinc-700"
@@ -82,7 +82,7 @@ export default function Discover() {
       <section>
         <h2 className="mb-6 text-3xl font-bold">Trending This Week</h2>
         <div className="space-y-4">
-          {trending.map((track: any, i) => (
+          {trending.map((track: MediaFile & { likes: number; owner_name: string }, i) => (
             <div
               key={track.id}
               className="flex items-center gap-4 rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900"

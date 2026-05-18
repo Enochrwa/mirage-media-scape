@@ -84,10 +84,14 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
       setArtist('');
       setAlbum('');
       setProgress(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : 'Unknown error';
+
       toast({
         title: 'Upload failed',
-        description: err.response?.data?.error || 'Unknown error',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

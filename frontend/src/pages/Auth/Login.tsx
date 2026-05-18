@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -14,8 +15,9 @@ export default function Login() {
     try {
       await login(username, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'Login failed';
+      setError(msg);
     }
   };
 

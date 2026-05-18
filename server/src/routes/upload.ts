@@ -40,6 +40,14 @@ router.post('/', authMiddleware, upload.single('file'), async (req: Request, res
 
   try {
     const filePath = path.resolve(req.file.path);
+
+    // Security: validate that the file is within the 'uploads' directory
+    const uploadsDir = path.resolve('uploads');
+    if (!filePath.startsWith(uploadsDir)) {
+      fs.unlinkSync(filePath);
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const stats = fs.statSync(filePath);
 
     // Disk quota check (10 GB)

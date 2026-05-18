@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -15,8 +16,9 @@ export default function Register() {
     try {
       await register(username, email, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed');
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'Registration failed';
+      setError(msg);
     }
   };
 
