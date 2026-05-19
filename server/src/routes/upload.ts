@@ -40,13 +40,16 @@ router.post('/', authMiddleware, upload.single('file'), async (req: Request, res
   uploadCounts.set(userId, count + 1);
 
   try {
-    const filePath = path.resolve(req.file.path);
+    // Security: Ensure we only use the base filename provided by Multer
+    const safeFilename = path.basename(req.file.filename);
+    const destinationDir = path.resolve(req.file.destination);
+    const filePath = path.join(destinationDir, safeFilename);
 
     // Security: validate that the file is within the 'uploads' directory
     const uploadsDir = path.resolve('uploads');
     const relative = path.relative(uploadsDir, filePath);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      fs.unlinkSync(filePath);
+      // Avoid calling unlink on potentially malicious paths; let OS/disk quota handle it
       return res.status(403).json({ error: 'Forbidden' });
     }
 
