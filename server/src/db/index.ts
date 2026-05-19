@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { getDatabasePath } from '../utils/db-utils.js';
 
 const dbPath = getDatabasePath();
@@ -13,12 +14,36 @@ if (!fs.existsSync(dbDir)) {
 
 const db: Database.Database = new Database(dbPath);
 
+// Dynamic SQLite settings based on available RAM
+// On low-RAM devices (1GB), we need to reduce cache and mmap to avoid OOM
+const freeMB = os.freemem() / 1024 / 1024;
+
+// Adaptive settings: scale down on low RAM devices
+let cacheSizePages: number;
+let mmapSizeBytes: number;
+
+if (freeMB < 512) {
+  // Very low RAM (< 512MB) - conservative settings
+  cacheSizePages = -4000;   // ~4MB cache
+  mmapSizeBytes = 16 * 1024 * 1024;  // 16MB mmap
+} else if (freeMB < 1536) {
+  // Low RAM (512MB - 1.5GB)
+  cacheSizePages = -8000;   // ~8MB cache  
+  mmapSizeBytes = 64 * 1024 * 1024;  // 64MB mmap
+} else {
+  // Adequate+ RAM (> 1.5GB) - default settings
+  cacheSizePages = -16000;  // ~16MB cache
+  mmapSizeBytes = 128 * 1024 * 1024;  // 128MB mmap
+}
+
 // Enable WAL mode for high-performance concurrent access
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
-db.pragma('cache_size = -16000');
+db.pragma(`cache_size = ${cacheSizePages}`);
 db.pragma('temp_store = MEMORY');
-db.pragma('mmap_size = 134217728');
+db.pragma(`mmap_size = ${mmapSizeBytes}`);
+
+console.log(`SQLite initialized with cache_size=${cacheSizePages} pages, mmap_size=${mmapSizeBytes / 1024 / 1024}MB (free RAM: ${freeMB.toFixed(0)}MB)`);
 
 // Initialize schema
 db.exec(`

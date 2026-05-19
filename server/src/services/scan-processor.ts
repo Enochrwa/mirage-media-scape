@@ -64,12 +64,12 @@ export function processFile(
 
   const metadata: TrackMetadata = native.extractMetadata(filePath);
 
+  // Don't generate fingerprint during scan - defer to background analysis
+  // Fingerprinting is a CPU-intensive operation (100-300ms per file) and blocks
+  // the scan, making the UI unresponsive. The fingerprint is used for deduplication
+  // but can be generated later in AnalysisService.
   let fingerprint: string | null = existing?.fingerprint || null;
-  if (!fingerprint && metadata.fileType === 'audio') {
-    try {
-      fingerprint = native.generateWaveformFingerprint(filePath);
-    } catch (e) { console.error(e); }
-  }
+  // TODO: Add fingerprint generation to AnalysisService for background processing
 
   const id = existing?.id ?? (() => {
     if (fingerprint) {

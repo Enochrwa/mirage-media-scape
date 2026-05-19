@@ -3,6 +3,7 @@ import os from 'os';
 import db from '../db/index.js';
 import { scannerService } from '../services/scanner.js';
 import { refreshLibraryWatcherPaths } from '../services/LibraryWatcher.js';
+import { getOSMediaDirectories } from '../utils/os-defaults.js';
 
 export const scanFolder = async (req: Request, res: Response) => {
   const { directory } = req.body;
@@ -40,20 +41,31 @@ export const getBootstrap = (_req: Request, res: Response) => {
 };
 
 export const postOnboardingHome = async (_req: Request, res: Response) => {
-  const home = os.homedir();
-  if (home === '/tmp' || home === '/tmp/') {
-    return res.json({ ok: true, message: 'Skipping /tmp as a watched folder' });
+  // Use getOSMediaDirectories() to scan only known media folders
+  // instead of scanning the entire home directory
+  const mediaDirs = getOSMediaDirectories();
+  
+  if (mediaDirs.length === 0) {
+    return res.json({ ok: true, message: 'No media directories found' });
   }
-  db.prepare(
-    'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, 1)',
-  ).run(home, Date.now());
+  
+  // Add all discovered media directories as watched folders
+  for (const dir of mediaDirs) {
+    if (dir === '/tmp' || dir.startsWith('/tmp/')) continue;
+    db.prepare(
+      'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, 1)',
+    ).run(dir, Date.now());
+  }
+  
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
     'library_onboarding_complete',
     '1',
   );
-  await scannerService.scan([home]);
+  
+  // Scan all discovered media directories
+  await scannerService.scan(mediaDirs);
   refreshLibraryWatcherPaths();
-  res.json({ ok: true, path: home });
+  res.json({ ok: true, paths: mediaDirs });
 };
 
 export const postOnboardingChooseFolder = async (req: Request, res: Response) => {
