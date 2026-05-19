@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import db from '../db/index.js';
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
+export const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('jwt_secret') as { value: string } | undefined;
   if (existing) return existing.value;
   const secret = crypto.randomBytes(32).toString('hex');
@@ -80,4 +80,8 @@ export const signToken = (user: { id: string; username: string; role: string }) 
 
 export const signRefreshToken = () => {
   return crypto.randomBytes(32).toString('hex');
+};
+
+export const verifyToken = (token: string) => {
+  return jwt.verify(token, JWT_SECRET) as { id: string, username: string, role: string };
 };

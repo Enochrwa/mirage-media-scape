@@ -67,14 +67,23 @@ export class ScannerService {
 
       const worker = new Worker(workerPath, {
         workerData: { dbPath, folders, coversDir },
-        execArgv: useTsx ? ['--import', 'tsx'] : [],
+        execArgv: [
+          ...(useTsx ? ['--import', 'tsx'] : []),
+          '--max-old-space-size=512',
+        ],
+        resourceLimits: {
+          maxOldGenerationSizeMb: 512,
+        },
       });
 
+      let resolved = false;
       worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
         if (this.io) {
           this.io.emit(msg.type, msg);
         }
-        if (msg.type === 'SCAN_COMPLETE') {
+        if (msg.type === 'SCAN_COMPLETE' && !resolved) {
+          resolved = true;
+          this.isScanning = false;
           // Background analysis is now handled inside the scan worker (scan-worker.ts)
           // and marked with analysis_version=1 to avoid duplicate work here.
           // We call it here only as a fallback for any missed tracks.

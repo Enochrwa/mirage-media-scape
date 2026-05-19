@@ -4,6 +4,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import db from '../db/index.js';
 import { validatePath } from '../utils/path-utils.js';
+import { verifyToken } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -32,12 +33,18 @@ router.get('/:trackId', async (req, res) => {
     return res.status(404).json({ error: 'Track not found' });
   }
 
-  // Authorization check (simplified for now, will be enhanced in Task 4)
-  // For local mode (127.0.0.1), skip.
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1';
+  // Authorization check
+  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1' || process.env.LOCAL_MODE === 'true';
   if (!isLocal && track.owner_id && !track.is_public) {
-      // In a real scenario, we'd check JWT here.
-      // return res.status(403).json({ error: 'Unauthorized' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      verifyToken(authHeader.split(' ')[1]);
+    } catch {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
   }
 
   if (!validatePath(track.file_path)) {
@@ -49,17 +56,34 @@ router.get('/:trackId', async (req, res) => {
   }
 
   if (transcode) {
-    res.setHeader('Content-Type', 'audio/webm');
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', track.file_path,
-      '-c:a', 'libopus',
-      '-b:a', '128k',
-      '-f', 'webm',
-      'pipe:1'
-    ]);
-    ffmpeg.stdout.pipe(res);
-    req.on('close', () => ffmpeg.kill());
-    return;
+    const ext = path.extname(track.file_path).toLowerCase();
+    const isVideo = ['.mkv', '.avi', '.mov', '.wmv', '.m4v'].includes(ext);
+
+    if (isVideo) {
+      res.setHeader('Content-Type', 'video/mp4');
+      const ffmpeg = spawn('ffmpeg', [
+        '-i', track.file_path,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+        '-f', 'mp4', 'pipe:1'
+      ]);
+      ffmpeg.stdout.pipe(res);
+      req.on('close', () => ffmpeg.kill('SIGKILL'));
+      return;
+    } else {
+      res.setHeader('Content-Type', 'audio/webm');
+      const ffmpeg = spawn('ffmpeg', [
+        '-i', track.file_path,
+        '-c:a', 'libopus',
+        '-b:a', '128k',
+        '-f', 'webm',
+        'pipe:1'
+      ]);
+      ffmpeg.stdout.pipe(res);
+      req.on('close', () => ffmpeg.kill('SIGKILL'));
+      return;
+    }
   }
 
   const stat = fs.statSync(track.file_path);

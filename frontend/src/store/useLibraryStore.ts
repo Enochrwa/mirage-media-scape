@@ -55,7 +55,7 @@ export function mapIncomingTrackToMediaFile(track: IncomingTrack): MediaFile {
     album: track.album ?? undefined,
     cover: track.cover_cache_path ? `${API_BASE}/api/tracks/cover/${track.id}` : undefined,
     thumbnail: track.thumbnail_path ? `${API_BASE}/api/tracks/thumbnail/${track.id}` : undefined,
-    file: `${API_BASE}/api/tracks/stream?id=${encodeURIComponent(track.id)}`,
+    file: `${API_BASE}/api/stream/${encodeURIComponent(track.id)}`,
     file_path: track.file_path,
     type,
     duration: track.duration,

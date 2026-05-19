@@ -27,6 +27,7 @@ import coversRouter from './routes/covers.js';
 import { LocalSyncServer } from './services/LocalSyncServer.js';
 import { RemoteControlServer } from './services/RemoteControlServer.js';
 import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/LibraryWatcher.js';
+import { execSync } from 'child_process';
 
 dotenv.config();
 
@@ -37,11 +38,23 @@ const httpServer = createServer(app);
 // CORS configuration from environment
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
-  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'];
+  : [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:8080',
+      'tauri://localhost',
+      'http://tauri.localhost',
+      'capacitor://localhost',
+      'http://localhost',
+    ];
 
 const io = new Server(httpServer, {
   cors: {
-    origin: corsOrigins,
+    origin: (origin, cb) => {
+      // Allow requests with no origin (same-origin, curl, Tauri, mobile webview)
+      if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true,
     methods: ['GET', 'POST'],
   },
@@ -50,9 +63,24 @@ const io = new Server(httpServer, {
 scannerService.setIo(io);
 analysisService.setIo(io);
 setLibraryWatcherIo(io);
-refreshLibraryWatcherPaths();
+await refreshLibraryWatcherPaths();
 
-app.use(cors({ origin: corsOrigins, credentials: true }));
+// Check for ffmpeg
+try {
+  execSync('ffmpeg -version', { stdio: 'pipe' });
+} catch {
+  console.warn('[zovyra] ffmpeg not found — transcoding disabled');
+}
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 // Apply rate limiting to all requests
@@ -97,4 +125,9 @@ const PORT = process.env.PORT || 3001;
 
 httpServer.listen(PORT, () => {
   console.log(`Zovyra Server running on port ${PORT}`);
+
+  // Bug 8: Scan all watched folders 3 seconds after startup
+  setTimeout(() => {
+    scannerService.scanAll().catch((err) => console.error('Startup scan failed:', err));
+  }, 3000);
 });

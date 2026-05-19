@@ -21,6 +21,10 @@ self.addEventListener('fetch', (event: Event) => {
   // Cache-first for audio files, network-first for API
   const url = new URL(fetchEvent.request.url);
 
+  // Skip cross-origin and socket.io
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/socket.io/')) return;
+
   if (url.pathname.startsWith('/api/')) {
     fetchEvent.respondWith(
       fetch(fetchEvent.request).catch(() => caches.match(fetchEvent.request) as Promise<Response>),

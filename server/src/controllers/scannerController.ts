@@ -9,7 +9,7 @@ export const scanFolder = async (req: Request, res: Response) => {
   const { directory } = req.body;
   if (!directory) {
     scannerService.scanAll();
-    refreshLibraryWatcherPaths();
+    await refreshLibraryWatcherPaths();
     return res.json({ message: 'Global scan started' });
   }
 
@@ -18,7 +18,7 @@ export const scanFolder = async (req: Request, res: Response) => {
   }
 
   await scannerService.addFolder(directory);
-  refreshLibraryWatcherPaths();
+  await refreshLibraryWatcherPaths();
   res.json({ message: 'Folder added and scan started' });
 };
 
@@ -56,7 +56,7 @@ export const postOnboardingHome = async (_req: Request, res: Response) => {
   );
 
   await scannerService.scanAll();
-  refreshLibraryWatcherPaths();
+  await refreshLibraryWatcherPaths();
   res.json({ ok: true, paths: dirs });
 };
 
@@ -82,7 +82,7 @@ export const postOnboardingChooseFolder = async (req: Request, res: Response) =>
     '1',
   );
   await scannerService.scan([normalized]);
-  refreshLibraryWatcherPaths();
+  await refreshLibraryWatcherPaths();
   res.json({ ok: true, path: normalized });
 };
 

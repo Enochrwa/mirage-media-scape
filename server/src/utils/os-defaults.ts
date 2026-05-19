@@ -36,8 +36,29 @@ export function getOSMediaDirectories(): string[] {
     if (xdgMusic) candidates.push(xdgMusic);
     if (xdgVideos) candidates.push(xdgVideos);
     // External drives
-    if (fs.existsSync('/media')) candidates.push('/media');
-    if (fs.existsSync('/mnt')) candidates.push('/mnt');
+    if (fs.existsSync('/media')) {
+      const user = os.userInfo().username;
+      const userMedia = path.join('/media', user);
+      if (fs.existsSync(userMedia)) {
+        candidates.push(userMedia);
+      }
+      // Don't add raw /media — it contains device nodes and other users
+    }
+    if (fs.existsSync('/mnt')) {
+      // Only add real subdirectory mounts (skip symlinks, device nodes)
+      try {
+        const entries = fs.readdirSync('/mnt', { withFileTypes: true });
+        for (const e of entries) {
+          if (e.isDirectory()) {
+            const full = path.join('/mnt', e.name);
+            try {
+              fs.accessSync(full, fs.constants.R_OK);
+              candidates.push(full);
+            } catch { /* skip inaccessible */ }
+          }
+        }
+      } catch { /* /mnt not listable */ }
+    }
   }
 
   return candidates.filter((dir) => {

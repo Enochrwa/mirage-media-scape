@@ -163,6 +163,25 @@ const VideoPlayer: React.FC = () => {
   }, [location.pathname, isPlaying, hasInteracted, autoPiP]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleError = async () => {
+      if (!currentFile) return;
+      const src = video.src;
+      if (!src.includes('transcode=1')) {
+        console.warn('[VideoPlayer] Native playback failed, switching to transcode mode');
+        video.src = `${API_BASE}/api/stream/${currentFile.id}?transcode=1`;
+        video.load();
+        video.play().catch(console.error);
+      }
+    };
+
+    video.addEventListener('error', handleError);
+    return () => video.removeEventListener('error', handleError);
+  }, [currentFile]);
+
+  useEffect(() => {
     if (currentFile?.id) {
       client.get(`/api/tracks/${currentFile.id}`).then((res) => {
         if (res.aspect_ratio_override) setAspectRatio(res.aspect_ratio_override);

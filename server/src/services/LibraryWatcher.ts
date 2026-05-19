@@ -90,11 +90,11 @@ export function setLibraryWatcherIo(io: Server | null): void {
   ioRef = io;
 }
 
-export function refreshLibraryWatcherPaths(): void {
+export async function refreshLibraryWatcherPaths(): Promise<void> {
   const rows = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
 
   if (watcher) {
-    void watcher.close();
+    await watcher.close();
     watcher = null;
   }
 
@@ -109,10 +109,13 @@ export function refreshLibraryWatcherPaths(): void {
   watcher = chokidar.watch(paths, {
     ignoreInitial: true,
     persistent: true,
+    followSymlinks: false,
     awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
     ignored: [
       /^.*[/\\]systemd-private-.*$/,
       /^\/tmp[/\\]$/,
+      /[/\\]\.wine[^/\\]*/,
+      /[/\\]dosdevices[/\\]/,
       // Ignore common non-media directories
       '**/node_modules/**',
       '**/.*/**',
@@ -140,8 +143,12 @@ export function refreshLibraryWatcherPaths(): void {
   watcher.on('addDir', () => scheduleRescan());
 
   watcher.on('error', (err: unknown) => {
-    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'EACCES') {
-      return;
+    if (err && typeof err === 'object' && 'code' in err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EACCES' || code === 'EPERM') {
+        console.warn(`LibraryWatcher: skipping inaccessible path — ${(err as NodeJS.ErrnoException).path}`);
+        return;
+      }
     }
     console.error('LibraryWatcher error:', err);
   });
