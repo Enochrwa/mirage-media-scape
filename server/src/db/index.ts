@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { getDatabasePath } from '../utils/db-utils.js';
 
 const dbPath = getDatabasePath();
@@ -16,9 +17,24 @@ const db: Database.Database = new Database(dbPath);
 // Enable WAL mode for high-performance concurrent access
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
-db.pragma('cache_size = -16000');
+
+// Dynamic SQLite settings based on available RAM
+const totalMB = os.totalmem() / 1024 / 1024;
+if (totalMB < 1024) {
+  // 1GB or less: very conservative
+  db.pragma('cache_size = -4000'); // 4MB
+  db.pragma('mmap_size = 16777216'); // 16MB
+} else if (totalMB < 3072) {
+  // 1GB-3GB: medium
+  db.pragma('cache_size = -8000'); // 8MB
+  db.pragma('mmap_size = 67108864'); // 64MB
+} else {
+  // 3GB+: default performance settings
+  db.pragma('cache_size = -16000'); // 16MB
+  db.pragma('mmap_size = 134217728'); // 128MB
+}
+
 db.pragma('temp_store = MEMORY');
-db.pragma('mmap_size = 134217728');
 
 // Initialize schema
 db.exec(`

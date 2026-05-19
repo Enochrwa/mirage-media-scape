@@ -14,6 +14,7 @@ const BACKOFF_MAX     = 60_000;  // maximum backoff cap
 let lastScanFailed  = false;
 let backoffMs       = BACKOFF_INITIAL;
 let isScanning      = false;
+let pendingChanges  = false;
 
 let debounceTimerRef: NodeJS.Timeout | null = null;
 
@@ -28,10 +29,13 @@ function scheduleRescan(): void {
 
   // ── Scanning in progress ──────────────────────────────────────────
   // A scan is already running (runScan is active, isScanning === true).
-  // Drop the event: if any overlooked changes exist the finally handler in
-  // runScan will fire another scan when this one completes and isScanning
-  // flips to false.
-  if (isScanning) return;
+  // Record that a change happened and drop the event: if any overlooked
+  // changes exist the finally handler in runScan will fire another scan
+  // when this one completes.
+  if (isScanning) {
+    pendingChanges = true;
+    return;
+  }
 
   const delay = lastScanFailed ? backoffMs : DEBOUNCE_MS;
   debounceTimerRef = setTimeout(runScan, delay);
@@ -40,6 +44,7 @@ function scheduleRescan(): void {
 function runScan(): void {
   debounceTimerRef = null;          // consume the timer slot
   isScanning      = true;            // guard: drop all events until this finishes
+  pendingChanges  = false;           // reset pending flag
   lastScanFailed  = false;           // optimistic — will flip back if the scan throws
   backoffMs       = BACKOFF_INITIAL;
 
@@ -54,13 +59,14 @@ function runScan(): void {
     } finally {
       isScanning = false;
       // If a tree-change arrived just as we finished (scheduleRescan ran
-      // while isScanning was still true it would have returned early), allow
-      // one more scan after IN_PROGRESS_GRACE so nothing slips through the
-      // cracks when the watcher and scan completion don't quite line up.
-      debounceTimerRef = setTimeout(() => {
-        debounceTimerRef = null;
-        if (!isScanning) runScan();  // double-check — scan may restarted by another thread
-      }, 5_000);
+      // while isScanning was still true), allow one more scan after a short
+      // grace period so nothing slips through the cracks.
+      if (pendingChanges) {
+        debounceTimerRef = setTimeout(() => {
+          debounceTimerRef = null;
+          if (!isScanning) runScan();
+        }, 5_000);
+      }
     }
   })();
 }

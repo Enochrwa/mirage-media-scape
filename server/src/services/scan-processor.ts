@@ -64,20 +64,7 @@ export function processFile(
 
   const metadata: TrackMetadata = native.extractMetadata(filePath);
 
-  let fingerprint: string | null = existing?.fingerprint || null;
-  if (!fingerprint && metadata.fileType === 'audio') {
-    try {
-      fingerprint = native.generateWaveformFingerprint(filePath);
-    } catch (e) { console.error(e); }
-  }
-
-  const id = existing?.id ?? (() => {
-    if (fingerprint) {
-      const match = db.prepare('SELECT id FROM tracks WHERE fingerprint = ?').get(fingerprint) as { id: string } | undefined;
-      if (match) return match.id;
-    }
-    return crypto.randomUUID();
-  })();
+  const id = existing?.id ?? crypto.randomUUID();
 
   const fileType = metadata.fileType === 'video' ? 'video' : 'audio';
   const bitRate = metadata.bitRate != null ? Number(metadata.bitRate) : null;
