@@ -15,6 +15,11 @@ let lastScanFailed  = false;
 let backoffMs       = BACKOFF_INITIAL;
 let isScanning      = false;
 
+// Track whether any filesystem changes occurred since the last scan completed.
+// Only re-scan if actual changes were detected.
+let pendingChanges  = false;
+
+// Debounce timer reference
 let debounceTimerRef: NodeJS.Timeout | null = null;
 
 function scheduleRescan(): void {
@@ -28,10 +33,11 @@ function scheduleRescan(): void {
 
   // ── Scanning in progress ──────────────────────────────────────────
   // A scan is already running (runScan is active, isScanning === true).
-  // Drop the event: if any overlooked changes exist the finally handler in
-  // runScan will fire another scan when this one completes and isScanning
-  // flips to false.
-  if (isScanning) return;
+  // Mark that changes are pending so a scan will run after current completes.
+  if (isScanning) {
+    pendingChanges = true;
+    return;
+  }
 
   const delay = lastScanFailed ? backoffMs : DEBOUNCE_MS;
   debounceTimerRef = setTimeout(runScan, delay);
@@ -53,14 +59,14 @@ function runScan(): void {
       console.error('LibraryWatcher rescan failed:', e);
     } finally {
       isScanning = false;
-      // If a tree-change arrived just as we finished (scheduleRescan ran
-      // while isScanning was still true it would have returned early), allow
-      // one more scan after IN_PROGRESS_GRACE so nothing slips through the
-      // cracks when the watcher and scan completion don't quite line up.
-      debounceTimerRef = setTimeout(() => {
-        debounceTimerRef = null;
-        if (!isScanning) runScan();  // double-check — scan may restarted by another thread
-      }, 5_000);
+      
+      // Only schedule another scan if actual filesystem changes were detected
+      // while we were scanning. This prevents the runaway re-scan loop that
+      // constantly kept the scanner running even when nothing changed.
+      if (pendingChanges) {
+        pendingChanges = false;
+        debounceTimerRef = setTimeout(runScan, DEBOUNCE_MS);
+      }
     }
   })();
 }
@@ -95,7 +101,9 @@ export function refreshLibraryWatcherPaths(): void {
   // Cancel any pending timers and reset scan state
   if (debounceTimerRef) clearTimeout(debounceTimerRef);
   debounceTimerRef = null;
-  isScanning = false;   // abandon any in-flight scan — paths are about to be rebuilt
+  isScanning = false;
+  // Reset pending changes since we're rebuilding the watcher from scratch
+  pendingChanges = false;
 
   if (rows.length === 0) return;
 

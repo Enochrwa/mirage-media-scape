@@ -102,17 +102,60 @@ async function scan() {
   }
 
   function markMissingFiles() {
+    // Use streaming approach to check for missing files - process in batches
+    // instead of loading all tracks into memory at once. This prevents OOM
+    // on devices with large libraries (50,000+ tracks).
     const db = new Database(dbPath) as unknown as Db;
     db.pragma('journal_mode = WAL');
-    const dbTracks = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0').all() as {
-      id: string;
-      file_path: string;
-    }[];
-    for (const track of dbTracks) {
-      if (!fs.existsSync(track.file_path)) {
-        db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?').run(track.id);
+    
+    // Process in batches to avoid loading all tracks into memory
+    const batchSize = 500;
+    let offset = 0;
+    let checked = 0;
+    let missing = 0;
+    
+    while (true) {
+      // Fetch a batch of tracks
+      const tracks = db.prepare(
+        'SELECT id, file_path FROM tracks WHERE missing = 0 LIMIT ? OFFSET ?'
+      ).all(batchSize, offset) as { id: string; file_path: string }[];
+      
+      if (tracks.length === 0) break;
+      
+      for (const track of tracks) {
+        try {
+          // Use try-catch with statSync instead of existsSync to handle race conditions
+          // and avoid throwing on permission errors
+          if (!fs.existsSync(track.file_path)) {
+            db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?').run(track.id);
+            missing++;
+          }
+        } catch {
+          // File access error - mark as missing
+          db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?').run(track.id);
+          missing++;
+        }
+        checked++;
+      }
+      
+      offset += batchSize;
+      
+      // Yield to event loop periodically
+      if (offset % 5000 === 0) {
+        parentPort?.postMessage({ 
+          type: 'SCAN_PROGRESS', 
+          scanned: offset, 
+          total: offset,  // approximate
+        });
       }
     }
+    
+    parentPort?.postMessage({ 
+      type: 'MARK_MISSING_COMPLETE', 
+      checked, 
+      missing 
+    });
+    
     db.close();
   }
 

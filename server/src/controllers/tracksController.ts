@@ -28,7 +28,11 @@ const getParamId = (req: Request): string => {
 // Library queries
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getInstantTracks = (_req: Request, res: Response): void => {
+export const getInstantTracks = (req: Request, res: Response): void => {
+  // Support pagination: limit and offset query parameters
+  const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 500, 1000);
+  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+  
   const rows = db
     .prepare(
       `SELECT id, title, artist, album, duration, cover_cache_path,
@@ -37,14 +41,21 @@ export const getInstantTracks = (_req: Request, res: Response): void => {
        FROM tracks
        WHERE missing = 0
        ORDER BY added_at DESC
-       LIMIT 500`,
+       LIMIT ? OFFSET ?`,
     )
-    .all();
+    .all(limit, offset);
   res.json(rows);
 };
 
-export const getAllTracks = (_req: Request, res: Response): void => {
-  const tracks = db.prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC').all();
+export const getAllTracks = (req: Request, res: Response): void => {
+  // Support pagination to prevent memory issues on large libraries
+  // Default: 500 tracks per page, max: 2000
+  const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 500, 2000);
+  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+  
+  const tracks = db
+    .prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC LIMIT ? OFFSET ?')
+    .all(limit, offset);
   res.json(tracks);
 };
 
