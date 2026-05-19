@@ -353,39 +353,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     void get().fetchTracks();
   },
 
-  addFolder: async (path) => {
-    if (path) {
-      await fetch(`${API_BASE}/api/scanner/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: path }),
-      });
-    } else if ('showDirectoryPicker' in window) {
-      try {
-        const handle = await (
-          window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
-        ).showDirectoryPicker();
-        if (handle) {
-          // Store handle for future access
-          const idb = get().db;
-          if (idb) {
-            await idb.put(HANDLES_STORE, handle, handle.name);
-            set((state) => ({ folderHandles: [...state.folderHandles, handle] }));
-          }
-
-          // For web, scan files client-side using File System Access API
-          // This allows scanning without sending folder to server
-          await get().scanWebFolder(handle);
-
-          void get().fetchTracks();
-        }
-      } catch (e) {
-        console.error('Directory picker failed', e);
-      }
-    }
-  },
-
-  // Web-specific folder scanning using File System Access API (must be defined before use in addFolder)
+  // Web-specific folder scanning using File System Access API
   scanWebFolder: async (handle: FileSystemDirectoryHandle) => {
     const mediaExtensions = [
       'mp3',
@@ -395,7 +363,6 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       'aac',
       'ogg',
       'opus',
-      'wma',
       'mp4',
       'mkv',
       'avi',
@@ -439,6 +406,38 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files, folderName: handle.name }),
       });
+    }
+  },
+
+  addFolder: async (path) => {
+    if (path) {
+      await fetch(`${API_BASE}/api/scanner/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory: path }),
+      });
+    } else if ('showDirectoryPicker' in window) {
+      try {
+        const handle = await (
+          window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
+        ).showDirectoryPicker();
+        if (handle) {
+          // Store handle for future access
+          const idb = get().db;
+          if (idb) {
+            await idb.put(HANDLES_STORE, handle, handle.name);
+            set((state) => ({ folderHandles: [...state.folderHandles, handle] }));
+          }
+
+          // For web, scan files client-side using File System Access API
+          // This allows scanning without sending folder to server
+          await get().scanWebFolder(handle);
+
+          void get().fetchTracks();
+        }
+      } catch (e) {
+        console.error('Directory picker failed', e);
+      }
     }
   },
 
