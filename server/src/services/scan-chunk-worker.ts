@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import native from '../utils/native-loader.js';
 import path from 'path';
 import crypto from 'node:crypto';
+import { ChapterInfo } from '../../zovyra-native.js';
 
 const { dbPath, coversDir } = workerData as {
   dbPath: string;
@@ -84,7 +85,10 @@ parentPort?.on('message', (msg: { type: string; files: { path: string; mtime: nu
         const chaptersJson =
           metadata.chapters && metadata.chapters.length > 0
             ? JSON.stringify({
-                chapters: metadata.chapters.map((c: any) => ({ time: c.startTimeMs / 1000, title: c.title })),
+                chapters: metadata.chapters.map((c: ChapterInfo) => ({
+                  time: c.startTimeMs / 1000,
+                  title: c.title,
+                })),
               })
             : null;
 

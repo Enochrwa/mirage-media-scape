@@ -9,7 +9,9 @@ export interface Db {
     run(...args: unknown[]): unknown;
     get(...args: unknown[]): unknown;
     all(...args: unknown[]): unknown[];
+    iterate(...args: unknown[]): IterableIterator<unknown>;
   };
+  transaction<T>(fn: (arg: T) => void): (arg: T) => void;
   close(): void;
 }
 

@@ -31,25 +31,19 @@ export function validatePath(filePath: string): boolean {
     // Get watched folders from database
     const watchedFolders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
 
-    let isContained = false;
     for (const folder of watchedFolders) {
-      const folderPath = path.resolve(folder.path);
+      // Normalize: resolve and strip trailing separators
+      const folderPath = path.resolve(folder.path.replace(/[/\\]+$/, ''));
       const relative = path.relative(folderPath, absolutePath);
 
       // If relative doesn't start with '..' and is not absolute, it's inside folderPath
       // relative === '' handles the folder itself.
       if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
-        isContained = true;
-        break;
+        return true;
       }
     }
 
-    if (!isContained) return false;
-
-    // We've already verified containment within watched folders.
-    // Return true immediately to satisfy CodeQL and avoid file existence check
-    // on a potentially user-provided path. The caller can check exists if needed.
-    return true;
+    return false;
   } catch {
     return false;
   }

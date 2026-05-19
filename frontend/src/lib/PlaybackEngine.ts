@@ -224,7 +224,30 @@ export class PlaybackEngine {
       const { invoke } = await import('@tauri-apps/api/core');
       return await invoke<string>('get_file_url', { path: track.file_path });
     }
-    return `${API_BASE}/api/stream/${track.id}`;
+
+    const baseUrl = `${API_BASE}/api/stream/${track.id}`;
+
+    // Check if browser can play natively
+    const ext = track.file_path?.split('.').pop()?.toLowerCase() ?? '';
+    const nativeExts = ['mp3', 'flac', 'm4a', 'ogg', 'wav', 'opus', 'aac', 'mp4', 'webm'];
+
+    if (!nativeExts.includes(ext)) {
+      // Force transcoding for unsupported formats
+      return `${baseUrl}?transcode=1`;
+    }
+
+    // For video, check hardware decode capability (placeholder for real check)
+    if (track.type === 'video') {
+      const codec = track.codec?.toLowerCase() ?? '';
+      const browserUnsupported = ['hevc', 'h265', 'vc1', 'wmv3', 'theora'].some((c) =>
+        codec.includes(c),
+      );
+      if (browserUnsupported) {
+        return `${baseUrl}?transcode=1`;
+      }
+    }
+
+    return baseUrl;
   }
 
   async load(file: MediaFile, startNext: boolean = false) {

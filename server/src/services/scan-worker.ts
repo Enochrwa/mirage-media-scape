@@ -55,7 +55,16 @@ const { dbPath, folders, coversDir } = workerData;
 const srcServicesDir  = path.resolve(__dirname);
 const serverRoot      = path.resolve(srcServicesDir, '..', '..');
 const distWorkerDir   = path.join(serverRoot, 'dist', 'src', 'services');
-const chunkWorkerPath = path.join(distWorkerDir, 'scan-chunk-worker.js');
+const distChunkPath   = path.join(distWorkerDir, 'scan-chunk-worker.js');
+
+// Detect dev mode: tsx is running if dist/ doesn't exist
+const isProd = process.env.NODE_ENV === 'production';
+let chunkWorkerPath = isProd ? path.join(__dirname, 'scan-chunk-worker.js') : distChunkPath;
+let useChunkTsx = false;
+if (!isProd && !fs.existsSync(chunkWorkerPath)) {
+  chunkWorkerPath = path.join(__dirname, 'scan-chunk-worker.ts');
+  useChunkTsx = true;
+}
 
 async function scan() {
   const db = new Database(dbPath) as unknown as Db;
@@ -95,7 +104,7 @@ async function scan() {
     VALUES (?, ?, ?, ?)
   `);
 
-  const saveTracksTransaction = (db as any).transaction((batch: BatchTrack[]) => {
+  const saveTracksTransaction = db.transaction((batch: BatchTrack[]) => {
     const now = Date.now();
     for (const t of batch) {
       insertTrackStmt.run(
@@ -148,6 +157,10 @@ async function scan() {
 
   const workerPool: Worker[] = [];
   const batchQueue: { path: string; mtime: number; size: number }[][] = [];
+  const scannedPaths = new Set<string>();
+  const MAX_QUEUE_DEPTH = 20;
+  let scannerPaused = false;
+  let resumeScanner: (() => void) | null = null;
 
   const processNextBatch = () => {
     if (batchQueue.length === 0 || activeWorkers >= maxConcurrency) {
@@ -156,6 +169,13 @@ async function scan() {
     }
 
     const files = batchQueue.shift()!;
+
+    // Resume scanner if we've drained enough
+    if (scannerPaused && batchQueue.length < MAX_QUEUE_DEPTH / 2) {
+      scannerPaused = false;
+      resumeScanner?.();
+      resumeScanner = null;
+    }
     activeWorkers++;
 
     let worker: Worker;
@@ -164,6 +184,7 @@ async function scan() {
     } else {
       worker = new Worker(chunkWorkerPath, {
         workerData: { files: [], dbPath, coversDir },
+        execArgv: useChunkTsx ? ['--import', 'tsx'] : [],
       });
 
       worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
@@ -198,7 +219,7 @@ async function scan() {
 
   const checkCompletion = () => {
     if (rustScanComplete && activeWorkers === 0 && batchQueue.length === 0) {
-      markMissingFiles();
+      markMissingFiles(scannedPaths);
       parentPort?.postMessage({
         type: 'SCAN_COMPLETE',
         scanned: totalScanned,
@@ -210,11 +231,19 @@ async function scan() {
     }
   };
 
-  native.scanFolders(folders, (files: { path: string; mtime: number; size: number }[] | null) => {
+  native.scanFolders(folders, async (files: { path: string; mtime: number; size: number }[] | null) => {
     if (files === null) {
       rustScanComplete = true;
       checkCompletion();
     } else {
+      // Backpressure: wait if queue is too deep
+      if (batchQueue.length >= MAX_QUEUE_DEPTH) {
+        scannerPaused = true;
+        await new Promise<void>((resolve) => { resumeScanner = resolve; });
+      }
+
+      for (const f of files) scannedPaths.add(f.path);
+
       totalFiles += files.length;
       parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned: totalScanned, total: totalFiles });
 
@@ -223,16 +252,19 @@ async function scan() {
     }
   });
 
-  function markMissingFiles() {
+  function markMissingFiles(scannedPaths: Set<string>) {
     // db is already open
-    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0') as any;
+    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0');
     const updateStmt = db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?');
-
-    for (const track of stmt.iterate() as Iterable<{ id: string; file_path: string }>) {
-      if (!fs.existsSync(track.file_path)) {
-        updateStmt.run(track.id);
+    const batch = db.transaction((rows: { id: string; file_path: string }[]) => {
+      for (const track of rows) {
+        if (!scannedPaths.has(track.file_path)) {
+          updateStmt.run(track.id);
+        }
       }
-    }
+    });
+    const rows = [...(stmt.iterate() as IterableIterator<{ id: string; file_path: string }>)];
+    batch(rows);
   }
 
 }

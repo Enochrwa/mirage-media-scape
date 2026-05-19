@@ -8,6 +8,12 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Never intercept cross-origin requests (e.g. API server on a different port)
+  if (url.origin !== self.location.origin) return;
+
+  // Never intercept WebSocket upgrade or socket.io polling
+  if (url.pathname.startsWith('/socket.io/')) return;
+
   if (url.pathname.startsWith('/api/covers/')) {
     event.respondWith(
       caches.open('zovyra-covers').then((cache) => {
