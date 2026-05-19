@@ -87,6 +87,12 @@ export class AnalysisService {
       const track = this.queue.shift()!;
       try {
         const analysis = native.analyzeAudio(track.file_path);
+        let fingerprint: string | null = null;
+        try {
+          fingerprint = native.generateWaveformFingerprint(track.file_path);
+        } catch (e) {
+          console.error(`Fingerprinting failed for ${track.file_path}`, e);
+        }
 
         db.prepare(
           `
@@ -96,6 +102,7 @@ export class AnalysisService {
             camelot_key = ?,
             energy = ?,
             loudness = ?,
+            fingerprint = COALESCE(?, fingerprint),
             analysis_version = ?,
             updated_at = ?
           WHERE id = ?
@@ -106,6 +113,7 @@ export class AnalysisService {
           analysis.camelotKey,
           analysis.energy,
           analysis.loudness,
+          fingerprint,
           CURRENT_ANALYSIS_VERSION,
           Date.now(),
           track.id,

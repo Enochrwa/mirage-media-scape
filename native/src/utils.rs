@@ -30,7 +30,10 @@ pub fn extract_dominant_color_from_bytes(bytes: &[u8]) -> Option<String> {
     Some(format!("#{:02x}{:02x}{:02x}", r / count, g / count, b / count))
 }
 
-pub fn walk_dir(dir: &Path, files: &mut Vec<ScannedFile>) {
+pub fn walk_dir<F>(dir: &Path, on_file: &mut F)
+where
+    F: FnMut(ScannedFile),
+{
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -39,7 +42,7 @@ pub fn walk_dir(dir: &Path, files: &mut Vec<ScannedFile>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            walk_dir(&path, files);
+            walk_dir(&path, on_file);
         } else if is_media_file(&path) {
             if let Ok(metadata) = entry.metadata() {
                 // Return mtime as milliseconds (f64) for consistent JS Date compatibility
@@ -50,7 +53,7 @@ pub fn walk_dir(dir: &Path, files: &mut Vec<ScannedFile>) {
                     .map(|d| d.as_millis() as f64)
                     .unwrap_or(0.0);
 
-                files.push(ScannedFile {
+                on_file(ScannedFile {
                     path: path.to_string_lossy().into_owned(),
                     mtime,
                     size: metadata.len() as i64,
