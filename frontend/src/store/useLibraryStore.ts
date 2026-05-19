@@ -375,7 +375,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
           // For web, scan files client-side using File System Access API
           // This allows scanning without sending folder to server
-          await scanWebFolder(handle);
+          await get().scanWebFolder(handle);
 
           void get().fetchTracks();
         }
@@ -385,7 +385,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
   },
 
-  // Web-specific folder scanning using File System Access API
+  // Web-specific folder scanning using File System Access API (must be defined before use in addFolder)
   scanWebFolder: async (handle: FileSystemDirectoryHandle) => {
     const mediaExtensions = [
       'mp3',
