@@ -16,7 +16,9 @@ export default function Login() {
       await login(username, password);
       navigate('/');
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'Login failed';
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : 'Login failed';
       setError(msg);
     }
   };

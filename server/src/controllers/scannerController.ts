@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import os from 'os';
 import db from '../db/index.js';
 import { scannerService } from '../services/scanner.js';
 import { refreshLibraryWatcherPaths } from '../services/LibraryWatcher.js';

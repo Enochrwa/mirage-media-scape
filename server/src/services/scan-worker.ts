@@ -104,7 +104,7 @@ async function scan() {
     VALUES (?, ?, ?, ?)
   `);
 
-  const saveTracksTransaction = (db as any).transaction((batch: BatchTrack[]) => {
+  const saveTracksTransaction = (db as unknown as { transaction: (fn: (batch: BatchTrack[]) => void) => (batch: BatchTrack[]) => void }).transaction((batch: BatchTrack[]) => {
     const now = Date.now();
     for (const t of batch) {
       insertTrackStmt.run(
@@ -254,9 +254,10 @@ async function scan() {
 
   function markMissingFiles(scannedPaths: Set<string>) {
     // db is already open
-    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0') as any;
+    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0');
     const updateStmt = db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?');
-    const batch = (db as any).transaction((rows: { id: string; file_path: string }[]) => {
+    const dbWithTx = db as unknown as { transaction: (fn: (rows: { id: string; file_path: string }[]) => void) => (rows: { id: string; file_path: string }[]) => void };
+    const batch = dbWithTx.transaction((rows: { id: string; file_path: string }[]) => {
       for (const track of rows) {
         if (!scannedPaths.has(track.file_path)) {
           updateStmt.run(track.id);

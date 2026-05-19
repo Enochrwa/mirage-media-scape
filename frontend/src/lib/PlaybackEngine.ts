@@ -238,7 +238,7 @@ export class PlaybackEngine {
 
     // For video, check hardware decode capability (placeholder for real check)
     if (track.type === 'video') {
-      const codec = (track as any).codec?.toLowerCase() ?? '';
+      const codec = track.codec?.toLowerCase() ?? '';
       const browserUnsupported = ['hevc', 'h265', 'vc1', 'wmv3', 'theora'].some((c) =>
         codec.includes(c),
       );
