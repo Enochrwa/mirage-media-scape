@@ -17,7 +17,9 @@ export default function Register() {
       await register(username, email, password);
       navigate('/');
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'Registration failed';
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : 'Registration failed';
       setError(msg);
     }
   };
