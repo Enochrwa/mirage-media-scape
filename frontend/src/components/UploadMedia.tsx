@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { MediaType } from '@/types/media';
 import { cn, API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -23,6 +24,7 @@ interface UploadMediaProps {
 
 const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
   const { fetchTracks } = useLibraryStore();
+  const { accessToken } = useAuthStore();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -69,6 +71,7 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
 
     try {
       await axios.post(`${API_BASE}/api/upload`, formData, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / (progressEvent.total || 100),

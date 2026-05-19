@@ -267,11 +267,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
       socket.on('SCAN_COMPLETE', () => {
         set({ scanProgress: null });
-        // Files are already added incrementally via NEW_TRACKS events
-        // Only fetch if we have no tracks yet (edge case)
-        if (get().files.length === 0) {
-          void get().fetchTracks();
-        }
+        // Always refresh tracks when a scan finishes — covers the case where
+        // NEW_TRACKS socket events were missed (e.g. page was hidden).
+        void get().fetchTracks();
       });
 
       socket.on('LIBRARY_CHANGE', () => {
@@ -280,7 +278,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
 
     await get().fetchInstantTracks();
-    void get().fetchTracks();
+    // fetchTracks does a full DB read. Skip it when a scan is already
+    // running — SCAN_COMPLETE will trigger it when the scan finishes.
+    // We still call it here on cold start (no scan in progress) so the
+    // library is populated from the DB immediately.
+    if (!get().scanProgress) {
+      void get().fetchTracks();
+    }
     await get().fetchSmartPlaylists();
 
     useLibraryStore.subscribe((state) => {

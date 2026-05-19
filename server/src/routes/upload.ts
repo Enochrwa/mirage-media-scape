@@ -2,6 +2,7 @@ import { Router, Request } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import db from '../db/index.js';
@@ -9,19 +10,34 @@ import native from '../utils/native-loader.js';
 
 const router = Router();
 
+// Resolve uploads directory relative to this file so it works regardless
+// of the working directory when the server is started.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Go up to server root: dist/src/routes → server root  OR  src/routes → server root
+const SERVER_ROOT = path.resolve(__dirname, '..', '..', '..').endsWith('dist')
+  ? path.resolve(__dirname, '..', '..', '..', '..')
+  : path.resolve(__dirname, '..', '..');
+const UPLOADS_ROOT = path.join(SERVER_ROOT, 'uploads');
+
 const storage = multer.diskStorage({
-  destination: (req: AuthRequest, file, cb) => {
-    const userId = req.user?.id || 'anonymous';
+  destination: (req: AuthRequest, _file, cb) => {
+    const userId = req.user?.id ?? 'anonymous';
     const safeUserId = userId.replace(/[^a-z0-9_-]/gi, '');
     const now = new Date();
-    const dir = path.join('uploads', safeUserId, now.getFullYear().toString(), (now.getMonth() + 1).toString());
+    const dir = path.join(
+      UPLOADS_ROOT,
+      safeUserId,
+      now.getFullYear().toString(),
+      (now.getMonth() + 1).toString(),
+    );
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const safeName = path.basename(file.originalname).replace(/[^a-z0-9._-]/gi, '_');
     cb(null, `${Date.now()}-${safeName}`);
-  }
+  },
 });
 
 const upload = multer({
@@ -45,9 +61,8 @@ router.post('/', authMiddleware, upload.single('file'), async (req: Request, res
     const destinationDir = path.resolve(req.file.destination);
     const filePath = path.join(destinationDir, safeFilename);
 
-    // Security: validate that the file is within the 'uploads' directory
-    const uploadsDir = path.resolve('uploads');
-    const relative = path.relative(uploadsDir, filePath);
+    // Security: validate that the file is within the uploads directory
+    const relative = path.relative(UPLOADS_ROOT, filePath);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
       // Avoid calling unlink on potentially malicious paths; let OS/disk quota handle it
       return res.status(403).json({ error: 'Forbidden' });
