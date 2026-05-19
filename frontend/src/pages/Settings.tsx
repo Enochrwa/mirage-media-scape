@@ -50,6 +50,7 @@ import { API_BASE, cn } from '@/lib/utils';
 import { useCapability } from '@/platform';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
+import axios from 'axios';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -58,6 +59,11 @@ const Settings = () => {
   const [notifications, setNotifications] = useState(true);
   const [autoplay, setAutoplay] = useState(true);
   const [downloadQuality, setDownloadQuality] = useState('high');
+  const [analysisStatus, setAnalysisStatus] = useState<{
+    isAnalyzing: boolean;
+    isPaused: boolean;
+    queued: number;
+  } | null>(null);
 
   const [bassEnhancer, setBassEnhancer] = useState(false);
   const [nightMode, setNightMode] = useState(false);
@@ -87,6 +93,15 @@ const Settings = () => {
 
   useEffect(() => {
     VideoDecodeEngine.probeHardwareDecode().then(setHwSupport);
+    const fetchAnalysis = () => {
+      axios
+        .get(`${API_BASE}/api/maintenance/analysis/status`)
+        .then((res) => setAnalysisStatus(res.data))
+        .catch(() => {});
+    };
+    fetchAnalysis();
+    const interval = setInterval(fetchAnalysis, 5000);
+    return () => clearInterval(interval);
     if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
       navigator.mediaDevices.enumerateDevices().then((devices) => {
         setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'));
@@ -604,6 +619,50 @@ const Settings = () => {
           </TabsContent>
 
           <TabsContent value="advanced" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Background Analysis</CardTitle>
+                <CardDescription>
+                  Server-side audio analysis for BPM, Key, and Energy
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {analysisStatus && (
+                  <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={analysisStatus.isAnalyzing ? 'default' : 'secondary'}>
+                          {analysisStatus.isAnalyzing ? 'Analyzing' : 'Idle'}
+                        </Badge>
+                        {analysisStatus.isPaused && <Badge variant="destructive">Paused</Badge>}
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {analysisStatus.queued} tracks in queue
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {analysisStatus.isPaused ? (
+                        <Button
+                          size="sm"
+                          onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/resume`)}
+                        >
+                          Resume
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => axios.post(`${API_BASE}/api/maintenance/analysis/pause`)}
+                        >
+                          Pause
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

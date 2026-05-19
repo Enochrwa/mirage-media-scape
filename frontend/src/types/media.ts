@@ -43,6 +43,9 @@ export interface MediaFile {
   preferred_speed?: number;
   encoder_delay?: number;
   encoder_padding?: number;
+  cover_cache_path?: string;
+  owner_id?: string;
+  owner_name?: string;
 }
 
 export interface SmartPlaylistCondition {

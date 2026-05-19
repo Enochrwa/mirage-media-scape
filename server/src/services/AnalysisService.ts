@@ -1,13 +1,16 @@
 import { Server } from 'socket.io';
 import db from '../db/index.js';
 import native from '../utils/native-loader.js';
+import { ResourceGovernor } from '../utils/ResourceGovernor.js';
 
 const CURRENT_ANALYSIS_VERSION = 1;
 
 export class AnalysisService {
   private io: Server | null = null;
   private isAnalyzing = false;
+  private isPaused = false;
   private queue: { id: string; file_path: string }[] = [];
+  private governor = new ResourceGovernor();
 
   constructor(io: Server | null = null) {
     this.io = io;
@@ -59,6 +62,10 @@ export class AnalysisService {
     }
   }
 
+  pause() { this.isPaused = true; }
+  resume() { this.isPaused = false; this.startBackgroundAnalysis(); }
+  getStatus() { return { isAnalyzing: this.isAnalyzing, isPaused: this.isPaused, queued: this.queue.length }; }
+
   private async processQueue() {
     const total = this.queue.length;
     let processed = 0;
@@ -66,6 +73,17 @@ export class AnalysisService {
     this.io?.emit('ANALYSIS_START', { total });
 
     while (this.queue.length > 0) {
+      if (this.isPaused) {
+          this.isAnalyzing = false;
+          return;
+      }
+
+      if (this.governor.shouldPauseAnalysis()) {
+          this.io?.emit('ANALYSIS_PAUSED', { reason: 'low_memory' });
+          await new Promise(r => setTimeout(r, 5000));
+          continue;
+      }
+
       const track = this.queue.shift()!;
       try {
         const analysis = native.analyzeAudio(track.file_path);
@@ -103,9 +121,8 @@ export class AnalysisService {
         console.error(`Analysis failed for ${track.file_path}`, e);
       }
 
-      // Yield back to the event loop after each track so we never block the
-      // main thread during a long synchronous analyzeAudio() decode call.
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      // Yield back based on resource governor
+      await new Promise<void>((resolve) => setTimeout(resolve, this.governor.delayBetweenTracks()));
     }
 
     this.isAnalyzing = false;

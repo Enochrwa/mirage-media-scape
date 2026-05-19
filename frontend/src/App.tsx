@@ -3,44 +3,62 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, lazy, Suspense, useState } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import Index from './pages/Index';
-import Home from './pages/Home';
-import Library from './pages/Library';
-import StatsPage from './pages/StatsPage';
-import RemotePage from './pages/RemotePage';
-import DuplicateManagerPage from './pages/DuplicateManagerPage';
-import RadioPage from './pages/RadioPage';
-import PodcastsPage from './pages/PodcastsPage';
-import Music from './pages/Music';
-import Videos from './pages/Videos';
-import Upload from './pages/Upload';
-import Playlists from './pages/Playlists';
-import Favorites from './pages/Favorites';
-import Settings from './pages/Settings';
-import Dashboard from './pages/Dashboard';
-import NotFound from './pages/NotFound';
-import { ArtistProfile } from './pages/ArtistProfile';
-import { ZovyraLayout } from './components/ZovyraLayout';
-import { AlbumView } from './pages/AlbumView';
-import { WifiOff } from 'lucide-react';
-import { useState } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+import { WifiOff, Loader2 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCapability } from './platform';
 import { useMediaSession } from './hooks/useMediaSession';
 
 const queryClient = new QueryClient();
 
+const Home = lazy(() => import('./pages/Home'));
+const Library = lazy(() => import('./pages/Library'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
+const RemotePage = lazy(() => import('./pages/RemotePage'));
+const DuplicateManagerPage = lazy(() => import('./pages/DuplicateManagerPage'));
+const RadioPage = lazy(() => import('./pages/RadioPage'));
+const PodcastsPage = lazy(() => import('./pages/PodcastsPage'));
+const Music = lazy(() => import('./pages/Music'));
+const Videos = lazy(() => import('./pages/Videos'));
+const Upload = lazy(() => import('./pages/Upload'));
+const Playlists = lazy(() => import('./pages/Playlists'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const Discover = lazy(() => import('./pages/Discover'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const ArtistProfile = lazy(() =>
+  import('./pages/ArtistProfile').then((m) => ({ default: m.ArtistProfile })),
+);
+const ZovyraLayout = lazy(() =>
+  import('./components/ZovyraLayout').then((m) => ({ default: m.ZovyraLayout })),
+);
+const AlbumView = lazy(() => import('./pages/AlbumView').then((m) => ({ default: m.AlbumView })));
+const Login = lazy(() => import('./pages/Auth/Login'));
+const Register = lazy(() => import('./pages/Auth/Register'));
+
+const PageSkeleton = () => (
+  <div className="flex h-full w-full items-center justify-center bg-background">
+    <div className="flex h-32 w-32 animate-pulse items-center justify-center rounded-lg bg-secondary">
+      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+    </div>
+  </div>
+);
+
 const App = () => {
   useMediaSession();
   const initLibrary = useLibraryStore((state) => state.init);
+  const initAuth = useAuthStore((state) => state.init);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const canSyncInBackground = useCapability('canSyncInBackground');
 
   useEffect(() => {
+    initAuth();
     initLibrary();
     const onOnline = () => setIsOffline(false);
     const onOffline = () => setIsOffline(true);
@@ -55,7 +73,7 @@ const App = () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [initLibrary, canSyncInBackground]);
+  }, [initLibrary, initAuth, canSyncInBackground]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -105,41 +123,47 @@ const App = () => {
           <Sonner />
           <ErrorBoundary>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <ZovyraLayout>
-                      <ArtistProfile />
-                    </ZovyraLayout>
-                  }
-                />
-                <Route
-                  path="/artist"
-                  element={
-                    <ZovyraLayout>
-                      <ArtistProfile />
-                    </ZovyraLayout>
-                  }
-                />
-                <Route path="/home" element={<Home />} />
-                <Route path="/library" element={<Library />} />
-                <Route path="/music" element={<Music />} />
-                <Route path="/videos" element={<Videos />} />
-                <Route path="/upload" element={<Upload />} />
-                <Route path="/playlists" element={<Playlists />} />
-                <Route path="/favorites" element={<Favorites />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/stats" element={<StatsPage />} />
-                <Route path="/album/:id" element={<AlbumView />} />
-                <Route path="/artist/:name" element={<ArtistProfile />} />
-                <Route path="/remote" element={<RemotePage />} />
-                <Route path="/duplicates" element={<DuplicateManagerPage />} />
-                <Route path="/radio" element={<RadioPage />} />
-                <Route path="/podcasts" element={<PodcastsPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <Suspense fallback={<PageSkeleton />}>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={
+                      <ZovyraLayout>
+                        <ArtistProfile />
+                      </ZovyraLayout>
+                    }
+                  />
+                  <Route
+                    path="/artist"
+                    element={
+                      <ZovyraLayout>
+                        <ArtistProfile />
+                      </ZovyraLayout>
+                    }
+                  />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/discover" element={<Discover />} />
+                  <Route path="/profile/:userId" element={<UserProfile />} />
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/library" element={<Library />} />
+                  <Route path="/music" element={<Music />} />
+                  <Route path="/videos" element={<Videos />} />
+                  <Route path="/upload" element={<Upload />} />
+                  <Route path="/playlists" element={<Playlists />} />
+                  <Route path="/favorites" element={<Favorites />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/stats" element={<StatsPage />} />
+                  <Route path="/album/:id" element={<AlbumView />} />
+                  <Route path="/artist/:name" element={<ArtistProfile />} />
+                  <Route path="/remote" element={<RemotePage />} />
+                  <Route path="/duplicates" element={<DuplicateManagerPage />} />
+                  <Route path="/radio" element={<RadioPage />} />
+                  <Route path="/podcasts" element={<PodcastsPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </BrowserRouter>
           </ErrorBoundary>
         </TooltipProvider>

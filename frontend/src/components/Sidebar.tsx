@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { getPlatform } from '@/platform';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import {
   Search,
@@ -26,6 +27,7 @@ import {
   Menu,
   Heart,
   Globe,
+  Compass,
   LayoutDashboard,
   Share2,
   Sparkles,
@@ -145,6 +147,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 active={view === 'home'}
                 to="/"
               />
+              {getPlatform().host === 'web' && (
+                <SidebarItem
+                  icon={<Compass size={20} />}
+                  label={t('Discover')}
+                  active={location.pathname === '/discover'}
+                  to="/discover"
+                />
+              )}
               <SidebarItem icon={<Search size={20} />} label={t('Search')} onClick={() => {}} />
               <SidebarItem
                 icon={<LayoutDashboard size={20} />}
@@ -346,6 +356,33 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               />
             )}
           </TooltipProvider>
+
+          {getPlatform().host === 'web' && (
+            <TooltipProvider>
+              {collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SidebarItem
+                        icon={<Compass size={20} />}
+                        label=""
+                        active={location.pathname === '/discover'}
+                        to="/discover"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('Discover')}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <SidebarItem
+                  icon={<Compass size={20} />}
+                  label={t('Discover')}
+                  active={location.pathname === '/discover'}
+                  to="/discover"
+                />
+              )}
+            </TooltipProvider>
+          )}
 
           <TooltipProvider>
             {collapsed ? (

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db/index.js';
 import { FingerprintService } from '../services/FingerprintService.js';
+import { analysisService } from '../services/AnalysisService.js';
 import native from '../utils/native-loader.js';
 import { sanitizeId, validatePath } from '../utils/path-utils.js';
 
@@ -57,6 +58,20 @@ router.get('/duplicates/groups', async (_req, res) => {
   // Simplified duplicate detection logic would go here
   // typically joining on size/duration then verifying with native.generateWaveformFingerprint
   res.json({ data: [] });
+});
+
+router.get('/analysis/status', (req, res) => {
+    res.json(analysisService.getStatus());
+});
+
+router.post('/analysis/pause', (req, res) => {
+    analysisService.pause();
+    res.json({ success: true });
+});
+
+router.post('/analysis/resume', (req, res) => {
+    analysisService.resume();
+    res.json({ success: true });
 });
 
 export default router;

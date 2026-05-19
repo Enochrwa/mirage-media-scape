@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { MediaFile, MediaType } from '@/types/media';
-import { cn } from '@/lib/utils';
+import { MediaType } from '@/types/media';
+import { cn, API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,154 +14,89 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
-import { Upload, X, FileAudio, FileVideo, Image } from 'lucide-react';
+import { Upload, X, FileAudio, FileVideo, Image, Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 interface UploadMediaProps {
   className?: string;
 }
 
 const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
-  const { addFile } = useLibraryStore();
+  const { fetchTracks } = useLibraryStore();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
   const [mediaType, setMediaType] = useState<MediaType>('audio');
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      handleFileSelect(file);
-    }
+    if (e.dataTransfer.files?.[0]) handleFileSelect(e.dataTransfer.files[0]);
   };
 
   const handleFileSelect = (file: File) => {
-    const fileType = file.type;
-
-    if (fileType.startsWith('audio/')) {
-      setMediaType('audio');
-      setSelectedFile(file);
-    } else if (fileType.startsWith('video/')) {
-      setMediaType('video');
-      setSelectedFile(file);
-    } else {
-      toast({
-        title: 'Unsupported File Type',
-        description: 'Please select an audio or video file.',
-        variant: 'destructive',
-      });
-    }
+    if (file.type.startsWith('audio/')) setMediaType('audio');
+    else if (file.type.startsWith('video/')) setMediaType('video');
+    setSelectedFile(file);
+    if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
-  const handleCoverSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) {
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('title', title);
+    formData.append('artist', artist);
+    formData.append('album', album);
+    formData.append('isPublic', String(isPublic));
+
+    try {
+      await axios.post(`${API_BASE}/api/upload`, formData, {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 100),
+          );
+          setProgress(percentCompleted);
+        },
+      });
+
+      toast({ title: 'Success', description: 'File uploaded successfully' });
+      fetchTracks();
+      setSelectedFile(null);
+      setTitle('');
+      setArtist('');
+      setAlbum('');
+      setProgress(0);
+    } catch (err: unknown) {
+      const errorMessage = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : 'Unknown error';
+
       toast({
-        title: 'Unsupported File Type',
-        description: 'Please select an image file for the cover.',
+        title: 'Upload failed',
+        description: errorMessage,
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setUploading(false);
     }
-
-    setSelectedCoverFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setCoverPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleUpload = () => {
-    if (!selectedFile) {
-      toast({
-        title: 'No File Selected',
-        description: 'Please select a file to upload.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!title) {
-      toast({
-        title: 'Title Required',
-        description: 'Please enter a title for the media file.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Create object URL for the file
-    const fileUrl = URL.createObjectURL(selectedFile);
-    let coverUrl = coverPreview || '/placeholder.svg';
-
-    if (selectedCoverFile) {
-      coverUrl = URL.createObjectURL(selectedCoverFile);
-    }
-
-    const newFile: MediaFile = {
-      id: `file-${Date.now()}`,
-      title,
-      artist: artist || undefined,
-      album: album || undefined,
-      cover: coverUrl,
-      file: fileUrl,
-      type: mediaType,
-      duration: undefined,
-      loudness: undefined,
-      bpm: undefined,
-      camelot_key: undefined,
-      file_path: selectedFile.name, // Mock path
-      key: undefined,
-      genre: undefined,
-      year: undefined,
-      bitrate: undefined,
-      sampleRate: undefined,
-    };
-
-    addFile(newFile);
-
-    toast({
-      title: 'File Uploaded Successfully',
-      description: `${newFile.title} has been added to your library.`,
-    });
-
-    // Reset form
-    setSelectedFile(null);
-    setSelectedCoverFile(null);
-    setTitle('');
-    setArtist('');
-    setAlbum('');
-    setCoverPreview(null);
-  };
-
-  const clearSelectedFile = () => {
-    setSelectedFile(null);
-  };
-
-  const clearSelectedCover = () => {
-    setSelectedCoverFile(null);
-    setCoverPreview(null);
   };
 
   return (
@@ -195,16 +130,13 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
               )}
               <div className="flex items-center gap-2">
                 <p className="text-lg font-medium">{selectedFile.name}</p>
-                <Button
-                  size="icon"
-                  variant="ghost"
+                <X
+                  className="h-4 w-4 cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    clearSelectedFile();
+                    setSelectedFile(null);
                   }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                />
               </div>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
@@ -215,21 +147,14 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
               <Upload className="h-12 w-12 text-muted-foreground" />
               <p className="text-lg font-medium">Drag and drop a file here</p>
               <p className="text-sm text-muted-foreground">or click to browse</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Supported formats: MP3, WAV, MP4, WEBM
-              </p>
             </div>
           )}
-          <Input
+          <input
             type="file"
             ref={fileInputRef}
             className="hidden"
             accept="audio/*,video/*"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                handleFileSelect(e.target.files[0]);
-              }
-            }}
+            onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
           />
         </div>
 
@@ -244,7 +169,6 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter media title"
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="artist">Artist</Label>
               <Input
@@ -254,7 +178,6 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter artist name"
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="album">Album</Label>
               <Input
@@ -264,12 +187,13 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 placeholder="Enter album name"
               />
             </div>
-
+          </div>
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="media-type">Type</Label>
-              <Select value={mediaType} onValueChange={(value) => setMediaType(value as MediaType)}>
+              <Select value={mediaType} onValueChange={(v) => setMediaType(v as MediaType)}>
                 <SelectTrigger id="media-type">
-                  <SelectValue placeholder="Select media type" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="audio">Audio</SelectItem>
@@ -277,59 +201,33 @@ const UploadMedia: React.FC<UploadMediaProps> = ({ className }) => {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <Label>Cover Image</Label>
-            <div
-              className={cn(
-                'flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-4 transition-colors',
-                coverPreview ? 'border-accent' : 'border-muted hover:bg-secondary/30',
-              )}
-              onClick={() => coverInputRef.current?.click()}
-            >
-              {coverPreview ? (
-                <div className="relative w-full">
-                  <img
-                    src={coverPreview}
-                    alt="Cover Preview"
-                    className="h-48 w-full rounded-md object-cover"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-2 top-2 bg-black/50 hover:bg-black/70"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearSelectedCover();
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Image className="h-10 w-10 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to add a cover image</p>
-                </>
-              )}
-              <Input
-                type="file"
-                ref={coverInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleCoverSelect(e.target.files[0]);
-                  }
-                }}
+            <div className="flex items-center space-x-2 pt-8">
+              <input
+                type="checkbox"
+                id="public"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-700 bg-zinc-800"
               />
+              <Label htmlFor="public">Make Public (share with other users)</Label>
             </div>
           </div>
         </div>
 
-        <Button className="w-full" onClick={handleUpload} disabled={!selectedFile || !title}>
-          Upload
+        {uploading && (
+          <div className="space-y-2">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-center text-xs text-zinc-400">Uploading: {progress}%</p>
+          </div>
+        )}
+
+        <Button className="w-full" onClick={handleUpload} disabled={!selectedFile || uploading}>
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Upload'}
         </Button>
       </Card>
     </div>

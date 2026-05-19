@@ -13,6 +13,8 @@ import { MediaFile } from '@/types/media';
 import { API_BASE } from '@/lib/utils';
 import { toast } from 'sonner';
 import { RefreshCw, Save } from 'lucide-react';
+import { getPlatform } from '@/platform';
+import TrackSocialBar from '../social/TrackSocialBar';
 
 interface TrackInfoModalProps {
   track: MediaFile;
@@ -163,6 +165,10 @@ export const TrackInfoModal: React.FC<TrackInfoModalProps> = ({
             />
           </div>
         </div>
+        <div className="px-1">
+          {getPlatform().host === 'web' && <TrackSocialBar trackId={track.id} />}
+        </div>
+
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
