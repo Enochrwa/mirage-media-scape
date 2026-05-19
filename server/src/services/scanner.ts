@@ -65,16 +65,25 @@ export class ScannerService {
       const dbPath = getDatabasePath();
       const coversDir = path.resolve(path.dirname(dbPath), 'cache/covers');
 
-      const worker = new Worker(workerPath, {
-        workerData: { dbPath, folders, coversDir },
-        execArgv: [
-          ...(useTsx ? ['--import', 'tsx'] : []),
-          '--max-old-space-size=512',
-        ],
-        resourceLimits: {
-          maxOldGenerationSizeMb: 512,
-        },
-      });
+      // IMPORTANT: new Worker() can throw SYNCHRONOUSLY (e.g. ERR_WORKER_INVALID_EXEC_ARGV).
+      // A sync throw inside a Promise constructor produces a rejected Promise, but
+      // isScanning was already set to true above — so it would be stuck forever.
+      // We catch sync construction errors here and reset state before re-throwing.
+      let worker: Worker;
+      try {
+        worker = new Worker(workerPath, {
+          workerData: { dbPath, folders, coversDir },
+          execArgv: useTsx ? ['--import', 'tsx'] : [],
+          resourceLimits: {
+            maxOldGenerationSizeMb: 512,
+          },
+        });
+      } catch (err) {
+        console.error('Scanner worker failed to start:', err);
+        this.isScanning = false;
+        resolve();
+        return;
+      }
 
       let resolved = false;
       worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
@@ -92,11 +101,15 @@ export class ScannerService {
         }
       });
 
-      // log the GS), do NOT reject: isScanning is already false and the caller
-      // already received SCAN_ERROR / SCAN_PROGRESS via Socket.IO.
+      // On worker error: reset state AND resolve so the caller's await unblocks.
+      // The error is already logged; callers that care receive SCAN_ERROR via Socket.IO.
       worker.on('error', (err) => {
         console.error('Scanner worker error:', err);
         this.isScanning = false;
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
       });
 
       worker.on('exit', (code) => {
@@ -104,6 +117,11 @@ export class ScannerService {
           console.error(`Scanner worker exited with code ${code}`);
         }
         this.isScanning = false;
+        // Ensure the promise resolves even if SCAN_COMPLETE was never sent
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
       });
     });
   }
