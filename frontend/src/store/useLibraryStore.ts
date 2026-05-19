@@ -106,6 +106,7 @@ interface LibraryState {
   fetchTracks: () => Promise<void>;
   fetchSmartPlaylists: () => Promise<void>;
   addFolder: (path?: string) => Promise<void>;
+  scanWebFolder: (handle: FileSystemDirectoryHandle) => Promise<void>;
   addFile: (file: MediaFile) => void;
   createPlaylist: (name: string) => void;
   addToPlaylist: (playlistId: string, fileId: string) => void;
@@ -365,16 +366,63 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
         ).showDirectoryPicker();
         if (handle) {
+          // Store handle for future access
           const idb = get().db;
           if (idb) {
             await idb.put(HANDLES_STORE, handle, handle.name);
             set((state) => ({ folderHandles: [...state.folderHandles, handle] }));
-            void get().fetchTracks();
           }
+          
+          // For web, scan files client-side using File System Access API
+          // This allows scanning without sending folder to server
+          await scanWebFolder(handle);
+          
+          void get().fetchTracks();
         }
       } catch (e) {
         console.error('Directory picker failed', e);
       }
+    }
+  },
+  
+  // Web-specific folder scanning using File System Access API
+  scanWebFolder: async (handle: FileSystemDirectoryHandle) => {
+    const mediaExtensions = ['mp3', 'flac', 'wav', 'm4a', 'aac', 'ogg', 'opus', 'wma', 'mp4', 'mkv', 'avi', 'mov', 'webm', 'wmv', 'm4v'];
+    const files: Array<{ path: string; mtime: number; size: number }> = [];
+    
+    async function scanDir(dirHandle: FileSystemDirectoryHandle, basePath: string = '') {
+      try {
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file') {
+            const ext = entry.name.split('.').pop()?.toLowerCase();
+            if (ext && mediaExtensions.includes(ext)) {
+              const file = await entry.getFile();
+              files.push({
+                path: `${basePath}/${entry.name}`,
+                mtime: file.lastModified,
+                size: file.size,
+              });
+            }
+          } else if (entry.kind === 'directory') {
+            // Recursively scan subdirectories
+            const subHandle = await dirHandle.getDirectoryHandle(entry.name);
+            await scanDir(subHandle, `${basePath}/${entry.name}`);
+          }
+        }
+      } catch (e) {
+        console.error('Error scanning directory:', e);
+      }
+    }
+    
+    await scanDir(handle, handle.name);
+    
+    // Send scanned files to server for processing
+    if (files.length > 0) {
+      await fetch(`${API_BASE}/api/scanner/scan-web-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files, folderName: handle.name }),
+      });
     }
   },
 

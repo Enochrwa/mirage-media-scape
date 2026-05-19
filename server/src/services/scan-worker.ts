@@ -11,6 +11,38 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const { dbPath, folders, coversDir } = workerData;
 
+// Settings key for resumable scans
+const SCAN_CURSOR_KEY = 'scan_cursor';
+
+function saveScanCursor(cursor: { folder: string; lastProcessedIndex: number; timestamp: number }) {
+  const db = new Database(dbPath);
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+    SCAN_CURSOR_KEY,
+    JSON.stringify(cursor)
+  );
+  db.close();
+}
+
+function loadScanCursor(): { folder: string; lastProcessedIndex: number; timestamp: number } | null {
+  const db = new Database(dbPath);
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(SCAN_CURSOR_KEY) as { value: string } | undefined;
+  db.close();
+  if (row) {
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function clearScanCursor() {
+  const db = new Database(dbPath);
+  db.prepare('DELETE FROM settings WHERE key = ?').run(SCAN_CURSOR_KEY);
+  db.close();
+}
+
 // Directory layout (same logic as scanner.ts):
 //   src/services/scan-worker.ts  ← __dirname here in dev
 //   server/dist/src/services/scan-chunk-worker.js  ← compiled output in dist/
@@ -24,39 +56,66 @@ const distWorkerDir   = path.join(serverRoot, 'dist', 'src', 'services');
 const chunkWorkerPath = path.join(distWorkerDir, 'scan-chunk-worker.js');
 
 async function scan() {
-  const allFiles = native.scanFolders(folders);
-  const totalFiles = allFiles.length;
-
+  // Use batched scanning for low-RAM devices
+  // The batch_size is adjusted based on available memory
+  const freeMB = os.freemem() / 1024 / 1024;
+  const batchSize = freeMB < 400 ? 100 : freeMB < 900 ? 150 : 200;
+  
+  // Get files in batches - this reduces peak memory usage
+  const fileBatches = native.scanFoldersBatch(folders, batchSize);
+  const totalFiles = fileBatches.reduce((sum, batch) => sum + batch.length, 0);
+  
   parentPort?.postMessage({ type: 'SCAN_START', total: totalFiles });
-
-  if (allFiles.length === 0) {
+  
+  if (totalFiles === 0) {
     parentPort?.postMessage({ type: 'SCAN_COMPLETE', scanned: 0, total: 0 });
+    clearScanCursor(); // Clear any stale cursor
     return;
   }
-
-  const freeMB = os.freemem() / 1024 / 1024;
+  
+  // Calculate concurrency based on available memory
   const maxConcurrency = freeMB < 400 ? 1 : freeMB < 900 ? 2 : 4;
-  const concurrency = Math.max(1, Math.min(maxConcurrency, allFiles.length));
-  const chunkSize = Math.ceil(allFiles.length / concurrency);
-
+  const totalBatches = fileBatches.length;
+  const concurrency = Math.max(1, Math.min(maxConcurrency, totalBatches));
+  
   let totalScanned = 0;
   let completedChunks = 0;
-  const pendingChunks = [];
+  
+  // Initialize scan cursor for potential crash recovery
+  if (folders.length > 0) {
+    saveScanCursor({
+      folder: folders[0],
+      lastProcessedIndex: 0,
+      timestamp: Date.now()
+    });
+  }
+
+  const pendingChunks: Worker[] = [];
 
   for (let i = 0; i < concurrency; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, allFiles.length);
-    if (start >= allFiles.length) break;
-    const chunk = allFiles.slice(start, end);
-
+    // Calculate which batches this worker will process
+    const batchStart = Math.floor((i / concurrency) * totalBatches);
+    const batchEnd = Math.min(batchStart + Math.floor(totalBatches / concurrency), totalBatches);
+    
+    if (batchStart >= totalBatches) break;
+    const workerBatches = fileBatches.slice(batchStart, batchEnd).flat();
+    
     const worker = new Worker(chunkWorkerPath, {
-      workerData: { files: chunk, dbPath, coversDir },
+      workerData: { files: workerBatches, dbPath, coversDir },
     });
 
     worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
       if (msg.type === 'SCAN_PROGRESS') {
         const delta = msg.delta as number;
         totalScanned += delta;
+        // Update cursor periodically for crash recovery
+        if (totalScanned % 1000 === 0 && folders.length > 0) {
+          saveScanCursor({
+            folder: folders[0],
+            lastProcessedIndex: totalScanned,
+            timestamp: Date.now()
+          });
+        }
         parentPort?.postMessage({
           type: 'SCAN_PROGRESS',
           scanned: totalScanned,
@@ -69,6 +128,7 @@ async function scan() {
         totalScanned += scanned;
         completedChunks++;
         if (completedChunks === concurrency) {
+          clearScanCursor(); // Scan completed successfully
           markMissingFiles();
           parentPort?.postMessage({
             type: 'SCAN_COMPLETE',

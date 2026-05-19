@@ -55,4 +55,47 @@ router.post('/replaygain-scan', async (req, res) => {
   res.json({ data: { message: 'ReplayGain scan started' } });
 });
 
+// Web File System Access API - receive files scanned client-side
+router.post('/scan-web-files', async (req, res) => {
+  const { files, folderName } = req.body;
+  
+  if (!files || !Array.isArray(files)) {
+    return res.status(400).json({ error: 'Invalid files array' });
+  }
+  
+  // Store folder in watched_folders (with web prefix to indicate it's from web)
+  const webFolderPath = `web://${folderName}`;
+  db.prepare(
+    'INSERT OR IGNORE INTO watched_folders (path, added_at, auto_discovered) VALUES (?, ?, 0)',
+  ).run(webFolderPath, Date.now());
+  
+  // Process files - we'd need a special handler for web files
+  // Since we can't access file paths directly, we store the metadata
+  // and create file:// URLs for playback
+  for (const file of files) {
+    try {
+      // Create a unique ID
+      const id = `web-${Buffer.from(file.path).toString('base64').slice(0, 20)}`;
+      
+      db.prepare(`
+        INSERT OR REPLACE INTO tracks (
+          id, file_path, file_type, title, duration, mtime, file_size, missing, added_at, updated_at
+        ) VALUES (?, ?, 'audio', ?, 0, ?, ?, 0, ?, ?)
+      `).run(
+        id,
+        file.path,  // Store as file path for web playback
+        file.path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Unknown',
+        file.mtime,
+        file.size,
+        Date.now(),
+        Date.now(),
+      );
+    } catch (e) {
+      console.error('Error processing web file:', e);
+    }
+  }
+  
+  res.json({ data: { message: 'Files processed', count: files.length } });
+});
+
 export default router;

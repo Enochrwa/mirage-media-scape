@@ -36,7 +36,7 @@ export class AnalysisService {
       )
       .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
-    // Priority 2: Rest of the library  (reduced batch to keep RAM usage low)
+    // Priority 2: Rest of the library (reduced batch to keep RAM usage low)
     const remaining = db
       .prepare(
         `
@@ -48,7 +48,19 @@ export class AnalysisService {
       )
       .all(CURRENT_ANALYSIS_VERSION) as { id: string; file_path: string }[];
 
-    const combined = [...recentlyPlayed, ...remaining];
+    // Priority 3: Tracks that need fingerprints for deduplication
+    const needFingerprint = db
+      .prepare(
+        `
+      SELECT id, file_path FROM tracks
+      WHERE fingerprint IS NULL
+      AND missing = 0 AND file_type = 'audio'
+      LIMIT 50
+    `,
+      )
+      .all() as { id: string; file_path: string }[];
+
+    const combined = [...recentlyPlayed, ...remaining, ...needFingerprint];
     const seen = new Set<string>();
     this.queue = combined.filter((track) => {
       if (seen.has(track.id)) return false;
@@ -86,6 +98,7 @@ export class AnalysisService {
 
       const track = this.queue.shift()!;
       try {
+        // Run audio analysis
         const analysis = native.analyzeAudio(track.file_path);
 
         db.prepare(
@@ -110,6 +123,21 @@ export class AnalysisService {
           Date.now(),
           track.id,
         );
+
+        // Generate fingerprint in background for deduplication
+        // This is CPU-intensive but we're in background already
+        try {
+          const fingerprint = native.generateWaveformFingerprint(track.file_path);
+          if (fingerprint) {
+            db.prepare('UPDATE tracks SET fingerprint = ? WHERE id = ?').run(
+              fingerprint,
+              track.id,
+            );
+          }
+        } catch (e) {
+          // Fingerprinting failed - not critical, continue
+          console.error(`Fingerprint failed for ${track.file_path}:`, e);
+        }
 
         processed++;
         this.io?.emit('ANALYSIS_PROGRESS', {
