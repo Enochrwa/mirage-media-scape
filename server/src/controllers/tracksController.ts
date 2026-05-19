@@ -30,8 +30,8 @@ const getParamId = (req: Request): string => {
 
 export const getInstantTracks = (req: Request, res: Response): void => {
   // Support pagination: limit and offset query parameters
-  const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 500, 1000);
-  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+  const limit = Math.min(1000, Math.max(parseInt(req.query.limit as string, 10) || 500, 0));
+  const offset = Math.min(10000, Math.max(parseInt(req.query.offset as string, 10) || 0, 0));
   
   const rows = db
     .prepare(
@@ -50,8 +50,8 @@ export const getInstantTracks = (req: Request, res: Response): void => {
 export const getAllTracks = (req: Request, res: Response): void => {
   // Support pagination to prevent memory issues on large libraries
   // Default: 500 tracks per page, max: 2000
-  const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 500, 2000);
-  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+  const limit = Math.min(2000, Math.max(parseInt(req.query.limit as string, 10) || 500, 0));
+  const offset = Math.min(10000, Math.max(parseInt(req.query.offset as string, 10) || 0, 0));
   
   const tracks = db
     .prepare('SELECT * FROM tracks WHERE missing = 0 ORDER BY added_at DESC LIMIT ? OFFSET ?')

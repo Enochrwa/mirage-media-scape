@@ -62,8 +62,8 @@ async function scan() {
   const batchSize = freeMB < 400 ? 100 : freeMB < 900 ? 150 : 200;
   
   // Get files in batches - this reduces peak memory usage
-  const fileBatches = native.scanFoldersBatch(folders, batchSize);
-  const totalFiles = fileBatches.reduce((sum, batch) => sum + batch.length, 0);
+  const fileBatches = native.scanFolders(folders);
+  const totalFiles = fileBatches.length;
   
   parentPort?.postMessage({ type: 'SCAN_START', total: totalFiles });
   
