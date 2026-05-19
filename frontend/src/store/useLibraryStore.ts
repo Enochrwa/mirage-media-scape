@@ -372,11 +372,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             await idb.put(HANDLES_STORE, handle, handle.name);
             set((state) => ({ folderHandles: [...state.folderHandles, handle] }));
           }
-          
+
           // For web, scan files client-side using File System Access API
           // This allows scanning without sending folder to server
           await scanWebFolder(handle);
-          
+
           void get().fetchTracks();
         }
       } catch (e) {
@@ -384,12 +384,28 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       }
     }
   },
-  
+
   // Web-specific folder scanning using File System Access API
   scanWebFolder: async (handle: FileSystemDirectoryHandle) => {
-    const mediaExtensions = ['mp3', 'flac', 'wav', 'm4a', 'aac', 'ogg', 'opus', 'wma', 'mp4', 'mkv', 'avi', 'mov', 'webm', 'wmv', 'm4v'];
+    const mediaExtensions = [
+      'mp3',
+      'flac',
+      'wav',
+      'm4a',
+      'aac',
+      'ogg',
+      'opus',
+      'wma',
+      'mp4',
+      'mkv',
+      'avi',
+      'mov',
+      'webm',
+      'wmv',
+      'm4v',
+    ];
     const files: Array<{ path: string; mtime: number; size: number }> = [];
-    
+
     async function scanDir(dirHandle: FileSystemDirectoryHandle, basePath: string = '') {
       try {
         for await (const entry of dirHandle.values()) {
@@ -413,9 +429,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         console.error('Error scanning directory:', e);
       }
     }
-    
+
     await scanDir(handle, handle.name);
-    
+
     // Send scanned files to server for processing
     if (files.length > 0) {
       await fetch(`${API_BASE}/api/scanner/scan-web-files`, {
