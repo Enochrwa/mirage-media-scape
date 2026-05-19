@@ -52,8 +52,8 @@ parentPort?.on('message', (msg: { type: string; files: { path: string; mtime: nu
         const fileSize = Number(file.size);
 
         const existing = db
-          .prepare('SELECT last_modified, id, file_size FROM tracks WHERE file_path = ?')
-          .get(filePath) as { last_modified: number; id: string; file_size: number } | undefined;
+          .prepare('SELECT last_modified, id, file_size, fingerprint FROM tracks WHERE file_path = ?')
+          .get(filePath) as { last_modified: number; id: string; file_size: number; fingerprint: string | null } | undefined;
 
         if (existing && existing.last_modified === mtime && existing.file_size === fileSize) {
           scanned++;
@@ -111,6 +111,7 @@ parentPort?.on('message', (msg: { type: string; files: { path: string; mtime: nu
           replaygain_album_peak: metadata.replaygainAlbumPeak ?? null,
           encoder_delay: metadata.encoderDelay ?? null,
           encoder_padding: metadata.encoderPadding ?? null,
+      fingerprint: existing?.fingerprint ?? null,
           chaptersJson,
           cover_cache_path: coverCachePath,
           thumbnail_path: thumbnailPath,
@@ -139,5 +140,3 @@ parentPort?.on('message', (msg: { type: string; files: { path: string; mtime: nu
     parentPort?.postMessage({ type: 'SCAN_CHUNK_COMPLETE' });
   }
 });
-
-db.close();

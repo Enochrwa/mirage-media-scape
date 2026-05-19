@@ -47,7 +47,7 @@ export const getInstantTracks = (req: Request, res: Response): void => {
 };
 
 export const getAllTracks = (req: Request, res: Response): void => {
-  const limit = parseInt(req.query.limit as string) || 100000; // Large default but supports limit
+  const limit = parseInt(req.query.limit as string) || 2000; // Safer default for low-RAM devices
   const offset = parseInt(req.query.offset as string) || 0;
 
   const tracks = db

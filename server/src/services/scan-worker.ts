@@ -31,6 +31,7 @@ interface BatchTrack {
   replaygain_album_peak: number | null;
   encoder_delay: number | null;
   encoder_padding: number | null;
+  fingerprint: string | null;
   chaptersJson: string | null;
   cover_cache_path: string | null;
   thumbnail_path: string | null;
@@ -71,8 +72,9 @@ async function scan() {
       encoder_delay, encoder_padding,
       waveform_data, metadata_json,
       cover_cache_path, thumbnail_path,
+      fingerprint,
       last_modified, mtime, file_size, added_at, updated_at, missing
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
   `);
 
   const deleteChaptersStmt = db.prepare('DELETE FROM track_chapters WHERE track_id = ?');
@@ -104,6 +106,7 @@ async function scan() {
         t.replaygain_album_gain, t.replaygain_album_peak,
         t.encoder_delay, t.encoder_padding,
         null, t.chaptersJson, t.cover_cache_path, t.thumbnail_path,
+        t.fingerprint,
         t.last_modified, t.mtime, t.file_size, now, now
       );
 
@@ -144,44 +147,57 @@ async function scan() {
   let rustScanComplete = false;
 
   const workerPool: Worker[] = [];
+  const batchQueue: { path: string; mtime: number; size: number }[][] = [];
 
-  const getWorker = () => {
-    if (workerPool.length > 0) return workerPool.pop()!;
-    const worker = new Worker(chunkWorkerPath, {
-      workerData: { files: [], dbPath, coversDir }, // Dummy files, we will use postMessage
-    });
-
-    worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
-      if (msg.type === 'SCAN_PROGRESS') {
-        const delta = msg.delta as number;
-        totalScanned += delta;
-        parentPort?.postMessage({
-          type: 'SCAN_PROGRESS',
-          scanned: totalScanned,
-          total: totalFiles,
-        });
-      } else if (msg.type === 'NEW_TRACKS') {
-        const tracks = msg.tracks as BatchTrack[];
-        saveTracksTransaction(tracks);
-        parentPort?.postMessage({ type: 'NEW_TRACKS', tracks });
-      } else if (msg.type === 'SCAN_CHUNK_COMPLETE') {
-        activeWorkers--;
-        workerPool.push(worker);
-        checkCompletion();
-      }
-    });
-
-    worker.on('error', (err: Error) => {
-      console.error('Chunk worker error:', err);
-      activeWorkers--;
+  const processNextBatch = () => {
+    if (batchQueue.length === 0 || activeWorkers >= maxConcurrency) {
       checkCompletion();
-    });
+      return;
+    }
 
-    return worker;
+    const files = batchQueue.shift()!;
+    activeWorkers++;
+
+    let worker: Worker;
+    if (workerPool.length > 0) {
+      worker = workerPool.pop()!;
+    } else {
+      worker = new Worker(chunkWorkerPath, {
+        workerData: { files: [], dbPath, coversDir },
+      });
+
+      worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
+        if (msg.type === 'SCAN_PROGRESS') {
+          const delta = msg.delta as number;
+          totalScanned += delta;
+          parentPort?.postMessage({
+            type: 'SCAN_PROGRESS',
+            scanned: totalScanned,
+            total: totalFiles,
+          });
+        } else if (msg.type === 'NEW_TRACKS') {
+          const tracks = msg.tracks as BatchTrack[];
+          saveTracksTransaction(tracks);
+          parentPort?.postMessage({ type: 'NEW_TRACKS', tracks });
+        } else if (msg.type === 'SCAN_CHUNK_COMPLETE') {
+          activeWorkers--;
+          workerPool.push(worker);
+          processNextBatch();
+        }
+      });
+
+      worker.on('error', (err: Error) => {
+        console.error('Chunk worker error:', err);
+        activeWorkers--;
+        processNextBatch();
+      });
+    }
+
+    worker.postMessage({ type: 'PROCESS_BATCH', files });
   };
 
   const checkCompletion = () => {
-    if (rustScanComplete && activeWorkers === 0) {
+    if (rustScanComplete && activeWorkers === 0 && batchQueue.length === 0) {
       markMissingFiles();
       parentPort?.postMessage({
         type: 'SCAN_COMPLETE',
@@ -190,6 +206,7 @@ async function scan() {
       });
       // Cleanup pool
       for (const w of workerPool) w.terminate();
+      db.close();
     }
   };
 
@@ -201,19 +218,17 @@ async function scan() {
       totalFiles += files.length;
       parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned: totalScanned, total: totalFiles });
 
-      // Send batch to a worker
-      activeWorkers++;
-      const worker = getWorker();
-      worker.postMessage({ type: 'PROCESS_BATCH', files });
+      batchQueue.push(files);
+      processNextBatch();
     }
   });
 
   function markMissingFiles() {
     // db is already open
-    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0');
+    const stmt = db.prepare('SELECT id, file_path FROM tracks WHERE missing = 0') as any;
     const updateStmt = db.prepare('UPDATE tracks SET missing = 1 WHERE id = ?');
 
-    for (const track of (stmt as any).iterate() as { id: string; file_path: string }) {
+    for (const track of stmt.iterate() as Iterable<{ id: string; file_path: string }>) {
       if (!fs.existsSync(track.file_path)) {
         updateStmt.run(track.id);
       }

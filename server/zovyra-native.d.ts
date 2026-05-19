@@ -104,7 +104,10 @@ export interface ScannedFile {
   mtime: number;
   size: number;
 }
-export declare function scanFolders(folders: Array<string>): Array<ScannedFile>;
+export declare function scanFolders(
+  folders: Array<string>,
+  callback: (files: Array<ScannedFile> | null) => void,
+): void;
 export interface FingerprintResult {
   fingerprint: string;
   duration: number;

@@ -132,7 +132,7 @@ export function processFile(
     chaptersJson,
     coverCachePath,
     thumbnailPath,
-    fingerprint,
+    existing?.fingerprint ?? null,
     mtime,
     mtime,
     fileSize,
