@@ -25,7 +25,7 @@ import { formatDuration } from '@/lib/utils';
 import { WaveformSeekBar } from './WaveformSeekBar';
 import { useState, useEffect } from 'react';
 import { playbackEngine } from '@/lib/PlaybackEngine';
-import { resourceMonitor, ResourceState } from '@/lib/ResourceMonitor';
+import { resourceMonitor, ResourceState } from '@/engines/ResourceMonitor';
 
 export function PlaybackController() {
   const [showEQ, setShowEQ] = useState(false);

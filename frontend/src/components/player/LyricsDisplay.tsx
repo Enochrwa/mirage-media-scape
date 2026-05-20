@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface LyricsDisplayProps {
+  trackId?: string;
   artist: string;
   title: string;
   currentTime: number;
@@ -11,6 +12,7 @@ interface LyricsDisplayProps {
 }
 
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
+  trackId,
   artist,
   title,
   currentTime,
@@ -29,7 +31,11 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   useEffect(() => {
     const fetchLyrics = async () => {
-      const data = await LyricsService.getLyrics(artist, title);
+      if (!trackId) {
+        setLyrics([]);
+        return;
+      }
+      const data = await LyricsService.getLyrics(trackId);
       if (data) {
         setLyrics(data);
       } else {
@@ -37,7 +43,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       }
     };
     fetchLyrics();
-  }, [artist, title]);
+  }, [trackId]);
 
   useEffect(() => {
     // Binary search for active lyric index

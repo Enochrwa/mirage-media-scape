@@ -18,7 +18,8 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release && npm run build:stub",
+    "build": "npx tsx scripts/build-native.ts",
+    "build:napi": "napi build --platform --release && npm run build:stub",
     "build:debug": "napi build --platform && npm run build:stub",
     "build:stub": "tsc --project tsconfig.stub.json",
     "version": "napi version"

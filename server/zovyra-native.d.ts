@@ -106,7 +106,7 @@ export interface ScannedFile {
 }
 export declare function scanFolders(
   folders: Array<string>,
-  callback: (files: Array<ScannedFile> | null) => void,
+  callback: (err: Error | null, files: Array<ScannedFile> | null | undefined) => void,
 ): void;
 export interface FingerprintResult {
   fingerprint: string;

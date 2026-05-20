@@ -12,6 +12,7 @@ import { RecommendationService } from '../services/RecommendationService.js';
 import { FingerprintService } from '../services/FingerprintService.js';
 import { DuplicateFinderService } from '../services/DuplicateFinderService.js';
 import { analysisService } from '../services/AnalysisService.js';
+import { LyricsService } from '../services/LyricsService.js';
 import { sanitizeId, validatePath } from '../utils/path-utils.js';
 
 // ESM-safe __dirname
@@ -493,6 +494,26 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
       console.error(`Waveform worker exited with code ${code}`);
     }
   });
+};
+
+import { Track } from '../types/database.js';
+
+export const getTrackLyrics = async (req: Request, res: Response): Promise<void> => {
+  const safeId = sanitizeId(getParamId(req));
+  const track = db.prepare('SELECT * FROM tracks WHERE id = ?').get(safeId) as Track | undefined;
+
+  if (!track) {
+    res.status(404).json({ error: 'Track not found' });
+    return;
+  }
+
+  try {
+    const lyricsService = new LyricsService(db);
+    const lyrics = await lyricsService.getLyrics(track);
+    res.json(lyrics);
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
 };
 
 export const updateTrackMetadata = (req: Request, res: Response): void => {

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { ResourceMonitor } from '@/engines/ResourceMonitor';
+import { resourceMonitor } from '@/engines/ResourceMonitor';
 
 export function useLowPowerMode(): boolean {
-  const [lowPower, setLowPower] = useState(ResourceMonitor.getInstance().isLowPowerMode());
+  const [lowPower, setLowPower] = useState(resourceMonitor.isLowPowerMode());
 
   useEffect(() => {
-    return ResourceMonitor.getInstance().subscribe(setLowPower);
+    return resourceMonitor.subscribe(() => {
+      setLowPower(resourceMonitor.isLowPowerMode());
+    });
   }, []);
 
   return lowPower;
