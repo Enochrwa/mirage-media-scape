@@ -125,9 +125,10 @@ const PORT = process.env.PORT || 3001;
 
 httpServer.listen(PORT, () => {
   console.log(`Zovyra Server running on port ${PORT}`);
-
-  // Bug 8: Scan all watched folders 3 seconds after startup
-  setTimeout(() => {
-    scannerService.scanAll().catch((err) => console.error('Startup scan failed:', err));
-  }, 3000);
+  // Startup scan is intentionally NOT performed here.
+  // Scanning is triggered explicitly by:
+  //   - Desktop app: POST /api/scanner/auto-scan-defaults (only when library is stale or empty)
+  //   - User action:  POST /api/scanner/scan
+  //   - Onboarding:   POST /api/scanner/onboarding/home | /onboarding/choose-folder
+  // This prevents unwanted background scans when the server is accessed from any host.
 });

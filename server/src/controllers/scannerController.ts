@@ -7,7 +7,7 @@ import { getOSMediaDirectories } from '../utils/os-defaults.js';
 export const scanFolder = async (req: Request, res: Response) => {
   const { directory } = req.body;
   if (!directory) {
-    scannerService.scanAll();
+    await scannerService.scanAll();
     await refreshLibraryWatcherPaths();
     return res.json({ message: 'Global scan started' });
   }

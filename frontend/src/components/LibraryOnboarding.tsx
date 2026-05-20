@@ -57,19 +57,22 @@ const LibraryOnboarding: React.FC<LibraryOnboardingProps> = ({ onComplete }) => 
   };
 
   const startScan = async () => {
+    if (selectedFolders.length === 0) return;
     setBusy('folder');
     try {
-      // In a real app, we'd send all selectedFolders to the backend.
-      // For this spec, we'll just trigger a scan.
-      const res = await fetch(`${API_BASE}/api/scanner/onboarding/choose-folder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: selectedFolders[0] || '/home' }),
-      });
-      if (!res.ok) throw new Error('Request failed');
+      // Send each selected folder to the backend sequentially.
+      // The first folder triggers the scan; subsequent ones add to the watch list.
+      for (const folder of selectedFolders) {
+        const res = await fetch(`${API_BASE}/api/scanner/onboarding/choose-folder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ directory: folder }),
+        });
+        if (!res.ok) throw new Error(`Request failed for folder: ${folder}`);
+      }
       toast({
         title: 'Scan started',
-        description: 'Your library is being indexed in the background.',
+        description: `Indexing ${selectedFolders.length} folder${selectedFolders.length > 1 ? 's' : ''} in the background.`,
       });
       onComplete();
     } catch {

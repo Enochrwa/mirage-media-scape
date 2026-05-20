@@ -1,10 +1,31 @@
+/**
+ * frontend/src/engines/ResourceMonitor.ts
+ *
+ * Consolidated ResourceMonitor that tracks battery, FPS, and hardware
+ * to determine the optimal resource state for the application.
+ */
+
+export type ResourceState = 'normal' | 'low-power' | 'critical';
+
+interface BatteryManager extends EventTarget {
+  level: number;
+  charging: boolean;
+}
+
+interface NavigatorExtended extends Navigator {
+  getBattery?: () => Promise<BatteryManager>;
+  deviceMemory?: number;
+}
+
 export class ResourceMonitor {
   private static instance: ResourceMonitor;
-  private isLowPower: boolean = false;
-  private listeners: Set<(lowPower: boolean) => void> = new Set();
+  private state: ResourceState = 'normal';
+  private fps: number = 60;
+  private listeners: Set<(state: ResourceState) => void> = new Set();
+  private battery: BatteryManager | null = null;
 
   private constructor() {
-    this.monitorBattery();
+    this.initBattery();
     this.monitorHardware();
     this.monitorFPS();
   }
@@ -16,24 +37,16 @@ export class ResourceMonitor {
     return ResourceMonitor.instance;
   }
 
-  private async monitorBattery(): Promise<void> {
-    if ('getBattery' in navigator) {
+  private async initBattery(): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    const nav = navigator as NavigatorExtended;
+    if (nav.getBattery) {
       try {
-        const battery = await (
-          navigator as unknown as {
-            getBattery: () => Promise<{
-              level: number;
-              charging: boolean;
-              addEventListener: (type: string, listener: () => void) => void;
-            }>;
-          }
-        ).getBattery();
-        const check = () => {
-          const lowBattery = battery.level < 0.2 && !battery.charging;
-          this.updateState(lowBattery);
-        };
-        battery.addEventListener('levelchange', check);
-        battery.addEventListener('chargingchange', check);
+        this.battery = await nav.getBattery();
+        const check = () => this.evaluate();
+        this.battery.addEventListener('levelchange', check);
+        this.battery.addEventListener('chargingchange', check);
         check();
       } catch (e) {
         console.warn('Battery API not available:', e);
@@ -42,31 +55,35 @@ export class ResourceMonitor {
   }
 
   private monitorHardware(): void {
-    const cores = navigator.hardwareConcurrency || 4;
-    const memory = (navigator as unknown as { deviceMemory?: number }).deviceMemory || 4;
+    if (typeof navigator === 'undefined') return;
+
+    const nav = navigator as NavigatorExtended;
+    const cores = nav.hardwareConcurrency || 4;
+    const memory = nav.deviceMemory || 4;
     if (cores <= 2 || memory <= 1) {
-      this.updateState(true); // Permanent low-power for this device
+      this.evaluate();
     }
   }
 
   private monitorFPS(): void {
-    let frames = 0;
-    let lastTime = performance.now();
-    let consecutiveLowWindows = 0;
+    if (typeof window === 'undefined') return;
 
-    const loop = () => {
-      frames++;
+    let lastTime = performance.now();
+    let lastFrameTime = 0;
+
+    const loop = (time: number) => {
+      if (lastFrameTime) {
+        const delta = time - lastFrameTime;
+        if (delta > 0) {
+          const currentFPS = 1000 / delta;
+          this.fps = this.fps * 0.95 + currentFPS * 0.05;
+        }
+      }
+      lastFrameTime = time;
+
       const now = performance.now();
       if (now - lastTime >= 2000) {
-        const fps = frames / ((now - lastTime) / 1000);
-        if (fps < 20) {
-          consecutiveLowWindows++;
-          if (consecutiveLowWindows >= 2) this.updateState(true);
-        } else if (fps > 40) {
-          consecutiveLowWindows = 0;
-          this.updateState(false);
-        }
-        frames = 0;
+        this.evaluate();
         lastTime = now;
       }
       requestAnimationFrame(loop);
@@ -74,20 +91,60 @@ export class ResourceMonitor {
     requestAnimationFrame(loop);
   }
 
-  private updateState(lowPower: boolean): void {
-    if (this.isLowPower !== lowPower) {
-      this.isLowPower = lowPower;
-      this.listeners.forEach((fn) => fn(lowPower));
-      window.dispatchEvent(new CustomEvent('lowpowerchange', { detail: lowPower }));
+  private evaluate(): void {
+    let newState: ResourceState = 'normal';
+
+    // 1. Hardware Check
+    const nav = (typeof navigator !== 'undefined' ? navigator : {}) as NavigatorExtended;
+    const cores = nav.hardwareConcurrency || 4;
+    const memory = nav.deviceMemory || 4;
+
+    if (cores <= 2 || memory <= 1) {
+      newState = 'low-power';
+    }
+
+    // 2. Battery Check
+    if (this.battery) {
+      const { level, charging } = this.battery;
+      if (level < 0.1 && !charging) {
+        newState = 'critical';
+      } else if (level < 0.2 && !charging) {
+        newState = 'low-power';
+      }
+    }
+
+    // 3. FPS Check
+    if (this.fps < 20) {
+      newState = 'critical';
+    } else if (this.fps < 35) {
+      if (newState !== 'critical') newState = 'low-power';
+    }
+
+    if (this.state !== newState) {
+      this.state = newState;
+      this.listeners.forEach((fn) => fn(newState));
+      window.dispatchEvent(new CustomEvent('lowpowerchange', { detail: newState === 'low-power' || newState === 'critical' }));
     }
   }
 
-  isLowPowerMode(): boolean {
-    return this.isLowPower;
+  public getState(): ResourceState {
+    return this.state;
   }
 
-  subscribe(fn: (lowPower: boolean) => void): () => void {
+  public isLowPowerMode(): boolean {
+    return this.state === 'low-power' || this.state === 'critical';
+  }
+
+  public getFPS(): number {
+    return Math.round(this.fps);
+  }
+
+  public subscribe(fn: (state: ResourceState) => void): () => void {
     this.listeners.add(fn);
+    fn(this.state);
     return () => this.listeners.delete(fn);
   }
 }
+
+// Export a singleton for easier use
+export const resourceMonitor = ResourceMonitor.getInstance();

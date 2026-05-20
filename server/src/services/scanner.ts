@@ -93,6 +93,11 @@ export class ScannerService {
         if (msg.type === 'SCAN_COMPLETE' && !resolved) {
           resolved = true;
           this.isScanning = false;
+          // Record the timestamp so the frontend can check library freshness
+          db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+            'last_scan_at',
+            String(Date.now()),
+          );
           // Background analysis is now handled inside the scan worker (scan-worker.ts)
           // and marked with analysis_version=1 to avoid duplicate work here.
           // We call it here only as a fallback for any missed tracks.
@@ -182,6 +187,7 @@ export class ScannerService {
     totalDuration: number;
     artists: number;
     albums: number;
+    lastScanAt: number | null;
   } {
     const totalTracks = (
       db.prepare('SELECT COUNT(*) as count FROM tracks WHERE missing = 0').get() as {
@@ -211,7 +217,12 @@ export class ScannerService {
         .get() as { count: number }
     ).count;
 
-    return { totalTracks, totalDuration, artists, albums };
+    const lastScanRow = db
+      .prepare("SELECT value FROM settings WHERE key = 'last_scan_at'")
+      .get() as { value: string } | undefined;
+    const lastScanAt = lastScanRow ? Number(lastScanRow.value) : null;
+
+    return { totalTracks, totalDuration, artists, albums, lastScanAt };
   }
 }
 

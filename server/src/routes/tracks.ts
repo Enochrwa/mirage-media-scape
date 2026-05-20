@@ -18,6 +18,7 @@ import {
   reanalyzeTrack,
   getTrackAudioStreams,
   getTrackChapters,
+  getTrackLyrics,
 } from '../controllers/tracksController.js';
 import db from '../db/index.js';
 import { RecommendationService } from '../services/RecommendationService.js';
@@ -87,6 +88,9 @@ router.get('/:id/audio-streams', getTrackAudioStreams);
 
 /** GET /api/tracks/:id/chapters */
 router.get('/:id/chapters', getTrackChapters);
+
+/** GET /api/tracks/:id/lyrics */
+router.get('/:id/lyrics', getTrackLyrics);
 
 /** POST /api/tracks/:id/identify */
 router.post('/:id/identify', identifyTrack);

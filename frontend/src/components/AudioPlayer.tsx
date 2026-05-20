@@ -521,6 +521,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
           <div className="relative h-48 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
             {showLyrics ? (
               <LyricsDisplay
+                trackId={currentFile.id}
                 artist={currentFile.artist || ''}
                 title={currentFile.title}
                 currentTime={currentTime}
