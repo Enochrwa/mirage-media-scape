@@ -43,7 +43,11 @@ export function parseLRC(lrc: string): LyricLine[] {
 
       // If no enhanced word timings, treat as standard line
       // Strip tags for text display
-      const text = content.replace(/<[^>]+>/g, '').trim();
+      let text = content;
+      while (/<[^<>]*>/.test(text)) {
+        text = text.replace(/<[^<>]*>/g, '');
+      }
+      text = text.trim();
 
       cues.push({ time: lineTime, text, words: words.length > 0 ? words : undefined });
     }
