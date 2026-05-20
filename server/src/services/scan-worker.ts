@@ -231,8 +231,12 @@ async function scan() {
     }
   };
 
-  native.scanFolders(folders, async (files: { path: string; mtime: number; size: number }[] | null) => {
-    if (files === null) {
+  native.scanFolders(folders, async (err: Error | null, files: { path: string; mtime: number; size: number }[] | null | undefined) => {
+    if (err) {
+      console.error('Rust scanner error:', err);
+      return;
+    }
+    if (files === null || files === undefined) {
       rustScanComplete = true;
       checkCompletion();
     } else {

@@ -3,6 +3,9 @@ use ffmpeg_next as ffmpeg;
 use std::path::Path;
 use ffmpeg::util::frame::audio::Audio;
 use stratum_dsp::{analyze_audio as stratum_analyze, AnalysisConfig};
+use lofty::prelude::*;
+use lofty::tag::{Tag, TagType};
+use lofty::config::WriteOptions;
 
 #[napi(object)]
 pub struct AudioAnalysis {
@@ -143,8 +146,59 @@ pub fn compute_replay_gain(paths: Vec<String>) -> Result<Vec<ReplayGainResult>, 
 }
 
 #[napi]
-pub fn write_tags(_path: String, _tags: TagInput) -> Result<(), napi::Error> {
-    Err(napi::Error::from_reason(
-        "Tag writing not yet implemented: use id3/metaflac crates",
-    ))
+pub fn write_tags(path: String, tags: TagInput) -> Result<(), napi::Error> {
+    let path_buf = Path::new(&path);
+    let mut probed = lofty::probe::Probe::open(path_buf)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to open file: {}", e)))?
+        .read()
+        .map_err(|e| napi::Error::from_reason(format!("Failed to read tags: {}", e)))?;
+
+    let tag = match probed.primary_tag_mut() {
+        Some(t) => t,
+        None => {
+            if let Some(first_tag) = probed.first_tag_mut() {
+                first_tag
+            } else {
+                let tag_type = match probed.file_type() {
+                    lofty::file::FileType::Mpeg => TagType::Id3v2,
+                    lofty::file::FileType::Flac => TagType::VorbisComments,
+                    lofty::file::FileType::Mp4 => TagType::Mp4Ilst,
+                    lofty::file::FileType::Opus | lofty::file::FileType::Vorbis => TagType::VorbisComments,
+                    _ => TagType::Id3v2,
+                };
+                probed.insert_tag(Tag::new(tag_type));
+                probed.primary_tag_mut().unwrap()
+            }
+        }
+    };
+
+    if let Some(val) = tags.title {
+        tag.set_title(val);
+    }
+    if let Some(val) = tags.artist {
+        tag.set_artist(val);
+    }
+    if let Some(val) = tags.album {
+        tag.set_album(val);
+    }
+    if let Some(val) = tags.album_artist {
+        tag.insert_text(lofty::tag::ItemKey::AlbumArtist, val);
+    }
+    if let Some(val) = tags.year {
+        tag.set_year(val as u32);
+    }
+    if let Some(val) = tags.genre {
+        tag.set_genre(val);
+    }
+    if let Some(val) = tags.track_number {
+        tag.set_track(val as u32);
+    }
+    if let Some(val) = tags.disc_number {
+        tag.set_disk(val as u32);
+    }
+
+    tag.save_to_path(&path, WriteOptions::default())
+        .map_err(|e| napi::Error::from_reason(format!("Failed to save tags: {}", e)))?;
+
+    Ok(())
 }
