@@ -72,3 +72,63 @@ pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, napi::Error> {
 
     Ok(support)
 }
+
+#[napi]
+pub fn initialize_hardware_decode() -> Result<HardwareCodecSupport, napi::Error> {
+    ffmpeg::init()
+        .map_err(|e| napi::Error::from_reason(format!("FFmpeg init error: {}", e)))?;
+
+    let mut support = HardwareCodecSupport {
+        h264: false,
+        hevc: false,
+        av1: false,
+        vp9: false,
+    };
+
+    // Windows: DXVA2 / D3D11VA
+    #[cfg(target_os = "windows")]
+    {
+        if ffmpeg::decoder::find_by_name("h264_d3d11va").is_some() || ffmpeg::decoder::find_by_name("h264_dxva2").is_some() {
+            support.h264 = true;
+        }
+        if ffmpeg::decoder::find_by_name("hevc_d3d11va").is_some() {
+            support.hevc = true;
+        }
+        if ffmpeg::decoder::find_by_name("av1_d3d11va").is_some() {
+            support.av1 = true;
+        }
+        if ffmpeg::decoder::find_by_name("vp9_d3d11va").is_some() {
+            support.vp9 = true;
+        }
+    }
+
+    // macOS: VideoToolbox
+    #[cfg(target_os = "macos")]
+    {
+        if ffmpeg::decoder::find_by_name("h264_videotoolbox").is_some() {
+            support.h264 = true;
+        }
+        if ffmpeg::decoder::find_by_name("hevc_videotoolbox").is_some() {
+            support.hevc = true;
+        }
+    }
+
+    // Linux: VAAPI / NVDEC
+    #[cfg(target_os = "linux")]
+    {
+        if ffmpeg::decoder::find_by_name("h264_vaapi").is_some() || ffmpeg::decoder::find_by_name("h264_nvdec").is_some() {
+            support.h264 = true;
+        }
+        if ffmpeg::decoder::find_by_name("hevc_vaapi").is_some() || ffmpeg::decoder::find_by_name("hevc_nvdec").is_some() {
+            support.hevc = true;
+        }
+        if ffmpeg::decoder::find_by_name("av1_vaapi").is_some() || ffmpeg::decoder::find_by_name("av1_nvdec").is_some() {
+            support.av1 = true;
+        }
+        if ffmpeg::decoder::find_by_name("vp9_vaapi").is_some() || ffmpeg::decoder::find_by_name("vp9_nvdec").is_some() {
+            support.vp9 = true;
+        }
+    }
+
+    Ok(support)
+}

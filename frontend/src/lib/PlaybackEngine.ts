@@ -1,6 +1,8 @@
 import { API_BASE } from './utils';
 import { SleepTimer } from '@/engines/SleepTimer';
 import { MediaFile } from '@/types/media';
+import Hls from 'hls.js';
+import { detectDeviceProfile } from './DeviceProfile';
 import { getPlatform, PlatformCapabilities } from '../platform';
 import { getMediaKeyService, IMediaKeyService } from '../services/mediaKeys';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -23,6 +25,7 @@ interface TrackChain {
   replayGain: GainNode;
   eq: BiquadFilterNode[];
   fade: GainNode;
+  hls: Hls | null;
 }
 
 export type PlaybackState = 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'ENDED' | 'ERROR';
@@ -211,10 +214,11 @@ export class PlaybackEngine {
       }
     });
 
-    return { element: el, source, replayGain, eq, fade };
+    return { element: el, source, replayGain, eq, fade, hls: null };
   }
 
-  private async resolveTrackUrl(track: MediaFile): Promise<string> {
+  private async resolveTrackUrl(track: MediaFile, forceHLS: boolean = false): Promise<string> {
+    const profile = detectDeviceProfile();
     const platform = this.capabilities;
     if (platform.host === 'mobile') {
       const { MobileMediaService } = await import('../services/mobileMedia/MobileMediaService');
@@ -227,13 +231,21 @@ export class PlaybackEngine {
 
     const baseUrl = `${API_BASE}/api/stream/${track.id}`;
 
+    if (forceHLS) {
+      const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+      const { uri } = await res.json();
+      return `${API_BASE}${uri}`;
+    }
+
     // Check if browser can play natively
     const ext = track.file_path?.split('.').pop()?.toLowerCase() ?? '';
     const nativeExts = ['mp3', 'flac', 'm4a', 'ogg', 'wav', 'opus', 'aac', 'mp4', 'webm'];
 
     if (!nativeExts.includes(ext)) {
-      // Force transcoding for unsupported formats
-      return `${baseUrl}?transcode=1`;
+      // Use HLS for unsupported formats
+      const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+      const { uri } = await res.json();
+      return `${API_BASE}${uri}`;
     }
 
     // For video, check hardware decode capability (placeholder for real check)
@@ -243,7 +255,9 @@ export class PlaybackEngine {
         codec.includes(c),
       );
       if (browserUnsupported) {
-        return `${baseUrl}?transcode=1`;
+        const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+        const { uri } = await res.json();
+        return `${API_BASE}${uri}`;
       }
     }
 
@@ -271,10 +285,24 @@ export class PlaybackEngine {
     }
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
+
+    if (chain.hls) {
+      chain.hls.destroy();
+      chain.hls = null;
+    }
+
     this.currentTrackId = file.id;
     this.setState('LOADING');
-    const url = await this.resolveTrackUrl(file);
-    chain.element.src = url;
+    const useHLS = file.type === 'video' || !['mp3', 'aac'].includes(file.file_path?.split('.').pop()?.toLowerCase() ?? '');
+    const url = await this.resolveTrackUrl(file, useHLS);
+
+    if (useHLS && Hls.isSupported()) {
+      chain.hls = new Hls();
+      chain.hls.loadSource(url);
+      chain.hls.attachMedia(chain.element);
+    } else {
+      chain.element.src = url;
+    }
     chain.element.load();
     let gainDb = 0;
     const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
@@ -296,6 +324,10 @@ export class PlaybackEngine {
   async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
     this.initContext();
     const chain = this.chains[this.activeIndex];
+    if (chain.hls) {
+      chain.hls.destroy();
+      chain.hls = null;
+    }
     try {
       chain.source.disconnect();
     } catch (e) {
@@ -305,9 +337,17 @@ export class PlaybackEngine {
     chain.element = videoElement;
     chain.source = source;
     chain.source.connect(chain.replayGain);
-    const url = await this.resolveTrackUrl(file);
-    videoElement.src = url;
-    videoElement.load();
+
+    const url = await this.resolveTrackUrl(file, true); // Always use HLS for video as per optimization plan
+
+    if (Hls.isSupported()) {
+      chain.hls = new Hls();
+      chain.hls.loadSource(url);
+      chain.hls.attachMedia(videoElement);
+    } else {
+      videoElement.src = url;
+      videoElement.load();
+    }
     this.currentTrackId = file.id;
     if (this.capabilities.canControlMediaKeys) {
       this.mediaKeys.updateMetadata(file);

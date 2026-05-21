@@ -28,6 +28,7 @@ import { LocalSyncServer } from './services/LocalSyncServer.js';
 import { RemoteControlServer } from './services/RemoteControlServer.js';
 import { refreshLibraryWatcherPaths, setLibraryWatcherIo } from './services/LibraryWatcher.js';
 import { execSync } from 'child_process';
+import native from './utils/native-loader.js';
 
 dotenv.config();
 
@@ -70,6 +71,14 @@ try {
   execSync('ffmpeg -version', { stdio: 'pipe' });
 } catch {
   console.warn('[zovyra] ffmpeg not found — transcoding disabled');
+}
+
+// Check hardware acceleration
+try {
+  const hwSupport = native.initialize_hardware_decode();
+  console.log('[zovyra] Hardware decoding initialized:', hwSupport);
+} catch (e) {
+  console.warn('[zovyra] Hardware decoding initialization failed:', e);
 }
 
 app.use(

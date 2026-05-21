@@ -78,6 +78,7 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
     "fabric": "^7.3.1",
+    "hls.js": "^1.5.20",
     "i18next": "^25.3.2",
     "idb": "^8.0.3",
     "input-otp": "^1.2.4",

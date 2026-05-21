@@ -10,6 +10,16 @@ import type { MediaFile } from '@/types/media';
  * No server involved. No filesystem walking. Results in < 500ms.
  */
 export class MobileMediaService {
+  static async initHardwareAccel(): Promise<boolean> {
+    try {
+      // @ts-expect-error - Plugin might not be registered yet or missing in types
+      const result = await Capacitor.Plugins.MediaPlugin?.initHardwareAccel?.();
+      return result?.available ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   static async requestPermissions(): Promise<boolean> {
     try {
       const { CapacitorMediaStore } = await import('@odion-cloud/capacitor-mediastore');

@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
 import db from '../db/index.js';
 import { validatePath } from '../utils/path-utils.js';
 import { verifyToken } from '../middleware/auth.js';
+import { HLSTranscodeService } from '../services/HLSTranscodeService.js';
+import { cacheMiddleware } from '../middleware/CacheMiddleware.js';
+import { TranscodeService, DeviceProfile } from '../services/TranscodeService.js';
 
 const router = Router();
 
@@ -22,6 +24,37 @@ const MIME_TYPES: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.avi': 'video/x-msvideo',
 };
+
+router.get('/:trackId/hls/playlist.m3u8', async (req, res) => {
+  const { trackId } = req.params;
+  const manifestPath = HLSTranscodeService.getManifestPath(trackId);
+
+  if (fs.existsSync(manifestPath)) {
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    return res.sendFile(manifestPath);
+  }
+
+  res.status(404).send('Manifest not found');
+});
+
+router.get('/:trackId/hls/:segment', cacheMiddleware, async (req, res) => {
+  const { trackId, segment } = req.params;
+
+  // Sanitize segment filename to prevent path traversal
+  const sanitizedSegment = path.basename(segment);
+  if (sanitizedSegment !== segment) {
+    return res.status(403).send('Invalid segment name');
+  }
+
+  const segmentPath = HLSTranscodeService.getSegmentPath(trackId, sanitizedSegment);
+
+  if (fs.existsSync(segmentPath)) {
+    res.setHeader('Content-Type', 'video/MP2T');
+    return res.sendFile(segmentPath);
+  }
+
+  res.status(404).send('Segment not found');
+});
 
 router.get('/:trackId', async (req, res) => {
   const { trackId } = req.params;
@@ -63,50 +96,20 @@ router.get('/:trackId', async (req, res) => {
     return res.status(404).json({ error: 'File not found on disk' });
   }
 
-  if (transcode) {
-    const ext = path.extname(track.file_path).toLowerCase();
-    const isVideo = ['.mkv', '.avi', '.mov', '.wmv', '.m4v'].includes(ext);
+  if (transcode || req.query.hls === '1') {
+    const profile = (req.query.profile as DeviceProfile) || 'mid';
+    const bitrateConfig = TranscodeService.getBitrateConfig(profile);
 
-    if (isVideo) {
-      res.setHeader('Content-Type', 'video/mp4');
-      const ffmpeg = spawn('ffmpeg', [
-        '-i',
+    try {
+      const hls = await HLSTranscodeService.generateHLSManifest(
+        trackId,
         track.file_path,
-        '-c:v',
-        'libx264',
-        '-preset',
-        'ultrafast',
-        '-crf',
-        '23',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-movflags',
-        'frag_keyframe+empty_moov+default_base_moof',
-        '-f',
-        'mp4',
-        'pipe:1',
-      ]);
-      ffmpeg.stdout.pipe(res);
-      req.on('close', () => ffmpeg.kill('SIGKILL'));
-      return;
-    } else {
-      res.setHeader('Content-Type', 'audio/webm');
-      const ffmpeg = spawn('ffmpeg', [
-        '-i',
-        track.file_path,
-        '-c:a',
-        'libopus',
-        '-b:a',
-        '128k',
-        '-f',
-        'webm',
-        'pipe:1',
-      ]);
-      ffmpeg.stdout.pipe(res);
-      req.on('close', () => ffmpeg.kill('SIGKILL'));
-      return;
+        bitrateConfig.audio
+      );
+      return res.json(hls);
+    } catch (e) {
+      console.error('HLS generation failed', e);
+      return res.status(500).json({ error: 'Failed to generate HLS stream' });
     }
   }
 
