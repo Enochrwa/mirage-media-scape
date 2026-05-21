@@ -6,7 +6,6 @@ import db from '../db/index.js';
 import { validatePath, isValidId, sanitizeFilename } from '../utils/path-utils.js';
 import { verifyToken } from '../middleware/auth.js';
 import { HLSTranscodeService } from '../services/HLSTranscodeService.js';
-import { cacheMiddleware } from '../middleware/CacheMiddleware.js';
 import { DeviceProfile } from '../services/TranscodeService.js';
 
 const router = Router();
@@ -57,17 +56,21 @@ router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
     }
   }
 
-  const manifestPath = HLSTranscodeService.getManifestPath(trackId as string, profile as string);
+  try {
+    const manifestPath = HLSTranscodeService.getManifestPath(trackId as string, profile as string);
 
-  if (fs.existsSync(manifestPath)) {
+    if (fs.existsSync(manifestPath)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     return res.sendFile(manifestPath);
   }
 
-  res.status(404).send('Manifest not found');
+    res.status(404).send('Manifest not found');
+  } catch {
+    res.status(403).send('Invalid path parameters');
+  }
 });
 
-router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) => {
+router.get('/:trackId/hls/:profile/:segment', async (req, res) => {
   const { trackId, profile, segment } = req.params;
 
   if (!isValidId(trackId) || !isValidId(profile) || sanitizeFilename(segment) !== segment) {
@@ -80,7 +83,7 @@ router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) 
 
   if (!track) return res.status(404).send('Track not found');
 
-  // Authorization check
+  // Authorization check (BEFORE serving segment)
   const isLocal =
     req.ip === '127.0.0.1' ||
     req.ip === '::1' ||
@@ -98,14 +101,25 @@ router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) 
     }
   }
 
-  const segmentPath = HLSTranscodeService.getSegmentPath(trackId as string, profile as string, segment as string);
+  // Segment caching and serving
+  try {
+    const segmentPath = HLSTranscodeService.getSegmentPath(
+      trackId as string,
+      profile as string,
+      segment as string,
+    );
 
-  if (fs.existsSync(segmentPath)) {
-    res.setHeader('Content-Type', 'video/MP2T');
-    return res.sendFile(segmentPath);
+    if (fs.existsSync(segmentPath)) {
+      res.setHeader('Content-Type', 'video/MP2T');
+      res.set('X-Cache', 'HIT');
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(segmentPath);
+    }
+
+    res.status(404).send('Segment not found');
+  } catch {
+    res.status(403).send('Invalid path parameters');
   }
-
-  res.status(404).send('Segment not found');
 });
 
 router.get('/:trackId', async (req, res) => {

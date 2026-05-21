@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { sanitizeId, sanitizeFilename } from '../utils/path-utils.js';
+import { sanitizeId, ensureSafePath } from '../utils/path-utils.js';
 import { TranscodeService, DeviceProfile } from './TranscodeService.js';
 
 export interface HLSManifestResult {
@@ -135,15 +135,10 @@ export class HLSTranscodeService {
   }
 
   static getSegmentPath(trackId: string, profile: string, segmentName: string): string {
-    return path.join(
-      this.hlsDir,
-      sanitizeId(trackId),
-      sanitizeId(profile),
-      sanitizeFilename(segmentName),
-    );
+    return ensureSafePath(this.hlsDir, trackId, profile, segmentName);
   }
 
   static getManifestPath(trackId: string, profile: string): string {
-    return path.join(this.hlsDir, sanitizeId(trackId), sanitizeId(profile), 'playlist.m3u8');
+    return ensureSafePath(this.hlsDir, trackId, profile, 'playlist.m3u8');
   }
 }

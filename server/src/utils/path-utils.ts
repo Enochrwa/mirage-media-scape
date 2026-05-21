@@ -29,8 +29,29 @@ export function sanitizeFilename(str: unknown): string {
   // Prevent dot-segment traversal by using path.basename and blocking specific values
   const base = path.basename(str);
   if (base === '.' || base === '..') return '_';
-  // Strip any remaining dangerous characters
+  // Strip any remaining dangerous characters (specifically any slashes or backslashes)
   return base.replace(/[^a-z0-9._-]/gi, '_');
+}
+
+/**
+ * Ensures a path is safe to use by verifying it's within a specific root directory.
+ */
+export function ensureSafePath(root: string, ...segments: string[]): string {
+  const sanitizedSegments = segments.map((s) => {
+    const base = path.basename(s);
+    if (base === '.' || base === '..') throw new Error('Path traversal attempt detected');
+    return base.replace(/[^a-z0-9._-]/gi, '_');
+  });
+
+  const finalPath = path.join(root, ...sanitizedSegments);
+  const absoluteRoot = path.resolve(root);
+  const absoluteFinal = path.resolve(finalPath);
+
+  if (!absoluteFinal.startsWith(absoluteRoot)) {
+    throw new Error('Safe path escape detected');
+  }
+
+  return finalPath;
 }
 
 /**

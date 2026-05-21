@@ -311,10 +311,11 @@ export class PlaybackEngine {
     const nativelyPlayable = ['mp3', 'aac', 'flac', 'ogg', 'wav', 'opus'].includes(ext);
 
     // Disable HLS for desktop local file URLs and natively playable audio
+    // For video, we should use HLS only if not on desktop (desktop uses direct URLs which can be handled natively by some webviews or fallback to transcode=1)
     const useHLS = !isDesktop && (file.type === 'video' || !nativelyPlayable);
     const url = await this.resolveTrackUrl(file, useHLS);
 
-    if (useHLS && Hls.isSupported() && !isDesktop) {
+    if (useHLS && Hls.isSupported()) {
       chain.hls = new Hls();
       chain.hls.loadSource(url);
       chain.hls.attachMedia(chain.element);
