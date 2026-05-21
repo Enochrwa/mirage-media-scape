@@ -58,7 +58,9 @@ export function processFile(
 
   const existing = db
     .prepare('SELECT last_modified, id, file_size, fingerprint FROM tracks WHERE file_path = ?')
-    .get(filePath) as { last_modified: number; id: string; file_size: number; fingerprint?: string } | undefined;
+    .get(filePath) as
+    | { last_modified: number; id: string; file_size: number; fingerprint?: string }
+    | undefined;
 
   if (existing && existing.last_modified === mtime && existing.file_size === fileSize) {
     return null; // unchanged
@@ -130,7 +132,7 @@ export function processFile(
     metadata.replaygainAlbumPeak ?? null,
     metadata.encoderDelay ?? null,
     metadata.encoderPadding ?? null,
-    null,  // waveform_data — deferred to async background waveform worker
+    null, // waveform_data — deferred to async background waveform worker
     chaptersJson,
     coverCachePath,
     thumbnailPath,
@@ -187,12 +189,7 @@ export function processFile(
       VALUES (?, ?, ?, ?)
     `);
     for (const stream of metadata.subtitleStreams) {
-      insertSubtitleStream.run(
-        id,
-        stream.index,
-        stream.language ?? null,
-        stream.codecName ?? null,
-      );
+      insertSubtitleStream.run(id, stream.index, stream.language ?? null, stream.codecName ?? null);
     }
   }
 

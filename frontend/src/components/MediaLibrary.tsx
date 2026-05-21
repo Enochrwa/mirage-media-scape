@@ -91,6 +91,9 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
   // Ensure files is an array before filtering
   const safeFiles = Array.isArray(files) ? files : [];
 
+  // Use initialMediaType if provided, otherwise use mediaType state
+  const effectiveMediaType = initialMediaType || mediaType;
+
   const filteredFiles = safeFiles
     .filter((file) => {
       const matchesSearch =
@@ -98,7 +101,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
         (file.artist && file.artist.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (file.album && file.album.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesType = mediaType === 'all' || file.type === mediaType;
+      const matchesType = effectiveMediaType === 'all' || file.type === effectiveMediaType;
 
       return matchesSearch && matchesType;
     })

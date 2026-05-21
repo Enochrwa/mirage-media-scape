@@ -23,12 +23,12 @@ export class SubtitleService {
     const fd = fs.openSync(absolutePath, 'r');
 
     try {
-        // Read first 64KB
-        fs.readSync(fd, buffer, 0, CHUNK_SIZE, 0);
-        // Read last 64KB
-        fs.readSync(fd, buffer, CHUNK_SIZE, CHUNK_SIZE, Math.max(0, fileSize - CHUNK_SIZE));
+      // Read first 64KB
+      fs.readSync(fd, buffer, 0, CHUNK_SIZE, 0);
+      // Read last 64KB
+      fs.readSync(fd, buffer, CHUNK_SIZE, CHUNK_SIZE, Math.max(0, fileSize - CHUNK_SIZE));
     } finally {
-        fs.closeSync(fd);
+      fs.closeSync(fd);
     }
 
     let hash = BigInt(fileSize);

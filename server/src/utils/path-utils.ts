@@ -29,7 +29,9 @@ export function validatePath(filePath: string): boolean {
     const absolutePath = path.resolve(filePath);
 
     // Get watched folders from database
-    const watchedFolders = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+    const watchedFolders = db.prepare('SELECT path FROM watched_folders').all() as {
+      path: string;
+    }[];
 
     for (const folder of watchedFolders) {
       // Normalize: resolve and strip trailing separators

@@ -52,10 +52,10 @@ const { dbPath, folders, coversDir } = workerData;
 // From __dirname (/…/server/src/services/) go UP TWO levels to server/:
 //   services/..  → server/src
 //   ../dist/src/services/  → server/dist/src/services/  ✓
-const srcServicesDir  = path.resolve(__dirname);
-const serverRoot      = path.resolve(srcServicesDir, '..', '..');
-const distWorkerDir   = path.join(serverRoot, 'dist', 'src', 'services');
-const distChunkPath   = path.join(distWorkerDir, 'scan-chunk-worker.js');
+const srcServicesDir = path.resolve(__dirname);
+const serverRoot = path.resolve(srcServicesDir, '..', '..');
+const distWorkerDir = path.join(serverRoot, 'dist', 'src', 'services');
+const distChunkPath = path.join(distWorkerDir, 'scan-chunk-worker.js');
 
 // Detect dev mode: tsx is running if dist/ doesn't exist
 const isProd = process.env.NODE_ENV === 'production';
@@ -98,7 +98,9 @@ async function scan() {
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
-  const deleteSubtitleStreamsStmt = db.prepare('DELETE FROM track_subtitle_streams WHERE track_id = ?');
+  const deleteSubtitleStreamsStmt = db.prepare(
+    'DELETE FROM track_subtitle_streams WHERE track_id = ?',
+  );
   const insertSubtitleStreamStmt = db.prepare(`
     INSERT INTO track_subtitle_streams (track_id, stream_index, language, codec_name)
     VALUES (?, ?, ?, ?)
@@ -108,15 +110,38 @@ async function scan() {
     const now = Date.now();
     for (const t of batch) {
       insertTrackStmt.run(
-        t.id, t.file_path, t.file_type, t.title, t.artist, t.album, t.album_artist,
-        t.year, t.genre, t.track_number, t.disc_number, t.duration,
-        t.sample_rate, t.bitrate, t.channels, t.codec,
-        t.replaygain_track_gain, t.replaygain_track_peak,
-        t.replaygain_album_gain, t.replaygain_album_peak,
-        t.encoder_delay, t.encoder_padding,
-        null, t.chaptersJson, t.cover_cache_path, t.thumbnail_path,
+        t.id,
+        t.file_path,
+        t.file_type,
+        t.title,
+        t.artist,
+        t.album,
+        t.album_artist,
+        t.year,
+        t.genre,
+        t.track_number,
+        t.disc_number,
+        t.duration,
+        t.sample_rate,
+        t.bitrate,
+        t.channels,
+        t.codec,
+        t.replaygain_track_gain,
+        t.replaygain_track_peak,
+        t.replaygain_album_gain,
+        t.replaygain_album_peak,
+        t.encoder_delay,
+        t.encoder_padding,
+        null,
+        t.chaptersJson,
+        t.cover_cache_path,
+        t.thumbnail_path,
         t.fingerprint,
-        t.last_modified, t.mtime, t.file_size, now, now
+        t.last_modified,
+        t.mtime,
+        t.file_size,
+        now,
+        now,
       );
 
       // Sub-tables
@@ -132,7 +157,14 @@ async function scan() {
       deleteAudioStreamsStmt.run(t.id);
       if (meta.audioStreams && meta.audioStreams.length > 0) {
         for (const s of meta.audioStreams) {
-          insertAudioStreamStmt.run(t.id, s.index, s.language ?? null, s.codecName ?? null, s.channels ?? null, s.sampleRate ?? null);
+          insertAudioStreamStmt.run(
+            t.id,
+            s.index,
+            s.language ?? null,
+            s.codecName ?? null,
+            s.channels ?? null,
+            s.sampleRate ?? null,
+          );
         }
       }
 
@@ -231,30 +263,42 @@ async function scan() {
     }
   };
 
-  native.scanFolders(folders, async (err: Error | null, files: { path: string; mtime: number; size: number }[] | null | undefined) => {
-    if (err) {
-      console.error('Rust scanner error:', err);
-      return;
-    }
-    if (files === null || files === undefined) {
-      rustScanComplete = true;
-      checkCompletion();
-    } else {
-      // Backpressure: wait if queue is too deep
-      if (batchQueue.length >= MAX_QUEUE_DEPTH) {
-        scannerPaused = true;
-        await new Promise<void>((resolve) => { resumeScanner = resolve; });
+  native.scanFolders(
+    folders,
+    async (
+      err: Error | null,
+      files: { path: string; mtime: number; size: number }[] | null | undefined,
+    ) => {
+      if (err) {
+        console.error('Rust scanner error:', err);
+        return;
       }
+      if (files === null || files === undefined) {
+        rustScanComplete = true;
+        checkCompletion();
+      } else {
+        // Backpressure: wait if queue is too deep
+        if (batchQueue.length >= MAX_QUEUE_DEPTH) {
+          scannerPaused = true;
+          await new Promise<void>((resolve) => {
+            resumeScanner = resolve;
+          });
+        }
 
-      for (const f of files) scannedPaths.add(f.path);
+        for (const f of files) scannedPaths.add(f.path);
 
-      totalFiles += files.length;
-      parentPort?.postMessage({ type: 'SCAN_PROGRESS', scanned: totalScanned, total: totalFiles });
+        totalFiles += files.length;
+        parentPort?.postMessage({
+          type: 'SCAN_PROGRESS',
+          scanned: totalScanned,
+          total: totalFiles,
+        });
 
-      batchQueue.push(files);
-      processNextBatch();
-    }
-  });
+        batchQueue.push(files);
+        processNextBatch();
+      }
+    },
+  );
 
   function markMissingFiles(scannedPaths: Set<string>) {
     // db is already open
@@ -270,7 +314,6 @@ async function scan() {
     const rows = [...(stmt.iterate() as IterableIterator<{ id: string; file_path: string }>)];
     batch(rows);
   }
-
 }
 
 scan();

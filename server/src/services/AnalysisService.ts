@@ -62,9 +62,16 @@ export class AnalysisService {
     }
   }
 
-  pause() { this.isPaused = true; }
-  resume() { this.isPaused = false; this.startBackgroundAnalysis(); }
-  getStatus() { return { isAnalyzing: this.isAnalyzing, isPaused: this.isPaused, queued: this.queue.length }; }
+  pause() {
+    this.isPaused = true;
+  }
+  resume() {
+    this.isPaused = false;
+    this.startBackgroundAnalysis();
+  }
+  getStatus() {
+    return { isAnalyzing: this.isAnalyzing, isPaused: this.isPaused, queued: this.queue.length };
+  }
 
   private async processQueue() {
     const total = this.queue.length;
@@ -74,14 +81,14 @@ export class AnalysisService {
 
     while (this.queue.length > 0) {
       if (this.isPaused) {
-          this.isAnalyzing = false;
-          return;
+        this.isAnalyzing = false;
+        return;
       }
 
       if (this.governor.shouldPauseAnalysis()) {
-          this.io?.emit('ANALYSIS_PAUSED', { reason: 'low_memory' });
-          await new Promise(r => setTimeout(r, 5000));
-          continue;
+        this.io?.emit('ANALYSIS_PAUSED', { reason: 'low_memory' });
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
       }
 
       const track = this.queue.shift()!;

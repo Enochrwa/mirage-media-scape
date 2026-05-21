@@ -9,9 +9,9 @@ const router = Router();
 // Helper to get file path from ID
 const getFilePath = (id: unknown): string | null => {
   if (id && typeof id === 'string') {
-    const track = db
-      .prepare('SELECT file_path FROM tracks WHERE id = ?')
-      .get(sanitizeId(id)) as { file_path: string } | undefined;
+    const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(sanitizeId(id)) as
+      | { file_path: string }
+      | undefined;
     if (track && validatePath(track.file_path)) return track.file_path;
   }
   return null;

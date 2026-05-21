@@ -22,7 +22,7 @@ export class LyricsService {
         // Fallback for plain lyrics
         return data.plain_lyrics.split('\n').map((line: string) => ({
           time: 0,
-          text: line.trim()
+          text: line.trim(),
         }));
       }
 

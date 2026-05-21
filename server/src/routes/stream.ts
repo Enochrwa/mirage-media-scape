@@ -27,14 +27,22 @@ router.get('/:trackId', async (req, res) => {
   const { trackId } = req.params;
   const transcode = req.query.transcode === '1';
 
-  const track = db.prepare('SELECT file_path, codec, owner_id, is_public FROM tracks WHERE id = ?').get(trackId) as { file_path: string, codec: string | null, owner_id: string | null, is_public: number } | undefined;
+  const track = db
+    .prepare('SELECT file_path, codec, owner_id, is_public FROM tracks WHERE id = ?')
+    .get(trackId) as
+    | { file_path: string; codec: string | null; owner_id: string | null; is_public: number }
+    | undefined;
 
   if (!track) {
     return res.status(404).json({ error: 'Track not found' });
   }
 
   // Authorization check
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1' || process.env.LOCAL_MODE === 'true';
+  const isLocal =
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === '::ffff:127.0.0.1' ||
+    process.env.LOCAL_MODE === 'true';
   if (!isLocal && track.owner_id && !track.is_public) {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -62,11 +70,23 @@ router.get('/:trackId', async (req, res) => {
     if (isVideo) {
       res.setHeader('Content-Type', 'video/mp4');
       const ffmpeg = spawn('ffmpeg', [
-        '-i', track.file_path,
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-        '-c:a', 'aac', '-b:a', '128k',
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-        '-f', 'mp4', 'pipe:1'
+        '-i',
+        track.file_path,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-crf',
+        '23',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '128k',
+        '-movflags',
+        'frag_keyframe+empty_moov+default_base_moof',
+        '-f',
+        'mp4',
+        'pipe:1',
       ]);
       ffmpeg.stdout.pipe(res);
       req.on('close', () => ffmpeg.kill('SIGKILL'));
@@ -74,11 +94,15 @@ router.get('/:trackId', async (req, res) => {
     } else {
       res.setHeader('Content-Type', 'audio/webm');
       const ffmpeg = spawn('ffmpeg', [
-        '-i', track.file_path,
-        '-c:a', 'libopus',
-        '-b:a', '128k',
-        '-f', 'webm',
-        'pipe:1'
+        '-i',
+        track.file_path,
+        '-c:a',
+        'libopus',
+        '-b:a',
+        '128k',
+        '-f',
+        'webm',
+        'pipe:1',
       ]);
       ffmpeg.stdout.pipe(res);
       req.on('close', () => ffmpeg.kill('SIGKILL'));
@@ -93,10 +117,10 @@ router.get('/:trackId', async (req, res) => {
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
   if (range) {
-    const parts = range.replace(/bytes=/, "").split("-");
+    const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
     const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    const chunksize = (end - start) + 1;
+    const chunksize = end - start + 1;
     const file = fs.createReadStream(track.file_path, { start, end });
     const head = {
       'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -118,14 +142,16 @@ router.get('/:trackId', async (req, res) => {
 });
 
 router.get('/:trackId/can-play', (req, res) => {
-    const { trackId } = req.params;
-    const track = db.prepare('SELECT codec FROM tracks WHERE id = ?').get(trackId) as { codec: string | null } | undefined;
-    if (!track) return res.status(404).json({ error: 'Track not found' });
+  const { trackId } = req.params;
+  const track = db.prepare('SELECT codec FROM tracks WHERE id = ?').get(trackId) as
+    | { codec: string | null }
+    | undefined;
+  if (!track) return res.status(404).json({ error: 'Track not found' });
 
-    // Simplified logic: browsers generally play mp3, aac, opus, vp9, h264
-    const codec = track.codec?.toLowerCase() || '';
-    const nativePlayable = ['mp3', 'aac', 'opus', 'flac', 'h264', 'vp9'].includes(codec);
-    res.json({ nativePlayable, codec: track.codec });
+  // Simplified logic: browsers generally play mp3, aac, opus, vp9, h264
+  const codec = track.codec?.toLowerCase() || '';
+  const nativePlayable = ['mp3', 'aac', 'opus', 'flac', 'h264', 'vp9'].includes(codec);
+  res.json({ nativePlayable, codec: track.codec });
 });
 
 export default router;
