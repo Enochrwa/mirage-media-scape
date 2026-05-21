@@ -109,8 +109,8 @@ async function loadNative(): Promise<typeof NativeTypes> {
 
   // 2. Transpile stub-build.ts on the fly so the server can boot in stub-only mode
   try {
-    const { execSync } = await import('node:child_process');
-    execSync('npx --yes tsc --project ' + nativeDir.replace(/\\/g, '/') + '/tsconfig.stub.json', {
+    const { execFileSync } = await import('node:child_process');
+    execFileSync('npx', ['--yes', 'tsc', '--project', path.join(nativeDir, 'tsconfig.stub.json')], {
       stdio: 'pipe',
       cwd: repoRoot,
     });
