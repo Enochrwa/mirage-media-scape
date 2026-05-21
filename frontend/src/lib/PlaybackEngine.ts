@@ -304,7 +304,9 @@ export class PlaybackEngine {
 
     this.currentTrackId = file.id;
     this.setState('LOADING');
-    const useHLS = file.type === 'video' || !['mp3', 'aac'].includes(file.file_path?.split('.').pop()?.toLowerCase() ?? '');
+    const ext = file.file_path?.split('.').pop()?.toLowerCase() ?? '';
+    const nativelyPlayable = ['mp3', 'aac', 'flac', 'ogg', 'wav', 'opus'].includes(ext);
+    const useHLS = file.type === 'video' || !nativelyPlayable;
     const url = await this.resolveTrackUrl(file, useHLS);
 
     if (useHLS && Hls.isSupported()) {

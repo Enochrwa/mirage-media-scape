@@ -2,11 +2,11 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import db from '../db/index.js';
-import { validatePath } from '../utils/path-utils.js';
+import { validatePath, sanitizeId, sanitizeFilename } from '../utils/path-utils.js';
 import { verifyToken } from '../middleware/auth.js';
 import { HLSTranscodeService } from '../services/HLSTranscodeService.js';
 import { cacheMiddleware } from '../middleware/CacheMiddleware.js';
-import { TranscodeService, DeviceProfile } from '../services/TranscodeService.js';
+import { DeviceProfile } from '../services/TranscodeService.js';
 
 const router = Router();
 
@@ -25,14 +25,40 @@ const MIME_TYPES: Record<string, string> = {
   '.avi': 'video/x-msvideo',
 };
 
-router.get('/:trackId/hls/playlist.m3u8', async (req, res) => {
-  const { trackId } = req.params;
-  const sanitizedTrackId = trackId as string;
-  if (!/^[A-Za-z0-9_-]+$/.test(sanitizedTrackId)) {
-    return res.status(403).send('Invalid track id');
+router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
+  const { trackId, profile } = req.params;
+  const sanitizedTrackId = sanitizeId(trackId);
+  const sanitizedProfile = sanitizeId(profile);
+
+  if (sanitizedTrackId !== trackId || sanitizedProfile !== profile) {
+    return res.status(403).send('Invalid path parameters');
   }
 
-  const manifestPath = HLSTranscodeService.getManifestPath(sanitizedTrackId);
+  const track = db
+    .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
+    .get(sanitizedTrackId) as { owner_id: string | null; is_public: number } | undefined;
+
+  if (!track) return res.status(404).send('Track not found');
+
+  // Authorization check
+  const isLocal =
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === '::ffff:127.0.0.1' ||
+    process.env.LOCAL_MODE === 'true';
+  if (!isLocal && track.owner_id && !track.is_public) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      verifyToken(authHeader.split(' ')[1]);
+    } catch {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+
+  const manifestPath = HLSTranscodeService.getManifestPath(sanitizedTrackId, sanitizedProfile);
 
   if (fs.existsSync(manifestPath)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -42,20 +68,43 @@ router.get('/:trackId/hls/playlist.m3u8', async (req, res) => {
   res.status(404).send('Manifest not found');
 });
 
-router.get('/:trackId/hls/:segment', cacheMiddleware, async (req, res) => {
-  const { trackId, segment } = req.params;
-  const sanitizedTrackId = trackId as string;
-  if (!/^[A-Za-z0-9_-]+$/.test(sanitizedTrackId)) {
-    return res.status(403).send('Invalid track id');
+router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) => {
+  const { trackId, profile, segment } = req.params;
+
+  // Sanitize parameters to prevent path traversal
+  const sanitizedTrackId = sanitizeId(trackId);
+  const sanitizedProfile = sanitizeId(profile);
+  const sanitizedSegment = sanitizeFilename(segment);
+
+  if (sanitizedTrackId !== trackId || sanitizedSegment !== segment || sanitizedProfile !== profile) {
+    return res.status(403).send('Invalid path parameters');
   }
 
-  // Sanitize segment filename to prevent path traversal
-  const sanitizedSegment = path.basename(segment as string);
-  if (sanitizedSegment !== segment) {
-    return res.status(403).send('Invalid segment name');
+  const track = db
+    .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
+    .get(sanitizedTrackId) as { owner_id: string | null; is_public: number } | undefined;
+
+  if (!track) return res.status(404).send('Track not found');
+
+  // Authorization check
+  const isLocal =
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === '::ffff:127.0.0.1' ||
+    process.env.LOCAL_MODE === 'true';
+  if (!isLocal && track.owner_id && !track.is_public) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      verifyToken(authHeader.split(' ')[1]);
+    } catch {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
   }
 
-  const segmentPath = HLSTranscodeService.getSegmentPath(sanitizedTrackId, sanitizedSegment);
+  const segmentPath = HLSTranscodeService.getSegmentPath(sanitizedTrackId, sanitizedProfile, sanitizedSegment);
 
   if (fs.existsSync(segmentPath)) {
     res.setHeader('Content-Type', 'video/MP2T');
@@ -107,13 +156,44 @@ router.get('/:trackId', async (req, res) => {
 
   if (transcode || req.query.hls === '1') {
     const profile = (req.query.profile as DeviceProfile) || 'mid';
-    const bitrateConfig = TranscodeService.getBitrateConfig(profile);
+
+    // If it's a transcode request WITHOUT HLS flag, we should technically return media bytes
+    // as per P1 Badge: Preserve media stream behavior for transcode=1
+    if (transcode && req.query.hls !== '1') {
+      // Fallback to original single-bitrate stream behavior for compatibility
+      const ext = path.extname(track.file_path).toLowerCase();
+      const isVideo = ['.mkv', '.avi', '.mov', '.wmv', '.m4v'].includes(ext);
+
+      if (isVideo) {
+        res.setHeader('Content-Type', 'video/mp4');
+        const ffmpeg = spawn('ffmpeg', [
+          '-i', track.file_path,
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+          '-c:a', 'aac', '-b:a', '128k',
+          '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+          '-f', 'mp4', 'pipe:1',
+        ]);
+        ffmpeg.stdout.pipe(res);
+        req.on('close', () => ffmpeg.kill('SIGKILL'));
+        return;
+      } else {
+        res.setHeader('Content-Type', 'audio/webm');
+        const ffmpeg = spawn('ffmpeg', [
+          '-i', track.file_path,
+          '-c:a', 'libopus', '-b:a', '128k',
+          '-f', 'webm', 'pipe:1',
+        ]);
+        ffmpeg.stdout.pipe(res);
+        req.on('close', () => ffmpeg.kill('SIGKILL'));
+        return;
+      }
+    }
 
     try {
       const hls = await HLSTranscodeService.generateHLSManifest(
         trackId,
         track.file_path,
-        bitrateConfig.audio
+        profile,
       );
       return res.json(hls);
     } catch (e) {

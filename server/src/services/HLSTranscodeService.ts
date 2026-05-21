@@ -1,6 +1,8 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { sanitizeId, sanitizeFilename } from '../utils/path-utils.js';
+import { TranscodeService, DeviceProfile } from './TranscodeService.js';
 
 export interface HLSManifestResult {
   manifest: string;
@@ -17,63 +19,49 @@ export class HLSTranscodeService {
     }
   }
 
-  private static validateTrackId(trackId: string): void {
-    if (!/^[A-Za-z0-9_-]+$/.test(trackId)) {
-      throw new Error('Invalid trackId');
-    }
-  }
-
-  private static ensurePathWithinRoot(candidatePath: string, rootPath: string): string {
-    const normalizedRoot = path.resolve(rootPath);
-    const normalizedCandidate = path.resolve(candidatePath);
-    const rootWithSep = normalizedRoot.endsWith(path.sep) ? normalizedRoot : `${normalizedRoot}${path.sep}`;
-    if (normalizedCandidate !== normalizedRoot && !normalizedCandidate.startsWith(rootWithSep)) {
-      throw new Error('Path traversal detected');
-    }
-    return normalizedCandidate;
-  }
-
-  private static resolveTrackDir(trackId: string): string {
-    this.validateTrackId(trackId);
-    const trackDir = path.join(this.hlsDir, trackId);
-    return this.ensurePathWithinRoot(trackDir, this.hlsDir);
-  }
-
   static async generateHLSManifest(
     trackId: string,
     filePath: string,
-    targetBitrate?: number,
+    profile: string = 'mid',
   ): Promise<HLSManifestResult> {
-    const existingProcess = this.activeProcesses.get(trackId);
+    const sanitizedTrackId = sanitizeId(trackId);
+    const sanitizedProfile = sanitizeId(profile);
+    const lockKey = `${sanitizedTrackId}:${sanitizedProfile}`;
+
+    const existingProcess = this.activeProcesses.get(lockKey);
     if (existingProcess) return existingProcess;
 
-    const transcodePromise = this.startTranscode(trackId, filePath, targetBitrate);
-    this.activeProcesses.set(trackId, transcodePromise);
+    const transcodePromise = this.startTranscode(sanitizedTrackId, filePath, sanitizedProfile);
+    this.activeProcesses.set(lockKey, transcodePromise);
 
     try {
       return await transcodePromise;
     } finally {
-      this.activeProcesses.delete(trackId);
+      this.activeProcesses.delete(lockKey);
     }
   }
 
   private static async startTranscode(
     trackId: string,
     filePath: string,
-    targetBitrate?: number,
+    profile: string,
   ): Promise<HLSManifestResult> {
-    const trackDir = this.resolveTrackDir(trackId);
-    const manifestPath = this.ensurePathWithinRoot(path.join(trackDir, 'playlist.m3u8'), this.hlsDir);
+    const sanitizedTrackId = sanitizeId(trackId);
+    const sanitizedProfile = sanitizeId(profile);
+    const trackDir = path.join(this.hlsDir, sanitizedTrackId, sanitizedProfile);
+    const manifestPath = path.join(trackDir, 'playlist.m3u8');
 
     if (!fs.existsSync(trackDir)) {
       fs.mkdirSync(trackDir, { recursive: true });
     }
 
+    const { audio } = TranscodeService.getBitrateConfig(profile as unknown as DeviceProfile);
+
     // Check if manifest already exists
     if (fs.existsSync(manifestPath)) {
       return {
         manifest: fs.readFileSync(manifestPath, 'utf8'),
-        uri: `/api/stream/${trackId}/hls/playlist.m3u8`,
+        uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
       };
     }
 
@@ -83,7 +71,7 @@ export class HLSTranscodeService {
       '-c:a',
       'aac',
       '-b:a',
-      targetBitrate ? `${targetBitrate}k` : '192k',
+      `${audio}k`,
       '-c:v',
       'libx264',
       '-preset',
@@ -93,7 +81,7 @@ export class HLSTranscodeService {
       '-hls_list_size',
       '0',
       '-hls_segment_filename',
-      this.ensurePathWithinRoot(path.join(trackDir, 'seg-%d.ts'), this.hlsDir),
+      path.join(trackDir, 'seg-%d.ts'),
       '-f',
       'hls',
       manifestPath,
@@ -119,7 +107,7 @@ export class HLSTranscodeService {
         if (fs.existsSync(manifestPath)) {
           resolve({
             manifest: fs.readFileSync(manifestPath, 'utf8'),
-            uri: `/api/stream/${trackId}/hls/playlist.m3u8`,
+            uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
           });
         } else if (attempts < 20) {
           attempts++;
@@ -133,16 +121,16 @@ export class HLSTranscodeService {
     });
   }
 
-  static getSegmentPath(trackId: string, segmentName: string): string {
-    const trackDir = this.resolveTrackDir(trackId);
-    if (!/^seg-\d+\.ts$/.test(segmentName)) {
-      throw new Error('Invalid segment name');
-    }
-    return this.ensurePathWithinRoot(path.join(trackDir, segmentName), this.hlsDir);
+  static getSegmentPath(trackId: string, profile: string, segmentName: string): string {
+    return path.join(
+      this.hlsDir,
+      sanitizeId(trackId),
+      sanitizeId(profile),
+      sanitizeFilename(segmentName),
+    );
   }
 
-  static getManifestPath(trackId: string): string {
-    const trackDir = this.resolveTrackDir(trackId);
-    return this.ensurePathWithinRoot(path.join(trackDir, 'playlist.m3u8'), this.hlsDir);
+  static getManifestPath(trackId: string, profile: string): string {
+    return path.join(this.hlsDir, sanitizeId(trackId), sanitizeId(profile), 'playlist.m3u8');
   }
 }

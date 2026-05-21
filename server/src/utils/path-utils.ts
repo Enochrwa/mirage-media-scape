@@ -11,10 +11,13 @@ export function sanitizeId(id: unknown): string {
 
 /**
  * Sanitize a string to be safe for use in filenames.
+ * Specifically prevents dot-segment traversal by blocking '.' and '..' and removing all path separators.
  */
 export function sanitizeFilename(str: unknown): string {
   if (typeof str !== 'string') return '';
-  return str.replace(/[^a-z0-9._-]/gi, '_');
+  const sanitized = str.replace(/[^a-z0-9._-]/gi, '_');
+  if (sanitized === '.' || sanitized === '..') return '_';
+  return sanitized;
 }
 
 /**
