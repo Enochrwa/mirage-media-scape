@@ -1,21 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { sanitizeId, sanitizeFilename } from '../utils/path-utils.js';
+import { isValidId, sanitizeFilename } from '../utils/path-utils.js';
 
 // Simple file-based cache middleware as a substitute for Redis in this environment
 export const cacheMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const { trackId, profile, segment } = req.params;
 
-  // Sanitize to prevent path traversal
-  const sanitizedTrackId = sanitizeId(trackId);
-  const sanitizedProfile = profile ? sanitizeId(profile) : 'mid';
-  const sanitizedSegment = segment ? sanitizeFilename(segment) : '';
-
+  // Strict validation to prevent path traversal
   if (
-    sanitizedTrackId !== trackId ||
-    (profile && sanitizedProfile !== profile) ||
-    (segment && sanitizedSegment !== segment)
+    !isValidId(trackId) ||
+    (profile && !isValidId(profile)) ||
+    (segment && sanitizeFilename(segment) !== segment)
   ) {
     return res.status(403).send('Invalid path parameters');
   }
@@ -25,9 +21,9 @@ export const cacheMiddleware = (req: Request, res: Response, next: NextFunction)
       process.cwd(),
       'cache',
       'hls',
-      sanitizedTrackId,
-      sanitizedProfile,
-      sanitizedSegment,
+      trackId as string,
+      profile as string || 'mid',
+      segment as string,
     );
 
     if (fs.existsSync(cachePath)) {

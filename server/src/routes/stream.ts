@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
 import db from '../db/index.js';
-import { validatePath, sanitizeId, sanitizeFilename } from '../utils/path-utils.js';
+import { validatePath, isValidId, sanitizeFilename } from '../utils/path-utils.js';
 import { verifyToken } from '../middleware/auth.js';
 import { HLSTranscodeService } from '../services/HLSTranscodeService.js';
 import { cacheMiddleware } from '../middleware/CacheMiddleware.js';
@@ -27,16 +28,14 @@ const MIME_TYPES: Record<string, string> = {
 
 router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
   const { trackId, profile } = req.params;
-  const sanitizedTrackId = sanitizeId(trackId);
-  const sanitizedProfile = sanitizeId(profile);
 
-  if (sanitizedTrackId !== trackId || sanitizedProfile !== profile) {
+  if (!isValidId(trackId) || !isValidId(profile)) {
     return res.status(403).send('Invalid path parameters');
   }
 
   const track = db
     .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
-    .get(sanitizedTrackId) as { owner_id: string | null; is_public: number } | undefined;
+    .get(trackId) as { owner_id: string | null; is_public: number } | undefined;
 
   if (!track) return res.status(404).send('Track not found');
 
@@ -58,7 +57,7 @@ router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
     }
   }
 
-  const manifestPath = HLSTranscodeService.getManifestPath(sanitizedTrackId, sanitizedProfile);
+  const manifestPath = HLSTranscodeService.getManifestPath(trackId, profile);
 
   if (fs.existsSync(manifestPath)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -71,18 +70,13 @@ router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
 router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) => {
   const { trackId, profile, segment } = req.params;
 
-  // Sanitize parameters to prevent path traversal
-  const sanitizedTrackId = sanitizeId(trackId);
-  const sanitizedProfile = sanitizeId(profile);
-  const sanitizedSegment = sanitizeFilename(segment);
-
-  if (sanitizedTrackId !== trackId || sanitizedSegment !== segment || sanitizedProfile !== profile) {
+  if (!isValidId(trackId) || !isValidId(profile) || sanitizeFilename(segment) !== segment) {
     return res.status(403).send('Invalid path parameters');
   }
 
   const track = db
     .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
-    .get(sanitizedTrackId) as { owner_id: string | null; is_public: number } | undefined;
+    .get(trackId) as { owner_id: string | null; is_public: number } | undefined;
 
   if (!track) return res.status(404).send('Track not found');
 
@@ -104,7 +98,7 @@ router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) 
     }
   }
 
-  const segmentPath = HLSTranscodeService.getSegmentPath(sanitizedTrackId, sanitizedProfile, sanitizedSegment);
+  const segmentPath = HLSTranscodeService.getSegmentPath(trackId, profile, segment);
 
   if (fs.existsSync(segmentPath)) {
     res.setHeader('Content-Type', 'video/MP2T');

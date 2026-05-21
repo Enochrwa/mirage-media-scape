@@ -6,7 +6,18 @@ import db from '../db/index.js';
  */
 export function sanitizeId(id: unknown): string {
   if (typeof id !== 'string') return '';
-  return id.replace(/[^a-z0-9_-]/gi, '');
+  // Use path.basename to prevent traversal and regex to limit characters
+  const base = path.basename(id);
+  if (base === '.' || base === '..') return '';
+  const sanitized = base.replace(/[^a-z0-9_-]/gi, '');
+  return sanitized;
+}
+
+/**
+ * Check if a string is a valid ID (alphanumeric, underscores, dashes).
+ */
+export function isValidId(id: unknown): id is string {
+  return typeof id === 'string' && /^[a-z0-9_-]+$/i.test(id);
 }
 
 /**
@@ -15,7 +26,8 @@ export function sanitizeId(id: unknown): string {
  */
 export function sanitizeFilename(str: unknown): string {
   if (typeof str !== 'string') return '';
-  const sanitized = str.replace(/[^a-z0-9._-]/gi, '_');
+  const base = path.basename(str);
+  const sanitized = base.replace(/[^a-z0-9._-]/gi, '_');
   if (sanitized === '.' || sanitized === '..') return '_';
   return sanitized;
 }
