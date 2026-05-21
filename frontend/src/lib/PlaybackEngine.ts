@@ -248,13 +248,24 @@ export class PlaybackEngine {
       return `${API_BASE}${uri}`;
     }
 
-    // For video, check hardware decode capability (placeholder for real check)
+    // For video, check hardware decode capability
     if (track.type === 'video') {
       const codec = track.codec?.toLowerCase() ?? '';
-      const browserUnsupported = ['hevc', 'h265', 'vc1', 'wmv3', 'theora'].some((c) =>
-        codec.includes(c),
-      );
-      if (browserUnsupported) {
+      const { checkHardwareSupport } = await import('../hooks/useHardwareDecoding');
+      const hwSupport = await checkHardwareSupport();
+
+      const isHevc = codec.includes('hevc') || codec.includes('h265');
+      const isAv1 = codec.includes('av1');
+      const isVp9 = codec.includes('vp9');
+      const isH264 = codec.includes('h264') || codec.includes('avc');
+
+      const isSupported =
+        (isHevc && hwSupport.hevc) ||
+        (isAv1 && hwSupport.av1) ||
+        (isVp9 && hwSupport.vp9) ||
+        (isH264 && hwSupport.h264);
+
+      if (!isSupported || ['vc1', 'wmv3', 'theora'].some((c) => codec.includes(c))) {
         const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
         const { uri } = await res.json();
         return `${API_BASE}${uri}`;

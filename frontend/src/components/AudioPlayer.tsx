@@ -39,6 +39,7 @@ import {
 import { EqualizerControls } from './player/EqualizerControls';
 import { LyricsDisplay } from './player/LyricsDisplay';
 import Recommendations from './discovery/Recommendations';
+import { HWAccelBadge } from './HWAccelBadge';
 import { playbackEngine as pe } from '@/lib/PlaybackEngine';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -474,6 +475,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
                     {currentFile.camelot_key}
                   </span>
                 )}
+                <HWAccelBadge />
               </div>
             </div>
             <div className="flex gap-2">
