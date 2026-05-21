@@ -17,6 +17,28 @@ export class HLSTranscodeService {
     }
   }
 
+  private static validateTrackId(trackId: string): void {
+    if (!/^[A-Za-z0-9_-]+$/.test(trackId)) {
+      throw new Error('Invalid trackId');
+    }
+  }
+
+  private static ensurePathWithinRoot(candidatePath: string, rootPath: string): string {
+    const normalizedRoot = path.resolve(rootPath);
+    const normalizedCandidate = path.resolve(candidatePath);
+    const rootWithSep = normalizedRoot.endsWith(path.sep) ? normalizedRoot : `${normalizedRoot}${path.sep}`;
+    if (normalizedCandidate !== normalizedRoot && !normalizedCandidate.startsWith(rootWithSep)) {
+      throw new Error('Path traversal detected');
+    }
+    return normalizedCandidate;
+  }
+
+  private static resolveTrackDir(trackId: string): string {
+    this.validateTrackId(trackId);
+    const trackDir = path.join(this.hlsDir, trackId);
+    return this.ensurePathWithinRoot(trackDir, this.hlsDir);
+  }
+
   static async generateHLSManifest(
     trackId: string,
     filePath: string,
@@ -40,8 +62,8 @@ export class HLSTranscodeService {
     filePath: string,
     targetBitrate?: number,
   ): Promise<HLSManifestResult> {
-    const trackDir = path.join(this.hlsDir, trackId);
-    const manifestPath = path.join(trackDir, 'playlist.m3u8');
+    const trackDir = this.resolveTrackDir(trackId);
+    const manifestPath = this.ensurePathWithinRoot(path.join(trackDir, 'playlist.m3u8'), this.hlsDir);
 
     if (!fs.existsSync(trackDir)) {
       fs.mkdirSync(trackDir, { recursive: true });
@@ -71,7 +93,7 @@ export class HLSTranscodeService {
       '-hls_list_size',
       '0',
       '-hls_segment_filename',
-      path.join(trackDir, 'seg-%d.ts'),
+      this.ensurePathWithinRoot(path.join(trackDir, 'seg-%d.ts'), this.hlsDir),
       '-f',
       'hls',
       manifestPath,
@@ -112,10 +134,15 @@ export class HLSTranscodeService {
   }
 
   static getSegmentPath(trackId: string, segmentName: string): string {
-    return path.join(this.hlsDir, trackId, segmentName);
+    const trackDir = this.resolveTrackDir(trackId);
+    if (!/^seg-\d+\.ts$/.test(segmentName)) {
+      throw new Error('Invalid segment name');
+    }
+    return this.ensurePathWithinRoot(path.join(trackDir, segmentName), this.hlsDir);
   }
 
   static getManifestPath(trackId: string): string {
-    return path.join(this.hlsDir, trackId, 'playlist.m3u8');
+    const trackDir = this.resolveTrackDir(trackId);
+    return this.ensurePathWithinRoot(path.join(trackDir, 'playlist.m3u8'), this.hlsDir);
   }
 }
