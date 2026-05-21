@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 }
+  limits: { fileSize: 900 * 1024 * 1024 }
 });
 
 const uploadCounts = new Map<string, number>();

@@ -1,10 +1,12 @@
-[build]
-target = "x86_64-unknown-linux-gnu"
+# .cargo/config.toml
 
 [env]
-# ffmpeg-sys build configuration: download and statically link FFmpeg.
-# Without these, cargo tries to find system FFmpeg dev libraries (libavcodec-dev, …)
-# and the build fails on clean / CI machines.
 FFMPEG_DOWNLOAD_BUILD = "1"
 FFMPEG_STATIC = "1"
 FFMPEG_VERSION = "7.1.1"
+
+# Disable problematic docs generation
+FFMPEG_DISABLE_DOC = "1"
+
+# Extra configure flags passed to ffmpeg build
+FFMPEG_CONFIGURE_FLAGS = "--disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages"

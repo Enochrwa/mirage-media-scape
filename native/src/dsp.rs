@@ -3,9 +3,13 @@ use ffmpeg_next as ffmpeg;
 use std::path::Path;
 use ffmpeg::util::frame::audio::Audio;
 use stratum_dsp::{analyze_audio as stratum_analyze, AnalysisConfig};
-use lofty::prelude::*;
-use lofty::tag::{Tag, TagType};
+use std::str::FromStr;
+use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::probe::Probe;
+use lofty::tag::{Accessor, ItemKey, Tag, TagType, TagItem};
+use lofty::file::FileType;
 use lofty::config::WriteOptions;
+use lofty::tag::items::Timestamp;
 
 #[napi(object)]
 pub struct AudioAnalysis {
@@ -148,26 +152,27 @@ pub fn compute_replay_gain(paths: Vec<String>) -> Result<Vec<ReplayGainResult>, 
 #[napi]
 pub fn write_tags(path: String, tags: TagInput) -> Result<(), napi::Error> {
     let path_buf = Path::new(&path);
-    let mut probed = lofty::probe::Probe::open(path_buf)
+    let mut tagged_file = Probe::open(path_buf)
         .map_err(|e| napi::Error::from_reason(format!("Failed to open file: {}", e)))?
         .read()
         .map_err(|e| napi::Error::from_reason(format!("Failed to read tags: {}", e)))?;
 
-    let tag = match probed.primary_tag_mut() {
+    let tag = match tagged_file.primary_tag_mut() {
         Some(t) => t,
         None => {
-            if let Some(first_tag) = probed.first_tag_mut() {
+            if let Some(first_tag) = tagged_file.first_tag_mut() {
                 first_tag
             } else {
-                let tag_type = match probed.file_type() {
-                    lofty::file::FileType::Mpeg => TagType::Id3v2,
-                    lofty::file::FileType::Flac => TagType::VorbisComments,
-                    lofty::file::FileType::Mp4 => TagType::Mp4Ilst,
-                    lofty::file::FileType::Opus | lofty::file::FileType::Vorbis => TagType::VorbisComments,
+                // Determine tag type based on file format
+                let tag_type = match tagged_file.file_type() {
+                    FileType::Mpeg => TagType::Id3v2,
+                    FileType::Flac => TagType::VorbisComments,
+                    FileType::Mp4 => TagType::Mp4Ilst,
+                    FileType::Opus | FileType::Vorbis => TagType::VorbisComments,
                     _ => TagType::Id3v2,
                 };
-                probed.insert_tag(Tag::new(tag_type));
-                probed.primary_tag_mut().unwrap()
+                tagged_file.insert_tag(Tag::new(tag_type));
+                tagged_file.primary_tag_mut().unwrap()
             }
         }
     };
@@ -182,10 +187,10 @@ pub fn write_tags(path: String, tags: TagInput) -> Result<(), napi::Error> {
         tag.set_album(val);
     }
     if let Some(val) = tags.album_artist {
-        tag.insert_text(lofty::tag::ItemKey::AlbumArtist, val);
+        tag.insert(TagItem::new(ItemKey::AlbumArtist, lofty::tag::ItemValue::Text(val)));
     }
     if let Some(val) = tags.year {
-        tag.set_year(val as u32);
+        tag.set_date(Timestamp::from_str(&val.to_string()).unwrap());
     }
     if let Some(val) = tags.genre {
         tag.set_genre(val);
@@ -197,7 +202,7 @@ pub fn write_tags(path: String, tags: TagInput) -> Result<(), napi::Error> {
         tag.set_disk(val as u32);
     }
 
-    tag.save_to_path(&path, WriteOptions::default())
+    tagged_file.save_to_path(path_buf, WriteOptions::default())
         .map_err(|e| napi::Error::from_reason(format!("Failed to save tags: {}", e)))?;
 
     Ok(())
