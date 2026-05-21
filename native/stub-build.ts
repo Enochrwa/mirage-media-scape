@@ -49,6 +49,10 @@ export function probeHardwareCodecs(): HardwareCodecSupport {
   return { h264: true, hevc: true, av1: false, vp9: true };
 }
 
+export function initializeHardwareDecode(): HardwareCodecSupport {
+  return probeHardwareCodecs();
+}
+
 // ── Audio analysis ────────────────────────────────────────────────────────────
 export function analyzeAudio(_path: string): AudioAnalysis {
   return { bpm: 0, key: 'C', camelotKey: '1A', energy: 0, loudness: -96 };

@@ -75,7 +75,8 @@ try {
 
 // Check hardware acceleration
 try {
-  const hwSupport = native.initialize_hardware_decode();
+  // @ts-expect-error - NAPI-RS naming convention
+  const hwSupport = native.initializeHardwareDecode?.() || native.probeHardwareCodecs();
   console.log('[zovyra] Hardware decoding initialized:', hwSupport);
 } catch (e) {
   console.warn('[zovyra] Hardware decoding initialization failed:', e);

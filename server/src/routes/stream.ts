@@ -27,7 +27,7 @@ const MIME_TYPES: Record<string, string> = {
 
 router.get('/:trackId/hls/playlist.m3u8', async (req, res) => {
   const { trackId } = req.params;
-  const manifestPath = HLSTranscodeService.getManifestPath(trackId);
+  const manifestPath = HLSTranscodeService.getManifestPath(trackId as string);
 
   if (fs.existsSync(manifestPath)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -41,12 +41,12 @@ router.get('/:trackId/hls/:segment', cacheMiddleware, async (req, res) => {
   const { trackId, segment } = req.params;
 
   // Sanitize segment filename to prevent path traversal
-  const sanitizedSegment = path.basename(segment);
+  const sanitizedSegment = path.basename(segment as string);
   if (sanitizedSegment !== segment) {
     return res.status(403).send('Invalid segment name');
   }
 
-  const segmentPath = HLSTranscodeService.getSegmentPath(trackId, sanitizedSegment);
+  const segmentPath = HLSTranscodeService.getSegmentPath(trackId as string, sanitizedSegment);
 
   if (fs.existsSync(segmentPath)) {
     res.setHeader('Content-Type', 'video/MP2T');

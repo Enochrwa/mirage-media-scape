@@ -7,10 +7,10 @@ export const cacheMiddleware = (req: Request, res: Response, next: NextFunction)
   const { trackId, segment } = req.params;
 
   // Sanitize to prevent path traversal
-  const sanitizedTrackId = path.basename(trackId);
-  const sanitizedSegment = segment ? path.basename(segment) : '';
+  const sanitizedTrackId = path.basename(trackId as string);
+  const sanitizedSegment = segment ? path.basename(segment as string) : '';
 
-  if (sanitizedTrackId !== trackId || (segment && sanitizedSegment !== segment)) {
+  if (sanitizedTrackId !== (trackId as string) || (segment && sanitizedSegment !== (segment as string))) {
     return res.status(403).send('Invalid path parameters');
   }
 
