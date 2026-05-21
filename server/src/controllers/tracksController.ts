@@ -70,8 +70,8 @@ export const streamTrack = (req: Request, res: Response): void => {
   }
 
   const safeId = sanitizeId(id);
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(safeId) as
-    | { file_path: string }
+  const track = db.prepare('SELECT file_path, upload_path FROM tracks WHERE id = ?').get(safeId) as
+    | { file_path: string; upload_path: string | null }
     | undefined;
 
   if (!track || !track.file_path) {
@@ -79,11 +79,14 @@ export const streamTrack = (req: Request, res: Response): void => {
     return;
   }
 
-  // Double-check the path is still valid and within library bounds
-  const filePath = track.file_path;
-  if (!validatePath(filePath)) {
-    res.status(403).send('Access denied to library file');
-    return;
+  // If this is an uploaded track (upload_path is set and equals file_path), skip library validation.
+  // Otherwise, validate that the path is still valid and within library bounds.
+  if (!(track.upload_path && track.upload_path === track.file_path)) {
+    const filePath = track.file_path;
+    if (!validatePath(filePath)) {
+      res.status(403).send('Access denied to library file');
+      return;
+    }
   }
 
   // Handle remuxing if specific audio stream requested
@@ -453,8 +456,8 @@ export const updateTrackRating = (req: Request, res: Response): void => {
 
 export const getTrackWaveform = (req: Request, res: Response): void => {
   const safeId = sanitizeId(getParamId(req));
-  const track = db.prepare('SELECT file_path FROM tracks WHERE id = ?').get(safeId) as
-    | { file_path: string }
+  const track = db.prepare('SELECT file_path, upload_path FROM tracks WHERE id = ?').get(safeId) as
+    | { file_path: string; upload_path: string | null }
     | undefined;
 
   if (!track || !track.file_path) {
@@ -462,9 +465,13 @@ export const getTrackWaveform = (req: Request, res: Response): void => {
     return;
   }
 
-  if (!validatePath(track.file_path)) {
-    res.status(403).json({ error: 'Access denied' });
-    return;
+  // If this is an uploaded track (upload_path is set and equals file_path), skip library validation.
+  // Otherwise, validate that the path is still valid and within library bounds.
+  if (!(track.upload_path && track.upload_path === track.file_path)) {
+    if (!validatePath(track.file_path)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
   }
 
   // In compiled output the tree is:
