@@ -48,8 +48,8 @@ export class ScannerService {
       //   services/..  → server/src
       //   ../dist/src/services/  → server/dist/src/services/  ✓
       const srcServicesDir = path.resolve(__dirname);
-      const serverRoot     = path.resolve(srcServicesDir, '..', '..');
-      const distWorkerDir  = path.join(serverRoot, 'dist', 'src', 'services');
+      const serverRoot = path.resolve(srcServicesDir, '..', '..');
+      const distWorkerDir = path.join(serverRoot, 'dist', 'src', 'services');
       const distWorkerPath = path.join(distWorkerDir, 'scan-worker.js');
 
       // In production (main process is dist/src/index.js) __dirname is already

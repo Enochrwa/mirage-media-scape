@@ -31,7 +31,6 @@ import { execSync } from 'child_process';
 
 dotenv.config();
 
-
 const app = express();
 const httpServer = createServer(app);
 

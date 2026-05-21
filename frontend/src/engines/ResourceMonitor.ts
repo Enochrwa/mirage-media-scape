@@ -123,7 +123,11 @@ export class ResourceMonitor {
     if (this.state !== newState) {
       this.state = newState;
       this.listeners.forEach((fn) => fn(newState));
-      window.dispatchEvent(new CustomEvent('lowpowerchange', { detail: newState === 'low-power' || newState === 'critical' }));
+      window.dispatchEvent(
+        new CustomEvent('lowpowerchange', {
+          detail: newState === 'low-power' || newState === 'critical',
+        }),
+      );
     }
   }
 

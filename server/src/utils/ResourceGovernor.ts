@@ -7,7 +7,7 @@ export class ResourceGovernor {
     const cores = os.cpus().length;
 
     // Pause if less than 150 MB free OR CPU load > 90% of capacity
-    return freeMB < 150 || (load / cores) > 0.9;
+    return freeMB < 150 || load / cores > 0.9;
   }
 
   delayBetweenTracks(): number {

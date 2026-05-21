@@ -89,7 +89,6 @@ export const streamTrack = (req: Request, res: Response): void => {
     }
   }
 
-
   // Handle remuxing if specific audio stream requested
   if (audio_stream !== undefined) {
     const streamIndex = parseInt(audio_stream as string, 10);
@@ -146,7 +145,17 @@ export const streamTrack = (req: Request, res: Response): void => {
     '.webm': 'video/webm',
   };
 
-  const isVideo = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.wmv', '.mpeg', '.mpg'].includes(ext);
+  const isVideo = [
+    '.mp4',
+    '.mkv',
+    '.avi',
+    '.mov',
+    '.webm',
+    '.m4v',
+    '.wmv',
+    '.mpeg',
+    '.mpg',
+  ].includes(ext);
 
   // Frontend uses /api/stream/:id for both audio & video.
   // Raw byte streaming for many uploaded video containers/codecs can fail in browsers.
@@ -161,14 +170,22 @@ export const streamTrack = (req: Request, res: Response): void => {
     res.setHeader('Cache-Control', 'no-store');
 
     const ffmpeg = spawn('ffmpeg', [
-      '-i', track.file_path,
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '23',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      '-f', 'mp4',
+      '-i',
+      track.file_path,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-crf',
+      '23',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-movflags',
+      'frag_keyframe+empty_moov+default_base_moof',
+      '-f',
+      'mp4',
       'pipe:1',
     ]);
 
@@ -178,7 +195,6 @@ export const streamTrack = (req: Request, res: Response): void => {
     req.on('close', () => ffmpeg.kill('SIGKILL'));
     return;
   }
-
 
   if (range) {
     const parts = range.replace(/bytes=/, '').split('-');

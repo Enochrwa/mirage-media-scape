@@ -54,10 +54,14 @@ export function getOSMediaDirectories(): string[] {
             try {
               fs.accessSync(full, fs.constants.R_OK);
               candidates.push(full);
-            } catch { /* skip inaccessible */ }
+            } catch {
+              /* skip inaccessible */
+            }
           }
         }
-      } catch { /* /mnt not listable */ }
+      } catch {
+        /* /mnt not listable */
+      }
     }
   }
 

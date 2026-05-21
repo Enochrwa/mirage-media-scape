@@ -7,14 +7,14 @@ import { scannerService } from './scanner.js';
 let watcher: FSWatcher | null = null;
 let ioRef: Server | null = null;
 
-const DEBOUNCE_MS     = 2_000;   // normal debounce after library changes
-const BACKOFF_INITIAL = 15_000;  // delay after a failed scan
-const BACKOFF_MAX     = 60_000;  // maximum backoff cap
+const DEBOUNCE_MS = 2_000; // normal debounce after library changes
+const BACKOFF_INITIAL = 15_000; // delay after a failed scan
+const BACKOFF_MAX = 60_000; // maximum backoff cap
 
-let lastScanFailed  = false;
-let backoffMs       = BACKOFF_INITIAL;
-let isScanning      = false;
-let pendingChanges  = false;
+let lastScanFailed = false;
+let backoffMs = BACKOFF_INITIAL;
+let isScanning = false;
+let pendingChanges = false;
 
 let debounceTimerRef: NodeJS.Timeout | null = null;
 
@@ -42,15 +42,15 @@ function scheduleRescan(): void {
 }
 
 function runScan(): void {
-  debounceTimerRef = null;          // consume the timer slot
-  isScanning      = true;            // guard: drop all events until this finishes
-  pendingChanges  = false;           // reset pending flag
-  lastScanFailed  = false;           // optimistic — will flip back if the scan throws
-  backoffMs       = BACKOFF_INITIAL;
+  debounceTimerRef = null; // consume the timer slot
+  isScanning = true; // guard: drop all events until this finishes
+  pendingChanges = false; // reset pending flag
+  lastScanFailed = false; // optimistic — will flip back if the scan throws
+  backoffMs = BACKOFF_INITIAL;
 
   (async () => {
     try {
-      await scannerService.scanAll();   // scan — OR SCAN_COMPLETE resolves
+      await scannerService.scanAll(); // scan — OR SCAN_COMPLETE resolves
       // success: leave isScanning = true until finally resets it below
     } catch (e: unknown) {
       lastScanFailed = true;
@@ -101,7 +101,7 @@ export async function refreshLibraryWatcherPaths(): Promise<void> {
   // Cancel any pending timers and reset scan state
   if (debounceTimerRef) clearTimeout(debounceTimerRef);
   debounceTimerRef = null;
-  isScanning = false;   // abandon any in-flight scan — paths are about to be rebuilt
+  isScanning = false; // abandon any in-flight scan — paths are about to be rebuilt
 
   if (rows.length === 0) return;
 
@@ -146,7 +146,9 @@ export async function refreshLibraryWatcherPaths(): Promise<void> {
     if (err && typeof err === 'object' && 'code' in err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'EACCES' || code === 'EPERM') {
-        console.warn(`LibraryWatcher: skipping inaccessible path — ${(err as NodeJS.ErrnoException).path}`);
+        console.warn(
+          `LibraryWatcher: skipping inaccessible path — ${(err as NodeJS.ErrnoException).path}`,
+        );
         return;
       }
     }

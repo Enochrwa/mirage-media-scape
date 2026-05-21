@@ -61,17 +61,17 @@ router.get('/duplicates/groups', async (_req, res) => {
 });
 
 router.get('/analysis/status', (req, res) => {
-    res.json(analysisService.getStatus());
+  res.json(analysisService.getStatus());
 });
 
 router.post('/analysis/pause', (req, res) => {
-    analysisService.pause();
-    res.json({ success: true });
+  analysisService.pause();
+  res.json({ success: true });
 });
 
 router.post('/analysis/resume', (req, res) => {
-    analysisService.resume();
-    res.json({ success: true });
+  analysisService.resume();
+  res.json({ success: true });
 });
 
 export default router;

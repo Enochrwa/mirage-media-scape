@@ -51,14 +51,16 @@ export class FingerprintService {
    * Compute a Chromaprint fingerprint using the fpcalc binary.
    * Returns { fingerprint, duration } on success, or null if fpcalc is not available.
    */
-  private static async fpcalc(filePath: string): Promise<{ fingerprint: string; duration: number } | null> {
+  private static async fpcalc(
+    filePath: string,
+  ): Promise<{ fingerprint: string; duration: number } | null> {
     const bin = await this.findFpcalc();
     if (!bin) return null;
     try {
       const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) =>
         execFile(bin, ['-json', filePath], (err, stdout, stderr) =>
-          err ? reject(err) : resolve({ stdout: stdout.trim(), stderr: stderr.trim() })
-        )
+          err ? reject(err) : resolve({ stdout: stdout.trim(), stderr: stderr.trim() }),
+        ),
       );
       // fpcalc -json output: {"fingerprint":"AQAA...","duration":123.4}
       const data = JSON.parse(stdout) as { fingerprint: string; duration: number };

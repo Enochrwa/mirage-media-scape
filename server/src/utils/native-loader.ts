@@ -21,11 +21,11 @@
  *   2. stub-build.js      (server boots, returns safe defaults)
  */
 
-import { createRequire }                   from 'node:module';
-import { pathToFileURL, fileURLToPath }  from 'node:url';
-import path                        from 'node:path';
+import { createRequire } from 'node:module';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
-import type * as NativeTypes       from '../../zovyra-native.js';
+import type * as NativeTypes from '../../zovyra-native.js';
 
 // ── Locate monorepo root ─────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ function findMonorepoRoot(): string {
     dir = parent;
   }
 
-// Strategy 3: walk up from this file's directory at runtime
+  // Strategy 3: walk up from this file's directory at runtime
   // import.meta.url is always available in ESM; derive dirname from it
   const selfDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,17 +60,17 @@ function findMonorepoRoot(): string {
 
   throw new Error(
     '[zovyra-native] Cannot locate monorepo root.\n' +
-    '  Preferred:  run from repo root with  npm run dev\n' +
-    '  Manual:     ZOVYRA_ROOT=/path/to/zovyra npm run dev:server'
+      '  Preferred:  run from repo root with  npm run dev\n' +
+      '  Manual:     ZOVYRA_ROOT=/path/to/zovyra npm run dev:server',
   );
 }
 
 // ── Resolve native package paths ─────────────────────────────────────────────
 
-const repoRoot    = findMonorepoRoot();
-const nativeDir   = path.join(repoRoot, 'native');
+const repoRoot = findMonorepoRoot();
+const nativeDir = path.join(repoRoot, 'native');
 const nativeIndex = path.join(nativeDir, 'index.js');
-const nativeStub  = path.join(nativeDir, 'stub-build.js');
+const nativeStub = path.join(nativeDir, 'stub-build.js');
 
 function binaryExists(): boolean {
   try {
@@ -91,7 +91,7 @@ async function loadNative(): Promise<typeof NativeTypes> {
     } catch (err) {
       console.warn(
         '\x1b[33m[zovyra-native]\x1b[0m Binary found but failed to load — using stub.\n' +
-        `  Reason: ${(err as Error).message}`
+          `  Reason: ${(err as Error).message}`,
       );
     }
   }
@@ -101,7 +101,7 @@ async function loadNative(): Promise<typeof NativeTypes> {
   const jsPath = pathToFileURL(nativeStub).href;
   if (existsSync(nativeStub)) {
     try {
-      return await import(jsPath) as Promise<typeof NativeTypes>;
+      return (await import(jsPath)) as Promise<typeof NativeTypes>;
     } catch {
       // file exists but failed to load; fall through to recompile
     }
@@ -110,17 +110,17 @@ async function loadNative(): Promise<typeof NativeTypes> {
   // 2. Transpile stub-build.ts on the fly so the server can boot in stub-only mode
   try {
     const { execSync } = await import('node:child_process');
-    execSync(
-      'npx --yes tsc --project ' + nativeDir.replace(/\\/g, '/') + '/tsconfig.stub.json',
-      { stdio: 'pipe', cwd: repoRoot }
-    );
+    execSync('npx --yes tsc --project ' + nativeDir.replace(/\\/g, '/') + '/tsconfig.stub.json', {
+      stdio: 'pipe',
+      cwd: repoRoot,
+    });
     // Verify the file was actually written before importing
     if (existsSync(nativeStub)) {
-      return await import(jsPath) as Promise<typeof NativeTypes>;
+      return (await import(jsPath)) as Promise<typeof NativeTypes>;
     } else {
       console.error(
         '\x1b[31m[zovyra-native]\x1b[0m tsc completed but stub-build.js was not written.\n' +
-        '  Run: cd native && npm install && npm run build'
+          '  Run: cd native && npm install && npm run build',
       );
     }
   } catch {
@@ -129,7 +129,7 @@ async function loadNative(): Promise<typeof NativeTypes> {
 
   throw new Error(
     '[zovyra-native] Could not load stub build.\n' +
-    '  Run: cd native && npm install && npm run build'
+      '  Run: cd native && npm install && npm run build',
   );
 }
 
