@@ -1,8 +1,8 @@
-# Audio & Video Processing Optimization Strategy for ZOVYRA
+# Audio & Video Processing Optimization Strategy for ZOVYRA - Sprint Structure
 
 ## Executive Summary
 
-ZOVYRA is positioned to become the next-generation media platform surpassing VLC (native) and Spotify (streaming). However, current audio/video processing architecture has critical gaps that must be addressed to achieve **blazing-fast performance on low-CPU/RAM devices** while maintaining feature parity with market leaders.
+ZOVYRA is positioned to become the next-generation media platform surpassing VLC (native) and Spotify (streaming). However, current audio/video processing architecture has critical gaps that must be addressed.
 
 ### Current State Analysis
 - ✅ **Strengths:** Modern tech stack (Rust + FFmpeg, Web Audio API, multi-platform support via Tauri/Capacitor)
@@ -17,150 +17,21 @@ ZOVYRA is positioned to become the next-generation media platform surpassing VLC
 
 ---
 
-## 1. Current Audio Processing Pipeline Analysis
+## Sprint 1: Foundation - Adaptive Bitrate Streaming & HLS/DASH
 
-### What's Working
-```
-Web/Desktop: MediaElement/HTMLAudioElement → Web Audio API → PlaybackEngine
-Native (Tauri): FFmpeg → PCM decode → CPAL audio output
-Mobile (Capacitor): Web platform + native bridges
-```
+### Overview
+Replace single-bitrate transcoding with segmented, adaptive streaming. This is critical for low-end device support and serves as the foundation for a Spotify-like streaming experience.
 
-**Location:** `frontend/src/lib/PlaybackEngine.ts`, `native/src/dsp.rs`, `native/src/visualization.rs`
+### Sprint Goals
+- Implement HLS manifest generation
+- Enable dynamic bitrate streaming
+- Support on-demand segmentation
+- Establish Redis caching for segments
 
-### Issues Identified
+### Tasks
 
-#### 1.1 **Transcoding Inefficiency**
-**Problem:** Server-side FFmpeg transcoding is blocking and CPU-intensive.
-- Line 236-250 in PlaybackEngine shows fallback to `?transcode=1` for unsupported formats
-- No chunked/streaming transcoding (transcodes entire file at once)
-- No HLS/DASH manifest generation for streaming
-- Browsers with native format support don't leverage it efficiently
-
-**Impact on Goal:**
-- 🔴 **Low-end device death:** A 128MB FLAC file transcoded to PCM consumes full RAM buffer
-- 🔴 **Streaming platform fail:** Cannot deliver Spotify-like "seamless streaming" without ABR
-
-#### 1.2 **No Hardware Acceleration on Desktop**
-**Problem:** Desktop app (Tauri) doesn't use hardware decode despite FFmpeg support.
-
-**Current:** Rust FFmpeg bindings in `native/src/dsp.rs` use software decode by default.
-- No DXVA2 (Windows) / VideoToolbox (macOS) / VAAPI (Linux) initialization
-- Desktop users see 30-50% CPU spikes on 4K video
-
-**Impact:** VLC advantage (true HW acceleration) vs ZOVYRA (software decode)
-
-#### 1.3 **Web Audio API Limitations**
-**Problem:** Web platform locked into browser capabilities.
-- Cannot decode FLAC, ALAC, APE, DSD on Safari, older Chrome
-- Falls back to transcoding (slow, unreliable)
-- No adaptive streaming (HLS/DASH) for the "streaming platform" use case
-
-**Impact:** Spotify-level streaming platform impossible without ABR/HLS
-
-#### 1.4 **Mobile Platform Gaps**
-**Problem:** Capacitor implementation doesn't exist yet.
-- No native audio context on iOS/Android
-- Mobile relies entirely on HTML5 `<audio>` element
-- No background playback optimization on iOS
-
-#### 1.5 **Audio Analysis Missing Critical Features**
-**Current:** `native/src/dsp.rs` computes BPM, key, energy, loudness.
-
-**Missing:**
-- No genre classification (needed for recommendations)
-- No speech vs. music detection (podcasts)
-- No dynamic range analysis (for Night Mode compression tuning)
-- No vocal detection (for karaoke mode)
-
----
-
-## 2. Current Video Processing Pipeline Analysis
-
-### What's Working
-```
-Web: HTMLVideoElement (native codec support) → fallback transcoding
-Desktop (Tauri): FFmpeg hardware decode
-Mobile: Native video stack via Capacitor
-```
-
-**Location:** `frontend/src/components/VideoPlayer.tsx`, `native/src/transcoding.rs`
-
-### Issues Identified
-
-#### 2.1 **No Adaptive Bitrate Streaming (ABR)**
-**Problem:** Video streaming is single-bitrate only.
-- Cannot adapt to network bandwidth changes
-- YouTube/Netflix use ABR — ZOVYRA cannot
-- Large files stall on slow connections
-
-**Missing:**
-- HLS manifest generation
-- DASH manifest generation
-- Multi-bitrate encode pipeline
-- Bandwidth estimation logic
-
-#### 2.2 **Hardware Decode Not Fully Utilized**
-**Problem:** Only partial HW decode detection.
-
-**Current Status (line 408-418 FEATURES.md):**
-- ✅ Web: HTML5 element (browser auto-uses HW)
-- ⚠️ Desktop: "Try DXVA2/VideoToolbox/VAAPI" (NOT implemented)
-- ❌ Mobile: No HW decode strategy
-
-**Missing on Desktop:**
-- No explicit `-hwaccel dxva2 -hwaccel_output_format dxva2_vld` in FFmpeg pipeline
-- No fallback chain (try DXVA2 → D3D11VA → software)
-- No capability detection at startup
-
-#### 2.3 **No Real-Time Subtitle Rendering Pipeline**
-**Problem:** Subtitles rendered in JavaScript.
-- ASS/SSA subtitle parsing strips formatting (line 455 FEATURES.md)
-- Cannot handle soft-coded subtitles (stream copy)
-- No ffmpeg subtitle extraction pipeline
-
-#### 2.4 **Thumbnail Extraction Inefficient**
-**Problem:** Single thumbnail at 25% position (line 514-525 FEATURES.md).
-- No keyframe detection
-- No smart thumbnail selection for preview
-- Seeking preview asks server for every position (no prebuild)
-
----
-
-## 3. Performance Bottleneck: Low-End Devices
-
-### Scenario: 2GB RAM, 2-core CPU device (budget Android/older desktop)
-
-**Current ZOVYRA flow for 128MB FLAC:**
-1. Browser requests `/api/stream/{trackId}?transcode=1`
-2. Server spawns FFmpeg: `ffmpeg -i file.flac -f s16le pipe:1`
-3. FFmpeg decodes ENTIRE file into RAM buffer (~384MB uncompressed)
-4. Server chunks output to browser
-5. Browser Web Audio API plays 128KB chunks
-6. Result: **Device OOM, playback stalls**
-
-**Spotify approach:**
-1. Uses HLS (HTTP Live Streaming) with 6-second chunks at 128kbps–320kbps
-2. Only 3-4 chunks in buffer at any time (~200KB RAM max)
-3. Bandwidth estimation adjusts quality in real-time
-4. Result: **Smooth playback even on 2G networks**
-
-### Why VLC wins on native:
-- Hardware acceleration (GPU decode) → CPU never peaks
-- Efficient software decode (optimized C/assembly)
-- No transcoding overhead
-- Direct file mmap for seeking
-
----
-
-## 4. Strategic Recommendations
-
-### 🎯 **Phase 1: Foundation (Weeks 1-4)**
-*Critical for low-end device support*
-
-#### 4.1 **Implement Adaptive Bitrate Streaming (HLS/DASH)**
-
-**What:** Replace single-bitrate transcoding with segmented, adaptive streaming.
+#### 1.1 Backend HLS Service Implementation
+**What:** Create server-side HLS manifest generation and segment delivery
 
 **Why:** 
 - ✅ Solves the "streaming platform" requirement
@@ -168,13 +39,10 @@ Mobile: Native video stack via Capacitor
 - ✅ Matches Spotify's architecture
 - ✅ Automatic bandwidth adaptation
 
-**How:**
+**Implementation:**
 
-**Backend Changes (Node.js + FFmpeg):**
 ```typescript
-// POST /api/stream/{trackId}/manifest/hls
-// Generates HLS manifest dynamically
-
+// server/src/services/HLSTranscodeService.ts
 const generateHLSManifest = async (trackId: string, targetBitrate?: number) => {
   // 1. Detect source codec & bitrate
   const metadata = await probeFile(track.file_path);
@@ -197,68 +65,108 @@ const generateHLSManifest = async (trackId: string, targetBitrate?: number) => {
   ]);
   
   // 4. Write manifest + segments to Redis cache
-  // Manifest reusable across sessions
   return { manifest: m3u8Content, uri: `/api/stream/${trackId}/playlist.m3u8` };
 };
-
-// GET /api/stream/{trackId}/playlist.m3u8
-// Returns live M3U8 manifest
-
-// GET /api/stream/{trackId}/seg-{N}.ts
-// Returns pre-computed or on-demand segment
 ```
 
-**Frontend Changes (React):**
+**Deliverables:**
+- `server/src/services/HLSTranscodeService.ts`
+- `server/src/routes/stream.ts` (rewrite)
+
+#### 1.2 Frontend HLS Playback Integration
+**What:** Implement client-side HLS playback with adaptive bitrate
+
+**Implementation:**
+
 ```typescript
-// PlaybackEngine modification
+// frontend/src/hooks/useHLSPlayback.ts
+import Hls from 'hls.js';
+
+export function useHLSPlayback(videoRef: HTMLVideoElement, manifestUrl: string) {
+  useEffect(() => {
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        debug: false,
+        maxMaxBufferLength: 30,     // 30s buffer (prevents OOM)
+        maxBufferLength: 10,
+        abrEwmaFastLive: 3,
+      });
+      hls.loadSource(manifestUrl);
+      hls.attachMedia(videoRef);
+    }
+  }, [manifestUrl]);
+}
+```
+
+**Frontend Changes:**
+```typescript
+// frontend/src/lib/PlaybackEngine.ts - Modification
 async loadVideo(file: MediaFile, videoElement: HTMLVideoElement) {
   if (file.type === 'audio') {
-    // Use HLS for ALL formats (not just unsupported ones)
+    // Use HLS for ALL formats
     const manifestUrl = `/api/stream/${file.id}/playlist.m3u8`;
     videoElement.src = manifestUrl;
   }
-  // hls.js library handles playback + ABR
 }
 ```
 
-**Install & Use hls.js:**
-```bash
-npm install hls.js
-```
-
-```typescript
-import Hls from 'hls.js';
-
-const video = videoRef.current;
-if (Hls.isSupported()) {
-  const hls = new Hls({
-    debug: false,
-    maxMaxBufferLength: 30,     // 30s buffer (prevents OOM)
-    maxBufferLength: 10,
-    abrEwmaFastLive: 3,
-  });
-  hls.loadSource(manifestUrl);
-  hls.attachMedia(video);
-}
-```
-
-**Result:**
-- 🟢 Streaming: Continuous playback on 2G/3G
-- 🟢 Low-end: 6-second segments = max 200KB RAM buffer
-- 🟢 Bandwidth-aware: Auto-steps down on slow connections
-
-**Files to Create:**
-- `server/src/services/HLSTranscodeService.ts`
-- `server/src/routes/stream.ts` (rewrite)
+**Deliverables:**
 - `frontend/src/hooks/useHLSPlayback.ts`
+- Update `frontend/src/lib/PlaybackEngine.ts`
+- Install `npm install hls.js`
 
-**Time Estimate:** 2 weeks
+#### 1.3 Segment Caching Strategy
+**What:** Cache generated segments in Redis to avoid repeated transcoding
+
+**Implementation:**
+```typescript
+// server/src/middleware/CacheMiddleware.ts
+app.get('/api/stream/:trackId/seg-:num.ts', async (req, res) => {
+  const cacheKey = `seg:${req.params.trackId}:${req.params.num}`;
+  
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    res.set('X-Cache', 'HIT');
+    return res.send(cached);
+  }
+  
+  const segment = await transcodeSegment(trackId, segmentNum);
+  await redis.setex(cacheKey, 86400, segment);
+  res.set('X-Cache', 'MISS');
+  res.send(segment);
+});
+```
+
+**Deliverables:**
+- Segment caching middleware
+- Redis cache configuration
+
+### Success Criteria
+- 🟢 128MB FLAC streams smoothly on 2GB RAM device
+- 🟢 TTFB <500ms even on 3G
+- 🟢 Adaptive bitrate responds to network changes
 
 ---
 
-#### 4.2 **Enable Hardware Acceleration (All Platforms)**
+## Sprint 2: Hardware Acceleration - All Platforms
 
-**Desktop (Tauri/FFmpeg):**
+### Overview
+Enable hardware video decoding on desktop, web, and mobile platforms to reduce CPU usage and improve performance.
+
+### Sprint Goals
+- Implement DXVA2/D3D11VA on Windows
+- Add VideoToolbox support on macOS
+- Enable VAAPI on Linux
+- Leverage WebCodecs API on web
+- Establish native bridges for mobile
+
+### Tasks
+
+#### 2.1 Desktop Hardware Acceleration (Tauri/FFmpeg)
+
+**What:** Initialize and utilize platform-specific hardware decoders
+
+**Windows/macOS/Linux Implementation:**
 
 ```rust
 // native/src/decoding.rs - NEW FILE
@@ -313,7 +221,13 @@ pub fn initialize_hardware_decode() -> Result<HardwareCodecSupport, napi::Error>
 }
 ```
 
-**Web (HTML5 + VideoDecoder API):**
+**Deliverables:**
+- `native/src/decoding.rs` (new)
+- Update `native/src/lib.rs` with HW acceleration initialization
+
+#### 2.2 Web Hardware Acceleration
+
+**What:** Leverage WebCodecs API for hardware-accelerated decoding
 
 ```typescript
 // frontend/src/hooks/useHardwareDecoding.ts - NEW FILE
@@ -336,7 +250,7 @@ export function useHardwareDecoding() {
             // Hardware decode available
           }
         } catch (e) {
-          // Fallback
+          // Fallback to software decode
         }
       }
     })();
@@ -346,7 +260,13 @@ export function useHardwareDecoding() {
 }
 ```
 
-**Mobile (Capacitor → Native Bridges):**
+**Deliverables:**
+- `frontend/src/hooks/useHardwareDecoding.ts`
+- `frontend/src/components/HWAccelBadge.tsx` (UI indicator)
+
+#### 2.3 Mobile Hardware Acceleration (Capacitor)
+
+**What:** Create native bridges for iOS/Android hardware decoding
 
 ```typescript
 // frontend/src/services/mobileMedia/MobileMediaService.ts - REWRITE
@@ -377,28 +297,34 @@ public class MediaPlugin: CAPPlugin {
 }
 ```
 
-**Result:**
+**Deliverables:**
+- iOS Capacitor plugin
+- Android Capacitor plugin
+- Updated `MobileMediaService.ts`
+
+### Success Criteria
 - 🟢 Desktop: GPU decodes 4K video → ~5% CPU (vs. 50% software)
 - 🟢 Mobile: Native hardware decode available
-- 🟢 Web: Explicit opt-in to HW acceleration where supported
-
-**Files to Create/Modify:**
-- `native/src/decoding.rs` (rewrite)
-- `frontend/src/hooks/useHardwareDecoding.ts`
-- `frontend/src/components/HWAccelBadge.tsx`
-- iOS/Android plugin files
-
-**Time Estimate:** 1.5 weeks
+- 🟢 Web: Explicit HW acceleration detection working
 
 ---
 
-### 🎯 **Phase 2: Smart Codec & Encoding Strategy (Weeks 5-7)**
+## Sprint 3: Device-Aware Codec Optimization
 
-#### 4.3 **Codec Priority Ladder for Low-End Devices**
+### Overview
+Implement intelligent codec selection based on device capabilities to ensure smooth playback across all hardware tiers.
 
-**Problem:** Default codec selection doesn't account for device CPU/RAM.
+### Sprint Goals
+- Detect device capability tier (low/mid/high)
+- Create codec ladders per tier
+- Implement bitrate adaptation
+- Optimize for low-end devices
 
-**Solution:** Detect device capability tier and select codec accordingly.
+### Tasks
+
+#### 3.1 Device Profile Detection
+
+**What:** Detect and classify device capabilities
 
 ```typescript
 // frontend/src/lib/DeviceProfile.ts - NEW FILE
@@ -429,15 +355,23 @@ const CODEC_LADDER = {
   },
 };
 
-// On backend, use profile to pick bitrate:
-// low:  audio 128kbps, video 360p @ 500kbps
-// mid:  audio 192kbps, video 720p @ 2500kbps
-// high: audio 320kbps, video 1080p @ 5000kbps
+// Bitrate ladder per profile
+const BITRATE_LADDER = {
+  low: { audio: 128, video: 500, resolution: '360p' },
+  mid: { audio: 192, video: 2500, resolution: '720p' },
+  high: { audio: 320, video: 5000, resolution: '1080p' },
+};
 ```
 
-**Backend Adaptation:**
+**Deliverables:**
+- `frontend/src/lib/DeviceProfile.ts`
+
+#### 3.2 Backend Bitrate Adaptation
+
+**What:** Backend selects appropriate bitrate based on device profile
+
 ```typescript
-// server/src/services/TranscodeService.ts
+// server/src/services/TranscodeService.ts - REWRITE
 async transcodeToBitrate(file: string, deviceProfile: DeviceProfile) {
   const bitrates = {
     low: { audio: 128, video: 500, resolution: '360p' },
@@ -456,27 +390,49 @@ async transcodeToBitrate(file: string, deviceProfile: DeviceProfile) {
 }
 ```
 
-**Result:**
+**Deliverables:**
+- Rewrite `server/src/services/TranscodeService.ts`
+- Update `frontend/src/lib/PlaybackEngine.ts` to pass device profile
+
+#### 3.3 Client-Side Codec Prioritization
+
+**What:** Frontend requests appropriate codec based on device tier
+
+**Implementation:**
+- Pass `deviceProfile` to PlaybackEngine
+- Adjust HLS manifest generation parameters
+- Request lowest viable bitrate for device
+
+**Deliverables:**
+- Updated PlaybackEngine implementation
+- Device profile parameter passing
+
+### Success Criteria
 - 🟢 Low-end: MP3 @ 128kbps streams smoothly
-- 🟢 Mid-end: Opus @ 192kbps
+- 🟢 Mid-end: Opus @ 192kbps + 720p video
 - 🟢 High-end: FLAC / 5Mbps video
-
-**Files to Create/Modify:**
-- `frontend/src/lib/DeviceProfile.ts` (new)
-- `server/src/services/TranscodeService.ts` (rewrite)
-- `frontend/src/lib/PlaybackEngine.ts` (add device profile param)
-
-**Time Estimate:** 1 week
 
 ---
 
-#### 4.4 **Background Audio Analysis & Genre Classification**
+## Sprint 4: Audio Analysis & Genre Classification
 
-**Current:** BPM, key, energy, loudness only (no genre).
+### Overview
+Expand audio analysis to include genre detection and advanced audio features for better recommendations and playlist generation.
 
-**Add:**
+### Sprint Goals
+- Add spectral analysis for genre detection
+- Implement speech vs. music detection
+- Add dynamic range analysis
+- Enable vocal detection
+
+### Tasks
+
+#### 4.1 Advanced Audio Analysis Features
+
+**What:** Expand DSP analysis pipeline with machine learning capabilities
+
 ```rust
-// native/src/dsp.rs - ADD to analyze_audio()
+// native/src/dsp.rs - ADDITIONS to analyze_audio()
 #[napi]
 pub fn analyze_audio(path: String) -> Result<AudioAnalysis, napi::Error> {
     // ... existing BPM, key, energy, loudness ...
@@ -484,42 +440,74 @@ pub fn analyze_audio(path: String) -> Result<AudioAnalysis, napi::Error> {
     // NEW: Spectral flux for genre hints
     let spectrogram = compute_spectrogram(&samples, sample_rate);
     let genre_features = extract_genre_features(&spectrogram);
-    // Could use TensorFlow.js ONNX model for ~10 genres
+    
+    // NEW: Speech detection
+    let speech_confidence = detect_speech(&samples, sample_rate);
+    
+    // NEW: Dynamic range analysis
+    let dynamic_range_db = analyze_dynamic_range(&samples);
+    
+    // NEW: Vocal detection
+    let vocal_confidence = detect_vocals(&spectrogram);
     
     Ok(AudioAnalysis {
         bpm,
         key,
         energy,
         loudness_lufs,
-        genre_probabilities: {  // NEW
+        genre_probabilities: {
             "rock": 0.45,
             "pop": 0.35,
             "electronic": 0.15,
-            // ...
-        }
+        },
+        speech_confidence,
+        dynamic_range_db,
+        vocal_confidence,
     })
 }
 ```
 
-**Result:** Genre-aware playlists + better recommendations
+#### 4.2 Genre Classification Integration
 
-**Time Estimate:** 1 week
+**What:** Use TensorFlow.js ONNX model for multi-genre classification
+
+**Implementation:**
+- Load pre-trained ONNX model for genre classification (~10 genres)
+- Extract features from spectrogram
+- Cache genre classifications per track
+- Use for playlist generation and recommendations
+
+**Deliverables:**
+- Updated `native/src/dsp.rs`
+- Genre classification model files
+- Database schema updates for genre metadata
+
+### Success Criteria
+- 🟢 Genre detection enables mood-based playlists
+- 🟢 Speech vs. music detection improves content filtering
+- 🟢 Dynamic range analysis data available for audio processing
 
 ---
 
-### 🎯 **Phase 3: Streaming Platform Features (Weeks 8-10)**
+## Sprint 5: Streaming Platform Infrastructure - Caching & CDN
 
-#### 4.5 **CDN-Ready Caching & Prefetching**
+### Overview
+Implement enterprise-grade caching and CDN integration for sub-100ms segment delivery on the streaming platform.
 
-**Problem:** Streaming platform needs sub-100ms TTFB (time-to-first-byte).
+### Sprint Goals
+- Pre-encode popular tracks in multiple bitrates
+- Implement edge CDN integration
+- Establish caching strategy with TTL management
+- Monitor cache hit rates
 
-**Solution:** 
-1. Cache popular segments in Redis
-2. Pre-encode top 100 tracks in multiple bitrates
-3. Use Edge CDN (Cloudflare / BunnyCDN) for segment delivery
+### Tasks
+
+#### 5.1 CDN-Ready Segment Caching
+
+**What:** Cache popular segments in Redis and prepare for CDN distribution
 
 ```typescript
-// server/src/middleware/CacheMiddleware.ts - NEW
+// server/src/middleware/CacheMiddleware.ts - ENHANCEMENT
 app.get('/api/stream/:trackId/seg-:num.ts', async (req, res) => {
   const cacheKey = `seg:${req.params.trackId}:${req.params.num}`;
   
@@ -536,20 +524,64 @@ app.get('/api/stream/:trackId/seg-:num.ts', async (req, res) => {
   await redis.setex(cacheKey, 86400, segment); // cache 24h
   
   res.set('X-Cache', 'MISS');
+  res.set('Cache-Control', 'public, max-age=86400');
   res.send(segment);
 });
 ```
 
-**Result:**
+#### 5.2 Pre-Encoding Popular Tracks
+
+**What:** Background job to pre-encode top 100 tracks in multiple bitrates
+
+**Implementation:**
+- Track popularity metrics
+- Trigger pre-encoding for top 100 tracks
+- Cache segments in Redis
+- Schedule during off-peak hours
+
+**Deliverables:**
+- Background job implementation
+- Pre-encoding service
+- Popularity tracking service
+
+#### 5.3 CDN Integration (Cloudflare/BunnyCDN)
+
+**What:** Configure edge CDN for segment delivery
+
+**Implementation:**
+- Set up Cloudflare/BunnyCDN origin
+- Configure cache rules per content type
+- Implement purge strategies
+- Monitor cache performance metrics
+
+**Deliverables:**
+- CDN configuration
+- Cache invalidation service
+- Performance monitoring dashboard
+
+### Success Criteria
 - 🟢 Popular songs cache hit rate ~95%
 - 🟢 <100ms segment delivery via CDN
-- 🟢 Spotify-level UX
-
-**Time Estimate:** 1.5 weeks
+- 🟢 Zero cache misses for top tracks
 
 ---
 
-#### 4.6 **Real-Time Performance Monitoring & Auto-Adaptation**
+## Sprint 6: Real-Time Performance Monitoring & Auto-Adaptation
+
+### Overview
+Implement monitoring infrastructure to track performance and enable automatic adaptation to network conditions.
+
+### Sprint Goals
+- Measure network quality in real-time
+- Auto-adapt bitrate based on network performance
+- Monitor CPU and memory usage
+- Log performance metrics for analysis
+
+### Tasks
+
+#### 6.1 Network Quality Detection
+
+**What:** Monitor network performance and adapt streaming quality
 
 ```typescript
 // frontend/src/hooks/useNetworkQuality.ts - NEW
@@ -576,29 +608,63 @@ export function useNetworkQuality() {
 }
 ```
 
-**Integrate with hls.js:**
+#### 6.2 HLS.js Bitrate Adaptation
+
+**What:** Integrate network quality detection with HLS bitrate selection
+
 ```typescript
 hls.on(Hls.Events.hlsFragmentLoading, (data) => {
   const networkQuality = useNetworkQuality();
   
-  // Adjust bitrate ladder based on real network performance
   if (networkQuality === 'poor') {
     hls.nextLevel = 0; // force lowest bitrate
+  } else if (networkQuality === 'fair') {
+    hls.nextLevel = 1; // mid bitrate
+  } else {
+    hls.nextLevel = -1; // auto select
   }
 });
 ```
 
-**Time Estimate:** 1 week
+#### 6.3 Performance Analytics
+
+**What:** Collect and analyze performance metrics
+
+**Implementation:**
+- Track playback quality metrics
+- Monitor buffer underruns
+- Measure seeking latency
+- Log bandwidth estimates
+- Export metrics to analytics backend
+
+**Deliverables:**
+- Performance monitoring service
+- Analytics dashboard
+- Real-time alerting system
+
+### Success Criteria
+- 🟢 Auto-bitrate adapt to network changes within 30 seconds
+- 🟢 Zero buffer underruns on consistent connections
+- 🟢 Performance metrics available for all playback sessions
 
 ---
 
-### 🎯 **Phase 4: VLC-Level Desktop Performance (Weeks 11-13)**
+## Sprint 7: Desktop Performance Optimization - Zero-Copy Decoding
 
-#### 4.7 **Zero-Copy Video Decoding (Tauri)**
+### Overview
+Optimize desktop (Tauri) video processing by implementing zero-copy texture streaming and eliminating unnecessary memory copies.
 
-**Current:** FFmpeg → PCM buffer → Audio output (1 copy)
+### Sprint Goals
+- Implement GPU texture streaming
+- Avoid system RAM intermediate buffers
+- Support 4K playback with minimal overhead
+- Achieve VLC-level efficiency
 
-**Better:** Use shared memory for video frames to avoid copies.
+### Tasks
+
+#### 7.1 Zero-Copy Video Texture Streaming
+
+**What:** Use GPU directly for decoding and rendering without system RAM copies
 
 ```rust
 // native/src/streaming.rs - NEW
@@ -606,64 +672,184 @@ hls.on(Hls.Events.hlsFragmentLoading, (data) => {
 pub fn create_video_texture_stream(path: String) -> Result<(), napi::Error> {
     // Use CUDA/Metal/D3D to decode directly to GPU texture
     // Avoids system RAM altogether
+    
+    // Initialize GPU context based on platform
+    #[cfg(target_os = "windows")]
+    {
+        // D3D11 texture streaming
+        let device = create_d3d11_device()?;
+        let decoder = create_gpu_decoder(&device)?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // Metal texture streaming
+        let device = create_metal_device()?;
+        let decoder = create_gpu_decoder(&device)?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // VAAPI texture streaming
+        let device = create_vaapi_device()?;
+        let decoder = create_gpu_decoder(&device)?;
+    }
+    
     Ok(())
 }
 ```
 
-**Result:**
-- 🟢 4K playback: GPU handles decode + rendering
-- 🟢 ~95% reduction in memory traffic
-- 🟢 Matches VLC's efficiency
+#### 7.2 Memory-Efficient Frame Handling
 
-**Time Estimate:** 2 weeks
+**What:** Implement ring buffer for decoded frames without excessive copying
+
+**Implementation:**
+- Pre-allocate GPU memory
+- Use frame flipping instead of copies
+- Implement double/triple buffering
+- Minimize latency between decode and display
+
+**Deliverables:**
+- `native/src/streaming.rs`
+- GPU memory management utilities
+- Frame buffer implementation
+
+#### 7.3 Platform-Specific Optimizations
+
+**What:** Optimize for each desktop platform
+
+**Windows:**
+- D3D11 video decoding
+- WDDM (Windows Display Driver Model) optimization
+
+**macOS:**
+- Metal GPU rendering
+- VideoToolbox integration
+
+**Linux:**
+- VAAPI optimization
+- X11/Wayland compatibility
+
+**Deliverables:**
+- Platform-specific GPU modules
+- Cross-platform abstraction layer
+
+### Success Criteria
+- 🟢 4K playback at <5% CPU (hardware decode)
+- 🟢 Zero perceptible lag on seek
+- 🟢 Matches VLC performance metrics
 
 ---
 
-#### 4.8 **Smart Buffer Management**
+## Sprint 8: Smart Buffer Management
+
+### Overview
+Implement intelligent buffer management that adapts to device capabilities and network conditions.
+
+### Sprint Goals
+- Calculate optimal buffer sizes per device tier
+- Prevent OOM on low-memory devices
+- Maintain smooth playback across all scenarios
+- Implement predictive prefetching
+
+### Tasks
+
+#### 8.1 Adaptive Buffer Size Calculation
+
+**What:** Determine buffer strategy based on device profile
 
 ```typescript
 // frontend/src/lib/BufferManager.ts - NEW
 class BufferManager {
-  private targetBufferSize: number; // bytes
+  private targetBufferSize: number;
+  private segmentDuration: number;
   
-  constructor(deviceProfile: DeviceProfile) {
+  constructor(deviceProfile: DeviceProfile, bitrate: number) {
     switch (deviceProfile) {
       case 'low':
-        this.targetBufferSize = 1024 * 1024;        // 1MB
+        // 1MB max buffer = ~60 seconds at 128kbps
+        this.targetBufferSize = 1024 * 1024;
+        this.segmentDuration = 6;  // 6s segments
         break;
       case 'mid':
-        this.targetBufferSize = 5 * 1024 * 1024;    // 5MB
+        // 5MB max buffer = ~200 seconds at 192kbps
+        this.targetBufferSize = 5 * 1024 * 1024;
+        this.segmentDuration = 10;
         break;
       case 'high':
-        this.targetBufferSize = 30 * 1024 * 1024;   // 30MB
+        // 30MB max buffer
+        this.targetBufferSize = 30 * 1024 * 1024;
+        this.segmentDuration = 15;
+        break;
     }
   }
   
   getRecommendedSegmentDuration(): number {
-    // low:  6s segments (128KB at 128kbps)
-    // mid:  10s segments (240KB at 192kbps)
-    // high: 15s segments (1MB at 512kbps)
+    return this.segmentDuration;
+  }
+  
+  getMaxBufferSize(): number {
+    return this.targetBufferSize;
+  }
+  
+  getOptimalBufferTarget(): number {
+    // 50% of max buffer for smooth playback
+    return this.targetBufferSize / 2;
   }
 }
 ```
 
-**Result:**
+#### 8.2 Buffer State Monitoring
+
+**What:** Monitor and log buffer fill levels in real-time
+
+**Implementation:**
+- Track buffer fill percentage
+- Monitor segment fetch times
+- Detect buffer underruns
+- Alert on anomalies
+
+**Deliverables:**
+- Buffer monitoring service
+- Real-time metrics collection
+
+#### 8.3 Predictive Prefetching
+
+**What:** Prefetch segments likely to be needed based on playback pattern
+
+**Implementation:**
+- Analyze current bitrate and network speed
+- Calculate estimated buffer drain rate
+- Fetch next segments preemptively
+- Reduce stall probability
+
+**Deliverables:**
+- Prefetch prediction algorithm
+- Segment fetch scheduler
+
+### Success Criteria
 - 🟢 Low-end: never buffers more than 1MB
 - 🟢 No OOM on 2GB devices
-- 🟢 Playback stays smooth
-
-**Time Estimate:** 1 week
+- 🟢 Playback stays smooth with <1% stalls
 
 ---
 
-### 🎯 **Phase 5: Streaming Ecosystem (Weeks 14-16)**
+## Sprint 9: Streaming Ecosystem - License-Free Music Integration
 
-#### 4.9 **License-Free Music Library Integration**
+### Overview
+Integrate license-free music sources to establish an initial catalog for the streaming platform.
 
-Integrate with:
-- **Libre Music** (ccMixter, FreeMusic Archive) via API
-- **Internet Archive Audio** collection
-- **Bandcamp** artist direct streaming
+### Sprint Goals
+- Connect to independent music APIs
+- Support artist direct uploads
+- Implement license tracking
+- Create content discovery features
+
+### Tasks
+
+#### 9.1 License-Free Music Library Integration
+
+**What:** Integrate with open music sources
 
 ```typescript
 // server/src/services/StreamingLibraryService.ts - NEW
@@ -674,71 +860,137 @@ async function searchLibreMusic(query: string) {
     artist: r.artistName,
     title: r.trackTitle,
     license: r.license,
-    url: r.downloadUrl, // may need transcoding
+    url: r.downloadUrl,
+    metadata: {
+      genre: r.genre,
+      bpm: r.bpm,
+      duration: r.duration,
+    }
   }));
+}
+
+// Query Internet Archive
+async function searchInternetArchive(query: string) {
+  const results = await fetch(`https://archive.org/advancedsearch.php?q=${query}`);
+  return results.map(r => ({ /* format to standard */ }));
+}
+
+// Query FreeMusic Archive
+async function searchFreeMusic(query: string) {
+  const results = await fetch(`https://freemusicarchive.org/api/...?q=${query}`);
+  return results.map(r => ({ /* format to standard */ }));
 }
 ```
 
-**Result:**
-- 🟢 "Streaming platform" has initial music catalog
+#### 9.2 Artist Direct Upload System
+
+**What:** Enable artists to upload and distribute music directly
+
+**Implementation:**
+- Artist registration and verification
+- Upload interface with validation
+- Automatic metadata extraction
+- Distribution to streaming endpoints
+- Royalty/analytics dashboard
+
+**Deliverables:**
+- Artist upload service
+- Content verification pipeline
+- Artist analytics dashboard
+
+#### 9.3 License & Attribution Management
+
+**What:** Ensure proper license attribution and compliance
+
+**Implementation:**
+- Store license metadata for all tracks
+- Display license information in UI
+- Generate license compliance reports
+- Enable proper attribution in playlists
+
+**Deliverables:**
+- License metadata schema
+- License compliance system
+- Attribution UI components
+
+### Success Criteria
+- 🟢 "Streaming platform" has initial music catalog (10K+ tracks)
 - 🟢 Artists can distribute directly
-- 🟢 Differentiation from Spotify
-
-**Time Estimate:** 1.5 weeks
+- 🟢 All content properly licensed and attributed
 
 ---
 
-## 5. Implementation Roadmap
+## Implementation Priorities & Dependencies
 
-| Week | Task | Impact |
-|------|------|--------|
-| 1-2 | HLS/DASH implementation | 🔴 Critical: solves low-end device issue |
-| 3-4 | Hardware acceleration (all platforms) | 🔴 Critical: 50%+ CPU reduction |
-| 5-6 | Device profile + codec ladder | 🟡 High: ensures playback on 2GB devices |
-| 7 | Genre classification | 🟡 High: recommendation quality |
-| 8-9 | CDN + caching | 🟡 High: <100ms TTFB for streaming platform |
-| 10 | Performance monitoring | 🟡 High: auto-adaptation to network |
-| 11-12 | Zero-copy video (Tauri) | 🟢 Medium: 4K support |
-| 13 | Smart buffer management | 🟢 Medium: stability across devices |
-| 14-16 | Music library integration | 🟢 Low: feature completeness |
+### Phase 1 (Critical - Foundation)
+1. **Sprint 1:** HLS/DASH Implementation (blocks Sprints 3, 5)
+2. **Sprint 2:** Hardware Acceleration (blocks Sprint 7)
+
+### Phase 2 (High - Enablement)
+3. **Sprint 3:** Device Profile & Codec Optimization (depends on Sprint 1)
+4. **Sprint 4:** Audio Analysis & Genre Classification (independent)
+
+### Phase 3 (High - Platform Features)
+5. **Sprint 5:** Caching & CDN (depends on Sprint 1)
+6. **Sprint 6:** Performance Monitoring (depends on Sprint 1)
+
+### Phase 4 (Medium - Desktop Enhancement)
+7. **Sprint 7:** Zero-Copy Video Decoding (depends on Sprint 2)
+8. **Sprint 8:** Smart Buffer Management (depends on Sprint 1, 3)
+
+### Phase 5 (Low - Ecosystem)
+9. **Sprint 9:** Streaming Library Integration (independent)
 
 ---
 
-## 6. Success Metrics
+## Success Metrics
 
-### After Phase 1 (HLS + HW Accel):
+### After Sprint 1 & 2:
 - ✅ 128MB FLAC streams smoothly on 2GB RAM device
 - ✅ 4K video plays at <10% CPU on desktop
 - ✅ TTFB <500ms even on 3G
 
-### After Phase 2 (Codec Optimization):
+### After Sprint 3:
 - ✅ Low-end device gets <128kbps audio automatically
 - ✅ Mid-range device gets 192kbps + 720p video
 - ✅ High-end device gets lossless audio + 4K
 
-### After Phase 3 (Streaming):
+### After Sprint 4:
 - ✅ Genre detection enables mood-based playlists
+- ✅ Speech detection improves podcast handling
+
+### After Sprints 5 & 6:
 - ✅ Popular tracks pre-cached with <100ms delivery
 - ✅ Auto-bitrate adapt to network changes
+- ✅ Performance dashboards show real-time metrics
 
-### After Phase 4 (Desktop):
+### After Sprint 7:
 - ✅ 4K playback at <5% CPU (hardware decode)
 - ✅ Zero perceptible lag on seek
 - ✅ Matches VLC performance
 
+### After Sprint 8:
+- ✅ Smooth playback on all device tiers
+- ✅ No OOM on low-memory devices
+
+### After Sprint 9:
+- ✅ Initial streaming catalog available
+- ✅ Artists can upload directly
+- ✅ Competitive differentiation established
+
 ---
 
-## 7. Competitive Positioning
+## Competitive Positioning
 
 ### vs. VLC (Native Desktop)
 | Feature | VLC | ZOVYRA (Post-Optimization) |
-|---------|-----|---------------------------|
+|---------|-----|----------------------------|
 | 4K HW Decode | ✅ | ✅ |
 | Format Support | ~90% | 95%+ (via HLS fallback) |
 | Memory Efficiency | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Metadata Analysis | ❌ | ✅ |
 | AI Recommendations | ❌ | ✅ |
-| **WINNER** | Playback | **Smart Discovery** |
+| **Advantage** | Playback | **Smart Discovery** |
 
 ### vs. Spotify (Streaming Platform)
 | Feature | Spotify | ZOVYRA (Post-Optimization) |
@@ -748,13 +1000,13 @@ async function searchLibreMusic(query: string) {
 | Offline Download | ✅ | ✅ |
 | Local Library | ❌ | ✅ |
 | Artist Direct Upload | ❌ | ✅ |
-| **WINNER** | Scale | **Freedom + Local** |
+| **Advantage** | Scale | **Freedom + Local** |
 
 ---
 
-## 8. Open Questions & Trade-Offs
+## Risk Mitigation & Trade-Offs
 
-### Licensing
+### Licensing Considerations
 - **FFmpeg:** LGPL compliance required if distributing prebuilt binaries
 - **Solution:** Ship with libavcodec notices; consider Fraunhofer MP3 licensing for distributed platform
 
@@ -763,55 +1015,23 @@ async function searchLibreMusic(query: string) {
 - **Solution:** Use hls.js polyfill + DASH.js fallback
 
 ### Transcoding Server Load
-- **Peak usage:** 1000 simultaneous users on streaming platform
-- **Challenge:** 50 concurrent FFmpeg processes = ~16 CPU cores required
-- **Solution:** Use async FFmpeg pool + Redis segment cache
+- **Challenge:** 1000 concurrent users = 50 concurrent FFmpeg processes = ~16 CPU cores required
+- **Solution:** Use async FFmpeg pool + Redis segment cache + CDN distribution
 
----
-
-## 9. Files to Create/Modify Summary
-
-### **Phase 1 Priority**
-```
-✨ NEW FILES:
-- server/src/services/HLSTranscodeService.ts
-- frontend/src/hooks/useHLSPlayback.ts
-- frontend/src/hooks/useHardwareDecoding.ts
-- native/src/decoding.rs
-
-📝 MODIFY:
-- frontend/src/lib/PlaybackEngine.ts
-- server/src/routes/stream.ts
-- native/src/lib.rs
-- frontend/src/components/VideoPlayer.tsx
-```
-
-### **Phase 2 Priority**
-```
-✨ NEW FILES:
-- frontend/src/lib/DeviceProfile.ts
-
-📝 MODIFY:
-- server/src/services/TranscodeService.ts (rewrite)
-- native/src/dsp.rs (add genre classification)
-```
+### Mobile Compliance
+- **Issue:** App Store policies may restrict codec licensing
+- **Solution:** Work with legal team on licensing agreements early
 
 ---
 
 ## Conclusion
 
-To surpass VLC and Spotify, ZOVYRA must address the **audio/video processing bottlenecks head-on**. The current architecture has potential but lacks:
+To surpass VLC and Spotify, ZOVYRA must address audio/video processing bottlenecks systematically across 9 focused sprints. Each sprint builds on previous work, with clear dependencies and measurable outcomes.
 
-1. **HLS streaming** (essential for streaming platform)
-2. **Hardware acceleration** (essential for native performance)
-3. **Device-aware codec selection** (essential for low-end devices)
-4. **Real-time optimization** (essential for reliability)
-
-Implementing these phases will deliver:
+The structured sprint approach enables:
 - ✅ Smooth playback on **2GB RAM devices** (beats Spotify's bloat)
 - ✅ **4K @ 5% CPU** on desktop (matches VLC)
 - ✅ **Sub-100ms TTFB** for streaming (beats Spotify's 500ms)
 - ✅ **Local library + streaming** (beats both competitors)
 
-The roadmap is **realistic and achievable in 16 weeks** with a focused team. The result: **A true next-generation media OS.**
-
+This roadmap is **realistic and achievable with disciplined execution** and results in a **true next-generation media OS.**
