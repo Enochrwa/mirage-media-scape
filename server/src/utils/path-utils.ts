@@ -26,10 +26,11 @@ export function isValidId(id: unknown): id is string {
  */
 export function sanitizeFilename(str: unknown): string {
   if (typeof str !== 'string') return '';
+  // Prevent dot-segment traversal by using path.basename and blocking specific values
   const base = path.basename(str);
-  const sanitized = base.replace(/[^a-z0-9._-]/gi, '_');
-  if (sanitized === '.' || sanitized === '..') return '_';
-  return sanitized;
+  if (base === '.' || base === '..') return '_';
+  // Strip any remaining dangerous characters
+  return base.replace(/[^a-z0-9._-]/gi, '_');
 }
 
 /**

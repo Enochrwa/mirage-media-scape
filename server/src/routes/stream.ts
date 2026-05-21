@@ -35,7 +35,7 @@ router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
 
   const track = db
     .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
-    .get(trackId) as { owner_id: string | null; is_public: number } | undefined;
+    .get(trackId as string) as { owner_id: string | null; is_public: number } | undefined;
 
   if (!track) return res.status(404).send('Track not found');
 
@@ -57,7 +57,7 @@ router.get('/:trackId/hls/:profile/playlist.m3u8', async (req, res) => {
     }
   }
 
-  const manifestPath = HLSTranscodeService.getManifestPath(trackId, profile);
+  const manifestPath = HLSTranscodeService.getManifestPath(trackId as string, profile as string);
 
   if (fs.existsSync(manifestPath)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -76,7 +76,7 @@ router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) 
 
   const track = db
     .prepare('SELECT owner_id, is_public FROM tracks WHERE id = ?')
-    .get(trackId) as { owner_id: string | null; is_public: number } | undefined;
+    .get(trackId as string) as { owner_id: string | null; is_public: number } | undefined;
 
   if (!track) return res.status(404).send('Track not found');
 
@@ -98,7 +98,7 @@ router.get('/:trackId/hls/:profile/:segment', cacheMiddleware, async (req, res) 
     }
   }
 
-  const segmentPath = HLSTranscodeService.getSegmentPath(trackId, profile, segment);
+  const segmentPath = HLSTranscodeService.getSegmentPath(trackId as string, profile as string, segment as string);
 
   if (fs.existsSync(segmentPath)) {
     res.setHeader('Content-Type', 'video/MP2T');

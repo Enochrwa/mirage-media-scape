@@ -90,6 +90,10 @@ export class HLSTranscodeService {
     return new Promise((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', ffmpegParams);
 
+      // Drain stdio to prevent hangs due to full pipe buffers
+      ffmpeg.stdout.on('data', () => {});
+      ffmpeg.stderr.on('data', () => {});
+
       ffmpeg.on('error', (err) => {
         console.error(`FFmpeg error for ${trackId}:`, err);
         reject(err);
@@ -102,14 +106,23 @@ export class HLSTranscodeService {
       });
 
       // Better manifest creation check: use fs.watch or poll with backoff
+      // Increased timeout/attempts for slower systems
       let attempts = 0;
+      const maxAttempts = 120; // 60 seconds total
       const poll = () => {
         if (fs.existsSync(manifestPath)) {
-          resolve({
-            manifest: fs.readFileSync(manifestPath, 'utf8'),
-            uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
-          });
-        } else if (attempts < 20) {
+          // Additional check: ensure manifest isn't empty or truncated
+          const content = fs.readFileSync(manifestPath, 'utf8');
+          if (content.includes('#EXT-X-ENDLIST') || content.includes('#EXTINF')) {
+            resolve({
+              manifest: content,
+              uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
+            });
+            return;
+          }
+        }
+
+        if (attempts < maxAttempts) {
           attempts++;
           setTimeout(poll, 500);
         } else {

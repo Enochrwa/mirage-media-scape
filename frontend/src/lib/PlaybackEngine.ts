@@ -304,12 +304,17 @@ export class PlaybackEngine {
 
     this.currentTrackId = file.id;
     this.setState('LOADING');
+
+    const platform = this.capabilities;
+    const isDesktop = platform.host === 'desktop';
     const ext = file.file_path?.split('.').pop()?.toLowerCase() ?? '';
     const nativelyPlayable = ['mp3', 'aac', 'flac', 'ogg', 'wav', 'opus'].includes(ext);
-    const useHLS = file.type === 'video' || !nativelyPlayable;
+
+    // Disable HLS for desktop local file URLs and natively playable audio
+    const useHLS = !isDesktop && (file.type === 'video' || !nativelyPlayable);
     const url = await this.resolveTrackUrl(file, useHLS);
 
-    if (useHLS && Hls.isSupported()) {
+    if (useHLS && Hls.isSupported() && !isDesktop) {
       chain.hls = new Hls();
       chain.hls.loadSource(url);
       chain.hls.attachMedia(chain.element);
@@ -382,7 +387,12 @@ export class PlaybackEngine {
   async preloadNextForGapless(file: MediaFile) {
     this._preloadedFile = file;
     try {
-      const url = await this.resolveTrackUrl(file);
+      // Force non-HLS URL for gapless preloading (must be decodable bytes)
+      const url = await this.resolveTrackUrl(file, false);
+      if (url.endsWith('.m3u8')) {
+        console.warn('Gapless bridge: Cannot preload HLS manifest as audio buffer');
+        return;
+      }
       const res = await fetch(url, { headers: { Range: 'bytes=0-524288' } });
       const buffer = await res.arrayBuffer();
       const audioBuffer = await this.ctx.decodeAudioData(buffer);

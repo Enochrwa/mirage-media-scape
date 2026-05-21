@@ -16,13 +16,13 @@ export const cacheMiddleware = (req: Request, res: Response, next: NextFunction)
     return res.status(403).send('Invalid path parameters');
   }
 
-  if (segment) {
+  if (segment && profile) {
     const cachePath = path.join(
       process.cwd(),
       'cache',
       'hls',
       trackId as string,
-      profile as string || 'mid',
+      profile as string,
       segment as string,
     );
 
