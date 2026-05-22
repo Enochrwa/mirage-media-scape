@@ -55,14 +55,19 @@ export class HLSTranscodeService {
       fs.mkdirSync(trackDir, { recursive: true });
     }
 
-    const { audio } = TranscodeService.getBitrateConfig(profile as unknown as DeviceProfile);
+    const { audio, video, resolution } = TranscodeService.getBitrateConfig(
+      profile as unknown as DeviceProfile,
+    );
 
-    // Check if manifest already exists
+    // Check if manifest already exists and is valid
     if (fs.existsSync(manifestPath)) {
-      return {
-        manifest: fs.readFileSync(manifestPath, 'utf8'),
-        uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
-      };
+      const content = fs.readFileSync(manifestPath, 'utf8');
+      if (content.includes('#EXTINF') || content.includes('#EXT-X-ENDLIST')) {
+        return {
+          manifest: content,
+          uri: `/api/stream/${sanitizedTrackId}/hls/${sanitizedProfile}/playlist.m3u8`,
+        };
+      }
     }
 
     const ffmpegParams = [
@@ -74,6 +79,10 @@ export class HLSTranscodeService {
       `${audio}k`,
       '-c:v',
       'libx264',
+      '-b:v',
+      `${video}k`,
+      '-s',
+      resolution,
       '-preset',
       'ultrafast',
       '-hls_time',
@@ -95,7 +104,7 @@ export class HLSTranscodeService {
       ffmpeg.stderr.on('data', () => {});
 
       ffmpeg.on('error', (err) => {
-        console.error(`FFmpeg error for ${trackId}:`, err);
+        console.error('FFmpeg error for %s:', trackId, err);
         reject(err);
       });
 

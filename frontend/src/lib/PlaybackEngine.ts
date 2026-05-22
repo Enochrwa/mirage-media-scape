@@ -233,7 +233,9 @@ export class PlaybackEngine {
 
     if (forceHLS) {
       const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+      if (!res.ok) throw new Error(`HLS bootstrap failed with status ${res.status}`);
       const { uri } = await res.json();
+      if (!uri) throw new Error('HLS bootstrap response missing URI');
       return `${API_BASE}${uri}`;
     }
 
@@ -244,7 +246,9 @@ export class PlaybackEngine {
     if (!nativeExts.includes(ext)) {
       // Use HLS for unsupported formats
       const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+      if (!res.ok) throw new Error(`HLS bootstrap failed with status ${res.status}`);
       const { uri } = await res.json();
+      if (!uri) throw new Error('HLS bootstrap response missing URI');
       return `${API_BASE}${uri}`;
     }
 
@@ -267,7 +271,9 @@ export class PlaybackEngine {
 
       if (!isSupported || ['vc1', 'wmv3', 'theora'].some((c) => codec.includes(c))) {
         const res = await fetch(`${baseUrl}?hls=1&profile=${profile}`);
+        if (!res.ok) throw new Error(`HLS bootstrap failed with status ${res.status}`);
         const { uri } = await res.json();
+        if (!uri) throw new Error('HLS bootstrap response missing URI');
         return `${API_BASE}${uri}`;
       }
     }
@@ -313,7 +319,15 @@ export class PlaybackEngine {
     // Disable HLS for desktop local file URLs and natively playable audio
     // For video, we should use HLS only if not on desktop (desktop uses direct URLs which can be handled natively by some webviews or fallback to transcode=1)
     const useHLS = !isDesktop && (file.type === 'video' || !nativelyPlayable);
-    const url = await this.resolveTrackUrl(file, useHLS);
+
+    let url: string;
+    try {
+      url = await this.resolveTrackUrl(file, useHLS);
+    } catch (e) {
+      console.error('Failed to resolve track URL', e);
+      this.setState('ERROR');
+      return;
+    }
 
     if (useHLS && Hls.isSupported()) {
       chain.hls = new Hls();

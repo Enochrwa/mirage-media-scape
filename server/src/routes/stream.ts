@@ -6,7 +6,6 @@ import db from '../db/index.js';
 import { validatePath, isValidId, sanitizeFilename } from '../utils/path-utils.js';
 import { verifyToken } from '../middleware/auth.js';
 import { HLSTranscodeService } from '../services/HLSTranscodeService.js';
-import { DeviceProfile } from '../services/TranscodeService.js';
 
 const router = Router();
 
@@ -163,7 +162,10 @@ router.get('/:trackId', async (req, res) => {
   }
 
   if (transcode || req.query.hls === '1') {
-    const profile = (req.query.profile as DeviceProfile) || 'mid';
+    let profile = (req.query.profile as string) || 'mid';
+    if (!['low', 'mid', 'high'].includes(profile)) {
+      profile = 'mid';
+    }
 
     // If it's a transcode request WITHOUT HLS flag, we should technically return media bytes
     // as per P1 Badge: Preserve media stream behavior for transcode=1
