@@ -55,7 +55,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
         if (!res.ok) return;
         const data = (await res.json()) as { folderCount: number; onboardingComplete: boolean };
         if (cancelled) return;
-        if (data.folderCount === 0 && !data.onboardingComplete) {
+        if (data.folderCount === 0 && !data.onboardingComplete && safeFiles.length === 0) {
           setShowOnboarding(true);
         }
       } catch {
@@ -67,6 +67,9 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
     return () => {
       cancelled = true;
     };
+    // safeFiles.length intentionally omitted: bootstrap check is a one-time mount
+    // gate; we don't want it to re-run every time the library loads more tracks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [host]);
 
   useEffect(() => {

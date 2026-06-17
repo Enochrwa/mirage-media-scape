@@ -180,10 +180,12 @@ const store = create<PlayerState>((set, get) => ({
   playFile: async (file: MediaFile) => {
     set({ currentFile: file, isPlaying: true });
 
-    // Check for playlist crossfade override
-    // This would require knowing the current playlist context,
-    // which is not always available here.
-    // For now, we use the global setting from playbackEngine.
+    // For video files, the VideoPlayer component owns the <video> element
+    // and manages its own src/playback. Loading a video URL into the
+    // PlaybackEngine's <audio> element causes NotSupportedError.
+    if (file.type === 'video') {
+      return;
+    }
 
     await playbackEngine.load(file);
     playbackEngine.play();
