@@ -3,6 +3,8 @@ import { PlaybackController } from '@/components/player/PlaybackController';
 import { MoodSlider } from '@/components/discovery/MoodSlider';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
 import { useState } from 'react';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import VideoPlayer from '@/components/VideoPlayer';
 
 interface ZovyraLayoutProps {
   children: React.ReactNode;
@@ -10,6 +12,9 @@ interface ZovyraLayoutProps {
 
 export function ZovyraLayout({ children }: ZovyraLayoutProps) {
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
+  const { currentFile, closePlayer } = usePlayerStore();
+
+  const isVideo = currentFile?.type === 'video';
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black font-sans text-white">
@@ -29,15 +34,28 @@ export function ZovyraLayout({ children }: ZovyraLayoutProps) {
         </main>
       </div>
 
-      {/* Persistent Player Bar */}
-      <div className="block" onClick={() => setShowMobilePlayer(true)}>
-        <PlaybackController />
-      </div>
+      {/* Persistent Player Bar - only for audio */}
+      {!isVideo && <PlaybackController />}
+
+      {/* Mobile player tap target */}
+      {!isVideo && (
+        <div
+          className="fixed bottom-20 right-4 z-30 md:hidden"
+          onClick={() => setShowMobilePlayer(true)}
+        />
+      )}
 
       {/* Fullscreen Mobile Player Overlay */}
       {showMobilePlayer && (
         <div className="md:hidden">
           <MobilePlayer onClose={() => setShowMobilePlayer(false)} />
+        </div>
+      )}
+
+      {/* Video player modal */}
+      {isVideo && currentFile && (
+        <div className="fixed inset-0 z-[100] bg-black">
+          <VideoPlayer onClose={closePlayer} />
         </div>
       )}
     </div>

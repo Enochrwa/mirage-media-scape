@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -8,33 +8,39 @@ import { FullNowPlaying } from './player/FullNowPlaying';
 import VideoPlayer from './VideoPlayer';
 
 const PlayerWrapper = () => {
-  const { currentFile, isPlayerFullscreen, currentTime, playbackEngine: pe } = usePlayerStore();
+  const {
+    currentFile,
+    isPlayerFullscreen,
+    currentTime,
+    playbackEngine: pe,
+    closePlayer,
+  } = usePlayerStore();
   const [showResume, setShowResume] = useState(false);
   const [hasCheckedResume, setHasCheckedResume] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   useEffect(() => {
-    // If we have a currentFile but it's not playing and we just restored it
     if (currentFile && !hasCheckedResume) {
       const { isPlaying } = usePlayerStore.getState();
-      // If currentTime is 0, we might still be in the process of restoring session.
-      // We only finalize check once we have a non-zero time OR if we've waited a bit.
       if (!isPlaying && currentTime > 5) {
         setShowResume(true);
         setHasCheckedResume(true);
       } else if (isPlaying) {
-        // If it's already playing, we don't need to show resume
         setHasCheckedResume(true);
       }
     }
   }, [currentFile, hasCheckedResume, currentTime]);
 
-  if (!currentFile) {
-    return null;
-  }
+  // When a video file is selected, automatically show the video modal
+  useEffect(() => {
+    if (currentFile?.type === 'video') {
+      setShowVideoModal(true);
+    } else {
+      setShowVideoModal(false);
+    }
+  }, [currentFile?.id, currentFile?.type]);
 
-  if (currentFile.type === 'video') {
-    return <VideoPlayer />;
-  }
+  if (!currentFile) return null;
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -42,9 +48,15 @@ const PlayerWrapper = () => {
     return `${m}:${rs < 10 ? '0' : ''}${rs}`;
   };
 
+  const handleCloseVideo = () => {
+    setShowVideoModal(false);
+    closePlayer();
+  };
+
   return (
     <>
-      {showResume && (
+      {/* Resume toast */}
+      {showResume && currentFile.type !== 'video' && (
         <div className="fixed bottom-24 left-4 right-4 z-[60] md:left-auto md:right-4 md:w-80">
           <Card className="flex items-center gap-4 border-primary/20 bg-background/95 p-4 shadow-2xl backdrop-blur">
             <img
@@ -80,8 +92,19 @@ const PlayerWrapper = () => {
           </Card>
         </div>
       )}
-      <MiniPlayer />
-      {isPlayerFullscreen && <FullNowPlaying />}
+
+      {/* Video fullscreen modal */}
+      {currentFile.type === 'video' && showVideoModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
+          <VideoPlayer onClose={handleCloseVideo} />
+        </div>
+      )}
+
+      {/* Audio mini player (always rendered when audio is active) */}
+      {currentFile.type === 'audio' && <MiniPlayer />}
+
+      {/* Full audio player overlay */}
+      {currentFile.type === 'audio' && isPlayerFullscreen && <FullNowPlaying />}
     </>
   );
 };
