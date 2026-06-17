@@ -86,12 +86,24 @@ export class ScannerService {
       }
 
       let resolved = false;
+      const SCAN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          console.error('Scanner worker timed out after 5 minutes — terminating.');
+          resolved = true;
+          this.isScanning = false;
+          worker.terminate();
+          resolve();
+        }
+      }, SCAN_TIMEOUT_MS);
+
       worker.on('message', (msg: { type: string; [key: string]: unknown }) => {
         if (this.io) {
           this.io.emit(msg.type, msg);
         }
         if (msg.type === 'SCAN_COMPLETE' && !resolved) {
           resolved = true;
+          clearTimeout(timeoutId);
           this.isScanning = false;
           // Record the timestamp so the frontend can check library freshness
           db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
@@ -110,6 +122,7 @@ export class ScannerService {
       // The error is already logged; callers that care receive SCAN_ERROR via Socket.IO.
       worker.on('error', (err) => {
         console.error('Scanner worker error:', err);
+        clearTimeout(timeoutId);
         this.isScanning = false;
         if (!resolved) {
           resolved = true;
@@ -121,6 +134,7 @@ export class ScannerService {
         if (code !== 0) {
           console.error(`Scanner worker exited with code ${code}`);
         }
+        clearTimeout(timeoutId);
         this.isScanning = false;
         // Ensure the promise resolves even if SCAN_COMPLETE was never sent
         if (!resolved) {

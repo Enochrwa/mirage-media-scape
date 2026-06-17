@@ -111,6 +111,59 @@ const VideoPlayer: React.FC = () => {
   const [isPinching, setIsPinching] = useState(false);
   const [useFallbackPiP, setUseFallbackPiP] = useState(false);
 
+  // Load video src when currentFile changes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !currentFile) return;
+
+    const url = `${API_BASE}/api/stream/${encodeURIComponent(currentFile.id)}`;
+    video.src = url;
+    video.load();
+
+    const onLoadedMetadata = () => {
+      updateStoreDuration(video.duration);
+      setDuration(video.duration);
+    };
+
+    const onTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      updateStoreCurrentTime(video.currentTime);
+    };
+
+    const onEnded = () => {
+      usePlayerStore.getState().nextTrack();
+    };
+
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('timeupdate', onTimeUpdate);
+    video.addEventListener('ended', onEnded);
+
+    // Auto-play when file loads
+    video.play().catch((err) => {
+      // Autoplay may be blocked — user must click play
+      console.warn('[VideoPlayer] Autoplay blocked:', err);
+    });
+
+    return () => {
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('ended', onEnded);
+      video.pause();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFile?.id]);
+
+  // Sync play/pause state from store to video element
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !currentFile) return;
+    if (storeIsPlaying) {
+      video.play().catch(console.error);
+    } else {
+      video.pause();
+    }
+  }, [storeIsPlaying, currentFile]);
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
