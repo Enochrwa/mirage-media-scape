@@ -1,6 +1,4 @@
 import React, { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { FixedSizeGrid as Grid, type GridChildComponentProps } from 'react-window';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { MediaFile } from '@/types/media';
 import { Card } from '@/components/ui/card';
@@ -31,17 +29,12 @@ interface LibraryGridProps {
   files: MediaFile[];
 }
 
-const ROW_HEIGHT = 288;
-const MIN_COL_WIDTH = 168;
-const MAX_COLS = 6;
-
-type GridCellData = {
-  files: MediaFile[];
-  columnCount: number;
+interface GridCellProps {
+  file: MediaFile;
   playFile: (f: MediaFile) => void;
   selection: Set<string>;
   toggleSelection: (id: string) => void;
-};
+}
 
 function formatBadgeLabel(file: MediaFile): string {
   const p = file.file_path || '';
@@ -61,17 +54,14 @@ function resolutionLabel(file: MediaFile): string | null {
 }
 
 const GridCell = memo(function GridCell({
-  columnIndex,
-  rowIndex,
-  style,
-  data,
-}: GridChildComponentProps<GridCellData>) {
+  file,
+  playFile,
+  selection,
+  toggleSelection,
+}: GridCellProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [shouldLoad, setShouldLoad] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
-  const { files, columnCount, playFile, selection, toggleSelection } = data;
-  const index = rowIndex * columnCount + columnIndex;
-  const file = index < files.length ? files[index] : null;
   const trackId = file?.id;
   const isSelected = trackId ? selection.has(trackId) : false;
   const inSelectionMode = selection.size > 0;
@@ -93,10 +83,6 @@ const GridCell = memo(function GridCell({
     return () => observer.disconnect();
   }, [trackId]);
 
-  if (!file) {
-    return <div style={style} className="p-2" />;
-  }
-
   const poster = file.type === 'video' ? (file.thumbnail ?? file.cover) : file.cover;
   const res = resolutionLabel(file);
   const fmt = formatBadgeLabel(file);
@@ -106,7 +92,6 @@ const GridCell = memo(function GridCell({
 
   return (
     <div
-      style={style}
       className="box-border p-2"
       onClick={(e) => {
         if (inSelectionMode || e.shiftKey) {
@@ -117,7 +102,7 @@ const GridCell = memo(function GridCell({
     >
       <Card
         className={cn(
-          'group relative flex h-full flex-col overflow-hidden bg-card transition-colors hover:bg-card/80',
+          'group relative flex h-64 flex-col overflow-hidden bg-card transition-colors hover:bg-card/80',
           isSelected && 'bg-primary/5 ring-2 ring-primary',
           isMissing && 'opacity-60',
         )}
@@ -299,39 +284,18 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
   }
 
   return (
-    <div className="relative h-full">
-      <AutoSizer
-        ChildComponent={({ width, height }) => {
-          if (width === undefined || height === undefined) {
-            return null;
-          }
-          const columnCount = Math.min(MAX_COLS, Math.max(2, Math.floor(width / MIN_COL_WIDTH)));
-          const columnWidth = width / columnCount;
-          const rowCount = Math.ceil(files.length / columnCount);
-          const data: GridCellData = {
-            files,
-            columnCount,
-            playFile,
-            selection,
-            toggleSelection,
-          };
-          return (
-            <Grid
-              columnCount={columnCount}
-              columnWidth={columnWidth}
-              rowCount={rowCount}
-              rowHeight={ROW_HEIGHT}
-              width={width}
-              height={height}
-              overscanColumnCount={0}
-              overscanRowCount={2}
-              itemData={data}
-            >
-              {GridCell}
-            </Grid>
-          );
-        }}
-      />
+    <div className="relative">
+      <div className="grid grid-cols-2 gap-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        {files.map((file) => (
+          <GridCell
+            key={file.id}
+            file={file}
+            playFile={playFile}
+            selection={selection}
+            toggleSelection={toggleSelection}
+          />
+        ))}
+      </div>
 
       {selection.size > 0 && (
         <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full border border-border bg-background/95 px-6 py-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-4">
