@@ -1,5 +1,12 @@
 import path from 'path';
+import { fileURLToPath } from 'url';
 import db from '../db/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Go up to server root: dist/src/utils → server  OR  src/utils → server
+const SERVER_ROOT = path.resolve(__dirname, '..', '..');
+const UPLOADS_ROOT = path.resolve(SERVER_ROOT, 'uploads');
 
 /**
  * Sanitize a string to be safe for use in IDs.
@@ -27,6 +34,12 @@ export function validatePath(filePath: string): boolean {
 
   try {
     const absolutePath = path.resolve(filePath);
+
+    // Allow files inside the server's uploads directory (user-uploaded content)
+    const uploadsRelative = path.relative(UPLOADS_ROOT, absolutePath);
+    if (!uploadsRelative.startsWith('..') && !path.isAbsolute(uploadsRelative)) {
+      return true;
+    }
 
     // Get watched folders from database
     const watchedFolders = db.prepare('SELECT path FROM watched_folders').all() as {

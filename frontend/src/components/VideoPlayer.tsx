@@ -134,20 +134,25 @@ const VideoPlayer: React.FC = () => {
       usePlayerStore.getState().nextTrack();
     };
 
+    const onCanPlay = () => {
+      // Only auto-play if the store says we should be playing
+      if (usePlayerStore.getState().isPlaying) {
+        video.play().catch((err) => {
+          console.warn('[VideoPlayer] Autoplay blocked:', err);
+        });
+      }
+    };
+
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('ended', onEnded);
-
-    // Auto-play when file loads
-    video.play().catch((err) => {
-      // Autoplay may be blocked — user must click play
-      console.warn('[VideoPlayer] Autoplay blocked:', err);
-    });
+    video.addEventListener('canplay', onCanPlay, { once: true });
 
     return () => {
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('ended', onEnded);
+      video.removeEventListener('canplay', onCanPlay);
       video.pause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,7 +163,10 @@ const VideoPlayer: React.FC = () => {
     const video = videoRef.current;
     if (!video || !currentFile) return;
     if (storeIsPlaying) {
-      video.play().catch(console.error);
+      // Only call play() if video has enough data; canplay handler covers the loading case
+      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        video.play().catch(console.error);
+      }
     } else {
       video.pause();
     }

@@ -25,11 +25,15 @@ export const getBootstrap = (_req: Request, res: Response) => {
   const folderCount = (
     db.prepare('SELECT COUNT(*) as c FROM watched_folders').get() as { c: number }
   ).c;
+  const trackCount = (
+    db.prepare('SELECT COUNT(*) as c FROM tracks WHERE missing = 0').get() as { c: number }
+  ).c;
   const row = db
     .prepare("SELECT value FROM settings WHERE key = 'library_onboarding_complete'")
     .get() as { value: string } | undefined;
   let onboardingComplete = row?.value === '1';
-  if (folderCount > 0 && !onboardingComplete) {
+  // If there are tracks (e.g. via upload) or folders, treat as onboarded
+  if ((folderCount > 0 || trackCount > 0) && !onboardingComplete) {
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
       'library_onboarding_complete',
       '1',
