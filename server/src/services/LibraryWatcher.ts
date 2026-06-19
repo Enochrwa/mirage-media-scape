@@ -7,9 +7,9 @@ import { scannerService } from './scanner.js';
 let watcher: FSWatcher | null = null;
 let ioRef: Server | null = null;
 
-const DEBOUNCE_MS = 2_000; // normal debounce after library changes
-const BACKOFF_INITIAL = 15_000; // delay after a failed scan
-const BACKOFF_MAX = 60_000; // maximum backoff cap
+const DEBOUNCE_MS = 2_000;
+const BACKOFF_INITIAL = 15_000;
+const BACKOFF_MAX = 60_000;
 
 let lastScanFailed = false;
 let backoffMs = BACKOFF_INITIAL;
@@ -17,50 +17,38 @@ let isScanning = false;
 let pendingChanges = false;
 
 let debounceTimerRef: NodeJS.Timeout | null = null;
+let emfileRetryTimer: NodeJS.Timeout | null = null;
+let usePollingFallback = false;
 
 function scheduleRescan(): void {
-  // If the last scan failed, advance the backoff timer so the *next* attempt
-  // always waits the full backoff delay regardless of how many events fire in
-  // the meantime.
   if (lastScanFailed && debounceTimerRef) {
     clearTimeout(debounceTimerRef);
     debounceTimerRef = null;
   }
-
-  // ── Scanning in progress ──────────────────────────────────────────
-  // A scan is already running (runScan is active, isScanning === true).
-  // Record that a change happened and drop the event: if any overlooked
-  // changes exist the finally handler in runScan will fire another scan
-  // when this one completes.
   if (isScanning) {
     pendingChanges = true;
     return;
   }
-
   const delay = lastScanFailed ? backoffMs : DEBOUNCE_MS;
   debounceTimerRef = setTimeout(runScan, delay);
 }
 
 function runScan(): void {
-  debounceTimerRef = null; // consume the timer slot
-  isScanning = true; // guard: drop all events until this finishes
-  pendingChanges = false; // reset pending flag
-  lastScanFailed = false; // optimistic — will flip back if the scan throws
+  debounceTimerRef = null;
+  isScanning = true;
+  pendingChanges = false;
+  lastScanFailed = false;
   backoffMs = BACKOFF_INITIAL;
 
   (async () => {
     try {
-      await scannerService.scanAll(); // scan — OR SCAN_COMPLETE resolves
-      // success: leave isScanning = true until finally resets it below
+      await scannerService.scanAll();
     } catch (e: unknown) {
       lastScanFailed = true;
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX);
       console.error('LibraryWatcher rescan failed:', e);
     } finally {
       isScanning = false;
-      // If a tree-change arrived just as we finished (scheduleRescan ran
-      // while isScanning was still true), allow one more scan after a short
-      // grace period so nothing slips through the cracks.
       if (pendingChanges) {
         debounceTimerRef = setTimeout(() => {
           debounceTimerRef = null;
@@ -90,43 +78,56 @@ export function setLibraryWatcherIo(io: Server | null): void {
   ioRef = io;
 }
 
-export async function refreshLibraryWatcherPaths(): Promise<void> {
-  const rows = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
-
-  if (watcher) {
-    await watcher.close();
-    watcher = null;
-  }
-
-  // Cancel any pending timers and reset scan state
-  if (debounceTimerRef) clearTimeout(debounceTimerRef);
-  debounceTimerRef = null;
-  isScanning = false; // abandon any in-flight scan — paths are about to be rebuilt
-
-  if (rows.length === 0) return;
-
-  const paths = rows.map((r) => r.path);
-  watcher = chokidar.watch(paths, {
+function buildWatcherOptions(polling: boolean): import('chokidar').ChokidarOptions {
+  const baseOpts: import('chokidar').ChokidarOptions = {
     ignoreInitial: true,
     persistent: true,
     followSymlinks: false,
     awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+    // Limit depth to avoid watching enormous trees
+    depth: 10,
     ignored: [
       /^.*[/\\]systemd-private-.*$/,
       /^\/tmp[/\\]$/,
       /[/\\]\.wine[^/\\]*/,
       /[/\\]dosdevices[/\\]/,
-      // Ignore common non-media directories
       '**/node_modules/**',
       '**/.*/**',
-      // Ignore known non-media file patterns
       '**/*.{jpg,jpeg,png,gif,bmp,tiff,ico,webp,svg}',
       '**/*.{db,sqlite,sqlite3}',
       '**/*.{log,tmp,temp}',
       '**/Thumbs.db',
       '**/desktop.ini',
     ],
-  });
+  };
+
+  if (polling) {
+    // Polling fallback: much lower fd pressure, works on network mounts
+    return {
+      ...baseOpts,
+      usePolling: true,
+      interval: 5_000, // check every 5 s
+      binaryInterval: 10_000, // binary files every 10 s
+      // Polling doesn't need awaitWriteFinish because interval is long enough
+      awaitWriteFinish: { stabilityThreshold: 2_000, pollInterval: 500 },
+    };
+  }
+
+  return {
+    ...baseOpts,
+    // Native fs.watch — guard against opening too many fds
+    // by limiting the number of simultaneously watched paths
+    usePolling: false,
+  };
+}
+
+async function startWatcher(paths: string[], polling: boolean): Promise<void> {
+  if (watcher) {
+    await watcher.close();
+    watcher = null;
+  }
+
+  watcher = chokidar.watch(paths, buildWatcherOptions(polling));
 
   watcher.on('unlink', (filePath: string) => {
     markTrackMissing(filePath);
@@ -145,13 +146,66 @@ export async function refreshLibraryWatcherPaths(): Promise<void> {
   watcher.on('error', (err: unknown) => {
     if (err && typeof err === 'object' && 'code' in err) {
       const code = (err as NodeJS.ErrnoException).code;
+
       if (code === 'EACCES' || code === 'EPERM') {
         console.warn(
           `LibraryWatcher: skipping inaccessible path — ${(err as NodeJS.ErrnoException).path}`,
         );
         return;
       }
+
+      if (code === 'EMFILE' || code === 'ENFILE') {
+        // Too many open files — fall back to polling mode
+        if (!usePollingFallback) {
+          console.warn(
+            '[LibraryWatcher] EMFILE: too many open files. ' +
+              'Switching to polling mode (lower fd pressure). ' +
+              'To fix permanently, run: ulimit -n 65536',
+          );
+          usePollingFallback = true;
+
+          // Debounce the restart so we don't thrash during an EMFILE storm
+          if (emfileRetryTimer) clearTimeout(emfileRetryTimer);
+          emfileRetryTimer = setTimeout(async () => {
+            emfileRetryTimer = null;
+            const rows = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+            if (rows.length > 0) {
+              await startWatcher(
+                rows.map((r) => r.path),
+                true,
+              );
+              console.info('[LibraryWatcher] Restarted in polling mode.');
+            }
+          }, 3_000);
+        }
+        return; // suppress the flood of EMFILE messages
+      }
     }
     console.error('LibraryWatcher error:', err);
   });
+}
+
+export async function refreshLibraryWatcherPaths(): Promise<void> {
+  const rows = db.prepare('SELECT path FROM watched_folders').all() as { path: string }[];
+
+  // Cancel any pending timers and reset scan state
+  if (debounceTimerRef) clearTimeout(debounceTimerRef);
+  if (emfileRetryTimer) clearTimeout(emfileRetryTimer);
+  debounceTimerRef = null;
+  emfileRetryTimer = null;
+  isScanning = false;
+  usePollingFallback = false; // reset on explicit refresh
+
+  if (rows.length === 0) {
+    if (watcher) {
+      await watcher.close();
+      watcher = null;
+    }
+    return;
+  }
+
+  await startWatcher(
+    rows.map((r) => r.path),
+    false,
+  );
 }
