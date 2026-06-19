@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
   useLibraryStore,
@@ -71,6 +72,13 @@ export const FullNowPlaying: React.FC = () => {
   } = usePlayerStore();
 
   const { files } = useLibraryStore();
+  const location = useLocation();
+
+  // Auto-minimise when user navigates to another page
+  useEffect(() => {
+    setPlayerFullscreen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
   const [recommendations, setRecommendations] = useState<MediaFile[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -786,3 +794,4 @@ export const FullNowPlaying: React.FC = () => {
     </TooltipProvider>
   );
 };
+// This file is complete — no append needed

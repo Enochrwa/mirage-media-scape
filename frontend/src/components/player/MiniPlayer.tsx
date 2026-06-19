@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
   Play,
@@ -10,12 +10,14 @@ import {
   VolumeX,
   Volume1,
   ListMusic,
-  Zap,
   Heart,
   X,
   Repeat,
+  Repeat1,
   Shuffle,
   Radio,
+  Disc3,
+  Mic2,
 } from 'lucide-react';
 import { useLowPowerMode } from '@/hooks/useLowPowerMode';
 import { Button } from '@/components/ui/button';
@@ -29,7 +31,7 @@ export const MiniPlayer: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(0.8);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isHoveringProgress, setIsHoveringProgress] = useState(false);
   const progressRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -53,10 +55,11 @@ export const MiniPlayer: React.FC = () => {
 
   if (!currentFile) return null;
 
+  const isRadio = currentFile.album === 'Radio' || !duration;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const handleProgressMouseMove = (e: React.MouseEvent) => {
-    if (!progressRef.current) return;
+    if (!progressRef.current || isRadio) return;
     const rect = progressRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percent = Math.max(0, Math.min(1, x / rect.width));
@@ -65,7 +68,7 @@ export const MiniPlayer: React.FC = () => {
   };
 
   const handleSeekClick = (e: React.MouseEvent) => {
-    if (!progressRef.current) return;
+    if (!progressRef.current || isRadio) return;
     const rect = progressRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     usePlayerStore.getState().seekTo(percent * duration);
@@ -82,39 +85,57 @@ export const MiniPlayer: React.FC = () => {
     }
   };
 
+  const cycleRepeat = () => {
+    setRepeat(!repeat);
+  };
+
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
   return (
     <TooltipProvider delayDuration={300}>
       <div className="bg-background/92 fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 backdrop-blur-2xl">
-        {/* ── Seek bar ── */}
+        {/* ── Seek / Live bar ── */}
         <div
           ref={progressRef}
-          className="group relative h-1 w-full cursor-pointer transition-all hover:h-[5px]"
+          className={cn(
+            'group relative w-full transition-all',
+            isRadio
+              ? 'h-0.5 cursor-default'
+              : 'h-1 cursor-pointer hover:h-[5px]',
+          )}
+          onMouseEnter={() => setIsHoveringProgress(true)}
+          onMouseLeave={() => { setIsHoveringProgress(false); setTooltipTime(null); }}
           onMouseMove={handleProgressMouseMove}
-          onMouseLeave={() => setTooltipTime(null)}
           onClick={handleSeekClick}
         >
-          {/* Track */}
-          <div className="h-full bg-primary/15" />
-          {/* Progress */}
-          <div
-            className="absolute top-0 h-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-none"
-            style={{ width: `${progress}%` }}
-          />
-          {/* Thumb */}
-          <div
-            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
-            style={{ left: `${progress}%` }}
-          />
-          {/* Hover tooltip */}
-          {tooltipTime && (
-            <div
-              className="pointer-events-none absolute bottom-3 rounded-md bg-zinc-900/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xl ring-1 ring-white/10 backdrop-blur-sm"
-              style={{ left: `${tooltipPos}%`, transform: 'translateX(-50%)' }}
-            >
-              {tooltipTime}
+          {isRadio ? (
+            /* Animated live bar for radio */
+            <div className="h-full w-full overflow-hidden bg-gradient-to-r from-purple-600/20 via-fuchsia-500/40 to-purple-600/20">
+              <div className="h-full w-1/3 animate-[slide_2s_linear_infinite] bg-gradient-to-r from-transparent via-purple-400/70 to-transparent" />
             </div>
+          ) : (
+            <>
+              <div className="h-full bg-primary/10" />
+              <div
+                className="absolute top-0 h-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-none"
+                style={{ width: `${progress}%` }}
+              />
+              <div
+                className={cn(
+                  'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg transition-opacity',
+                  isHoveringProgress ? 'opacity-100' : 'opacity-0',
+                )}
+                style={{ left: `${progress}%` }}
+              />
+              {tooltipTime && (
+                <div
+                  className="pointer-events-none absolute bottom-3 rounded-md bg-zinc-900/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xl ring-1 ring-white/10 backdrop-blur-sm"
+                  style={{ left: `${tooltipPos}%`, transform: 'translateX(-50%)' }}
+                >
+                  {tooltipTime}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -123,56 +144,83 @@ export const MiniPlayer: React.FC = () => {
           {/* Track info */}
           <div
             className="group flex min-w-0 flex-1 cursor-pointer items-center gap-3"
-            onClick={() => setPlayerFullscreen(true)}
+            onClick={() => !isRadio && setPlayerFullscreen(true)}
           >
-            <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg shadow-md ring-1 ring-white/10">
-              <img
-                src={currentFile.cover || '/placeholder.svg'}
-                alt={currentFile.title}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              />
-              {/* Playing pulse ring */}
+            {/* Album art with spinning vinyl effect when playing */}
+            <div className="relative h-11 w-11 flex-shrink-0">
+              <div
+                className={cn(
+                  'h-full w-full overflow-hidden rounded-lg shadow-md ring-1 ring-white/10 transition-all duration-700',
+                  isPlaying && !isRadio && 'animate-[spin_8s_linear_infinite]',
+                )}
+              >
+                {currentFile.cover ? (
+                  <img
+                    src={currentFile.cover}
+                    alt={currentFile.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-700 to-fuchsia-700">
+                    {isRadio ? (
+                      <Radio size={18} className="text-white/70" />
+                    ) : (
+                      <Disc3 size={18} className="text-white/70" />
+                    )}
+                  </div>
+                )}
+              </div>
               {isPlaying && (
-                <div className="pointer-events-none absolute inset-0 animate-pulse rounded-lg ring-2 ring-purple-500/60 ring-offset-0" />
+                <div className="pointer-events-none absolute inset-0 animate-pulse rounded-lg ring-2 ring-purple-500/50" />
               )}
             </div>
+
             <div className="min-w-0 overflow-hidden">
               <div className="flex items-center gap-1.5">
                 <h4 className="truncate text-sm font-semibold leading-tight text-foreground">
                   {currentFile.title}
                 </h4>
-                <ChevronUp
-                  size={13}
-                  className="flex-shrink-0 text-muted-foreground/40 transition-colors group-hover:text-foreground"
-                />
+                {!isRadio && (
+                  <ChevronUp
+                    size={13}
+                    className="flex-shrink-0 text-muted-foreground/40 transition-colors group-hover:text-foreground"
+                  />
+                )}
               </div>
               <p className="truncate text-xs text-muted-foreground/70">
                 {currentFile.artist || currentFile.album}
+                {isRadio && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-px text-[9px] font-bold text-red-400">
+                    ● LIVE
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
           {/* ── Centre controls ── */}
           <div className="flex items-center gap-0.5">
-            {/* Shuffle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'hidden h-8 w-8 sm:inline-flex',
-                    shuffle
-                      ? 'text-purple-400 hover:text-purple-300'
-                      : 'text-muted-foreground/60 hover:text-foreground',
-                  )}
-                  onClick={() => setShuffle(!shuffle)}
-                >
-                  <Shuffle size={14} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Shuffle {shuffle ? 'On' : 'Off'}</TooltipContent>
-            </Tooltip>
+            {/* Shuffle — hidden for radio */}
+            {!isRadio && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'hidden h-8 w-8 sm:inline-flex',
+                      shuffle
+                        ? 'text-purple-400 hover:text-purple-300'
+                        : 'text-muted-foreground/60 hover:text-foreground',
+                    )}
+                    onClick={() => setShuffle(!shuffle)}
+                  >
+                    <Shuffle size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Shuffle {shuffle ? 'On' : 'Off'}</TooltipContent>
+              </Tooltip>
+            )}
 
             {/* Favorite */}
             <Tooltip>
@@ -191,18 +239,20 @@ export const MiniPlayer: React.FC = () => {
                   <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{isFavorite ? 'Unfavorite' : 'Favorite'}</TooltipContent>
+              <TooltipContent>{isFavorite ? 'Unfavorite' : 'Favourite'}</TooltipContent>
             </Tooltip>
 
             {/* Prev */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden h-8 w-8 text-foreground/80 hover:text-foreground sm:inline-flex"
-              onClick={() => previousTrack()}
-            >
-              <SkipBack size={17} fill="currentColor" />
-            </Button>
+            {!isRadio && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden h-8 w-8 text-foreground/80 hover:text-foreground sm:inline-flex"
+                onClick={() => previousTrack()}
+              >
+                <SkipBack size={17} fill="currentColor" />
+              </Button>
+            )}
 
             {/* Play/Pause */}
             <Button
@@ -218,42 +268,48 @@ export const MiniPlayer: React.FC = () => {
             </Button>
 
             {/* Next */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-foreground/80 hover:text-foreground"
-              onClick={() => nextTrack()}
-            >
-              <SkipForward size={17} fill="currentColor" />
-            </Button>
+            {!isRadio && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-foreground/80 hover:text-foreground"
+                onClick={() => nextTrack()}
+              >
+                <SkipForward size={17} fill="currentColor" />
+              </Button>
+            )}
 
             {/* Repeat */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'hidden h-8 w-8 sm:inline-flex',
-                    repeat
-                      ? 'text-purple-400 hover:text-purple-300'
-                      : 'text-muted-foreground/60 hover:text-foreground',
-                  )}
-                  onClick={() => setRepeat(!repeat)}
-                >
-                  <Repeat size={14} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Repeat {repeat ? 'On' : 'Off'}</TooltipContent>
-            </Tooltip>
+            {!isRadio && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'hidden h-8 w-8 sm:inline-flex',
+                      repeat
+                        ? 'text-purple-400 hover:text-purple-300'
+                        : 'text-muted-foreground/60 hover:text-foreground',
+                    )}
+                    onClick={cycleRepeat}
+                  >
+                    <Repeat size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Repeat {repeat ? 'On' : 'Off'}</TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* ── Right side ── */}
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:gap-2">
-            {lowPowerMode && (
-              <div className="hidden items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-[9px] font-bold text-yellow-500 md:flex">
-                <Zap className="mr-1 h-3 w-3 fill-current" />
-                LOW POWER
+            {/* Time display */}
+            {!isRadio && duration > 0 && (
+              <div className="hidden font-mono text-[11px] text-muted-foreground/50 md:block">
+                {formatDuration(currentTime)}
+                <span className="mx-0.5 text-muted-foreground/25">/</span>
+                {formatDuration(duration)}
               </div>
             )}
 
@@ -293,6 +349,7 @@ export const MiniPlayer: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   className="hidden h-8 w-8 text-muted-foreground/70 hover:text-foreground md:inline-flex"
+                  onClick={() => !isRadio && setPlayerFullscreen(true)}
                 >
                   <ListMusic size={15} />
                 </Button>
@@ -300,19 +357,19 @@ export const MiniPlayer: React.FC = () => {
               <TooltipContent>Queue</TooltipContent>
             </Tooltip>
 
-            {/* ✅ Close / dismiss player */}
+            {/* Close player */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground/50 hover:text-foreground"
+                  className="h-8 w-8 text-muted-foreground/50 hover:text-destructive"
                   onClick={closePlayer}
                 >
                   <X size={15} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Close player</TooltipContent>
+              <TooltipContent>Stop & close</TooltipContent>
             </Tooltip>
           </div>
         </div>

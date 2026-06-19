@@ -114,6 +114,10 @@ export default {
           '0%': { transform: 'rotate(0deg)' },
           '100%': { transform: 'rotate(360deg)' },
         },
+        'slide': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -122,6 +126,7 @@ export default {
         'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
         'bounce-slow': 'bounce-slow 3s ease-in-out infinite',
         'spin-slow': 'spin-slow 8s linear infinite',
+        'slide': 'slide 2s linear infinite',
         'wave-1': 'wave 1.2s linear infinite',
         'wave-2': 'wave 1.8s linear infinite',
         'wave-3': 'wave 1.5s linear infinite',
@@ -130,5 +135,19 @@ export default {
       },
     },
   },
-  plugins: [tailwindAnimate],
+  plugins: [
+    tailwindAnimate,
+    // Utility to hide scrollbars while keeping scroll functionality
+    function ({ addUtilities }: { addUtilities: (utils: Record<string, Record<string, string>>) => void }) {
+      addUtilities({
+        '.no-scrollbar': {
+          '-ms-overflow-style': 'none',
+          'scrollbar-width': 'none',
+        },
+        '.no-scrollbar::-webkit-scrollbar': {
+          display: 'none',
+        },
+      });
+    },
+  ],
 } satisfies Config;
