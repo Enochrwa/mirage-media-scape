@@ -127,7 +127,7 @@ export const FullNowPlaying: React.FC = () => {
   /* ── lyrics scroll ── */
   useEffect(() => {
     if (activeTab !== 'lyrics' || !lyricsRef.current || lyrics.length === 0) return;
-    const idx = lyrics.findLastIndex((l) => l.time <= currentTime);
+    const idx = lyrics.reduce((best, l, i) => (l.time <= currentTime ? i : best), -1);
     if (idx >= 0) {
       const el = lyricsRef.current.children[idx] as HTMLElement;
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -153,7 +153,7 @@ export const FullNowPlaying: React.FC = () => {
   };
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
-  const activeLyricIdx = lyrics.findLastIndex((l) => l.time <= currentTime);
+  const activeLyricIdx = lyrics.reduce((best, l, i) => (l.time <= currentTime ? i : best), -1);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -627,7 +627,7 @@ export const FullNowPlaying: React.FC = () => {
                 <div className="space-y-5 p-5">
                   {/* Visualiser */}
                   <div className="flex items-center justify-center rounded-xl bg-white/5 py-6">
-                    <AudioVisualizer mode="bars" className="h-16 w-full px-4" />
+                    <AudioVisualizer mode="spectrum" className="h-16 w-full px-4" />
                   </div>
 
                   {/* Meta */}
