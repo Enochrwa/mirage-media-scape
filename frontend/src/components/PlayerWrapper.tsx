@@ -14,10 +14,33 @@ const PlayerWrapper = () => {
     currentTime,
     playbackEngine: pe,
     closePlayer,
+    pausePlayback,
   } = usePlayerStore();
   const [showResume, setShowResume] = useState(false);
   const [hasCheckedResume, setHasCheckedResume] = useState(false);
+
+  // ✅ FIXED: video modal is only opened by explicit user action (clicking a video),
+  //  NOT by an effect that re-fires whenever type === 'video'.
+  //  We derive it purely from currentFile type, but wrap in a ref-based guard
+  //  so navigating away and coming back doesn't re-open it.
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const prevFileId = useRef<string | null>(null);
+
+  // Only auto-open modal when a *new* video file is loaded
+  useEffect(() => {
+    if (!currentFile) {
+      setShowVideoModal(false);
+      prevFileId.current = null;
+      return;
+    }
+    if (currentFile.type === 'video' && currentFile.id !== prevFileId.current) {
+      setShowVideoModal(true);
+      prevFileId.current = currentFile.id;
+    }
+    if (currentFile.type !== 'video') {
+      setShowVideoModal(false);
+    }
+  }, [currentFile?.id, currentFile?.type, currentFile]);
 
   useEffect(() => {
     if (currentFile && !hasCheckedResume) {
@@ -31,15 +54,6 @@ const PlayerWrapper = () => {
     }
   }, [currentFile, hasCheckedResume, currentTime]);
 
-  // When a video file is selected, automatically show the video modal
-  useEffect(() => {
-    if (currentFile?.type === 'video') {
-      setShowVideoModal(true);
-    } else {
-      setShowVideoModal(false);
-    }
-  }, [currentFile?.id, currentFile?.type]);
-
   if (!currentFile) return null;
 
   const formatTime = (s: number) => {
@@ -49,13 +63,16 @@ const PlayerWrapper = () => {
   };
 
   const handleCloseVideo = () => {
+    // ✅ Pause playback and clear file so video actually stops
+    pausePlayback();
     setShowVideoModal(false);
+    prevFileId.current = null;
     closePlayer();
   };
 
   return (
     <>
-      {/* Resume toast */}
+      {/* Resume toast — audio only */}
       {showResume && currentFile.type !== 'video' && (
         <div className="fixed bottom-24 left-4 right-4 z-[60] md:left-auto md:right-4 md:w-80">
           <Card className="flex items-center gap-4 border-primary/20 bg-background/95 p-4 shadow-2xl backdrop-blur">
@@ -93,14 +110,14 @@ const PlayerWrapper = () => {
         </div>
       )}
 
-      {/* Video fullscreen modal */}
+      {/* ✅ Video fullscreen modal — only when explicitly opened */}
       {currentFile.type === 'video' && showVideoModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-[200] bg-black">
           <VideoPlayer onClose={handleCloseVideo} />
         </div>
       )}
 
-      {/* Audio mini player (always rendered when audio is active) */}
+      {/* Audio mini player */}
       {currentFile.type === 'audio' && <MiniPlayer />}
 
       {/* Full audio player overlay */}

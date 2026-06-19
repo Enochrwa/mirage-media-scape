@@ -15,19 +15,16 @@ import {
   PictureInPicture,
   Subtitles,
   List,
-  ChevronLeft,
-  ChevronRight,
   X,
   Headphones,
   RotateCcw,
-  Sun,
-  Contrast,
-  Droplets,
   FlipHorizontal,
-  Monitor,
-  Download,
   ChevronsLeft,
   ChevronsRight,
+  Gauge,
+  Download,
+  Cast,
+  ChevronLeft,
 } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SubtitleManager from './SubtitleManager';
@@ -70,14 +67,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     currentFile,
     setCurrentTime: updateStoreCurrentTime,
     setDuration: updateStoreDuration,
-    playbackEngine: pe,
     isPlaying: storeIsPlaying,
   } = usePlayerStore();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -96,8 +91,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
   const [hoverTime, setHoverTime] = useState(0);
   const [hoverPercent, setHoverPercent] = useState(0);
   const [showHoverTime, setShowHoverTime] = useState(false);
-  const [skipIndicator, setSkipIndicator] = useState<'forward' | 'backward' | null>(null);
+  const [skipIndicator, setSkipIndicator] = useState<{
+    dir: 'forward' | 'backward';
+    secs: number;
+  } | null>(null);
   const [volumeIndicator, setVolumeIndicator] = useState<number | null>(null);
+  const [buffered, setBuffered] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Visual settings
   const [aspectRatio, setAspectRatio] = useState('fit');
@@ -114,6 +114,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     const video = videoRef.current;
     if (!video || !currentFile) return;
 
+    setIsLoading(true);
     const url = `${API_BASE}/api/stream/${encodeURIComponent(currentFile.id)}`;
     video.src = url;
     video.load();
@@ -125,25 +126,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     const onTimeUpdate = () => {
       setCurrentTime(video.currentTime);
       updateStoreCurrentTime(video.currentTime);
+      // Update buffered range
+      if (video.buffered.length > 0 && video.duration > 0) {
+        setBuffered((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
+      }
     };
     const onEnded = () => usePlayerStore.getState().nextTrack();
     const onCanPlay = () => {
+      setIsLoading(false);
       if (usePlayerStore.getState().isPlaying) {
         video.play().catch((err) => console.warn('[VideoPlayer] Autoplay blocked:', err));
       }
     };
+    const onWaiting = () => setIsLoading(true);
+    const onPlaying = () => setIsLoading(false);
 
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('ended', onEnded);
     video.addEventListener('canplay', onCanPlay, { once: true });
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
 
     return () => {
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('ended', onEnded);
       video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
+      // ✅ CRITICAL: pause video when component unmounts (navigating away)
       video.pause();
+      video.src = '';
+      video.load();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFile?.id]);
@@ -256,13 +271,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           break;
         case 'ArrowRight':
           e.preventDefault();
-          video.currentTime = Math.min(video.duration, video.currentTime + (e.shiftKey ? 30 : 10));
-          showSkip('forward');
+          {
+            const secs = e.shiftKey ? 30 : 10;
+            video.currentTime = Math.min(video.duration, video.currentTime + secs);
+            showSkipIndicator('forward', secs);
+          }
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? 30 : 10));
-          showSkip('backward');
+          {
+            const secs = e.shiftKey ? 30 : 10;
+            video.currentTime = Math.max(0, video.currentTime - secs);
+            showSkipIndicator('backward', secs);
+          }
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -282,6 +303,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           if (isFullscreen) document.exitFullscreen().catch(() => {});
           else onClose?.();
           break;
+        case 'j':
+          video.currentTime = Math.max(0, video.currentTime - 10);
+          showSkipIndicator('backward', 10);
+          break;
+        case 'l':
+          video.currentTime = Math.min(video.duration, video.currentTime + 10);
+          showSkipIndicator('forward', 10);
+          break;
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -289,9 +318,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume, isFullscreen]);
 
-  const showSkip = (dir: 'forward' | 'backward') => {
-    setSkipIndicator(dir);
-    setTimeout(() => setSkipIndicator(null), 600);
+  const showSkipIndicator = (dir: 'forward' | 'backward', secs: number) => {
+    setSkipIndicator({ dir, secs });
+    setTimeout(() => setSkipIndicator(null), 700);
   };
 
   const changeVolume = (v: number) => {
@@ -311,9 +340,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     }
   };
 
-  const togglePlayback = () => {
-    usePlayerStore.getState().togglePlayback();
-  };
+  const togglePlayback = () => usePlayerStore.getState().togglePlayback();
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
@@ -397,6 +424,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
       (!c.end_time_ms || currentTime * 1000 < c.end_time_ms),
   );
 
+  const handleClose = () => {
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.src = '';
+      video.load();
+    }
+    usePlayerStore.getState().pausePlayback();
+    onClose?.();
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -404,63 +442,84 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
         className="group relative flex h-full w-full select-none overflow-hidden bg-black"
         onMouseMove={resetControlsTimeout}
         onDoubleClick={toggleFullscreen}
-        onClick={() => {
-          if (!showChapterList) resetControlsTimeout();
+        onClick={(e) => {
+          // Only toggle if clicking the container itself, not controls
+          if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'VIDEO') {
+            if (!showChapterList) togglePlayback();
+          }
         }}
       >
-        {/* Video element */}
-        <div
-          className="flex h-full w-full items-center justify-center"
+        {/* Video element — fills full container */}
+        <video
+          ref={videoRef}
+          className={cn(
+            'absolute inset-0 h-full w-full',
+            aspectRatio === 'fill' || aspectRatio === 'stretch'
+              ? 'object-fill'
+              : aspectRatio === '16:9'
+                ? 'object-contain'
+                : aspectRatio === '4:3'
+                  ? 'object-contain'
+                  : 'object-contain',
+          )}
           style={{
+            filter: videoFilter,
             transform: `rotate(${rotation}deg) scaleX(${mirrorFlip ? -1 : 1}) scale(${scale})`,
           }}
-        >
-          <video
-            ref={videoRef}
-            className={cn(
-              'max-h-full max-w-full',
-              aspectRatio === 'fill' || aspectRatio === 'stretch'
-                ? 'h-full w-full object-fill'
-                : 'object-contain',
-            )}
-            style={{ filter: videoFilter }}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-          />
-        </div>
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          playsInline
+        />
 
         {/* Subtitles */}
         <SubtitleManager />
 
-        {/* Skip indicators */}
-        {skipIndicator === 'backward' && (
-          <div className="pointer-events-none absolute left-1/4 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-ping">
-            <div className="flex flex-col items-center gap-1 rounded-xl bg-black/60 px-6 py-4 backdrop-blur-sm">
-              <ChevronsLeft size={40} className="text-white" />
-              <span className="text-xs font-bold text-white">10s</span>
+        {/* Loading spinner */}
+        {isLoading && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-14 w-14 animate-spin rounded-full border-[3px] border-white/20 border-t-white/80" />
+          </div>
+        )}
+
+        {/* Skip indicators — YouTube-style ripple */}
+        {skipIndicator?.dir === 'backward' && (
+          <div className="pointer-events-none absolute left-[20%] top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="flex animate-[ping_0.5s_ease-out_1] flex-col items-center gap-2 rounded-2xl bg-white/20 px-8 py-5 backdrop-blur-md">
+              <ChevronsLeft size={44} className="text-white" />
+              <span className="text-sm font-bold text-white">{skipIndicator.secs}s</span>
             </div>
           </div>
         )}
-        {skipIndicator === 'forward' && (
-          <div className="pointer-events-none absolute right-1/4 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-ping">
-            <div className="flex flex-col items-center gap-1 rounded-xl bg-black/60 px-6 py-4 backdrop-blur-sm">
-              <ChevronsRight size={40} className="text-white" />
-              <span className="text-xs font-bold text-white">10s</span>
+        {skipIndicator?.dir === 'forward' && (
+          <div className="pointer-events-none absolute right-[20%] top-1/2 -translate-y-1/2 translate-x-1/2">
+            <div className="flex animate-[ping_0.5s_ease-out_1] flex-col items-center gap-2 rounded-2xl bg-white/20 px-8 py-5 backdrop-blur-md">
+              <ChevronsRight size={44} className="text-white" />
+              <span className="text-sm font-bold text-white">{skipIndicator.secs}s</span>
             </div>
           </div>
         )}
+
+        {/* Volume OSD */}
         {volumeIndicator !== null && (
-          <div className="pointer-events-none absolute left-1/2 top-8 -translate-x-1/2 animate-in fade-in">
-            <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 backdrop-blur-sm">
+          <div className="pointer-events-none absolute left-1/2 top-10 -translate-x-1/2 animate-in fade-in">
+            <div className="flex items-center gap-2 rounded-full bg-black/70 px-5 py-2.5 ring-1 ring-white/10 backdrop-blur-md">
               <VolumeIcon size={16} className="text-white" />
-              <span className="text-sm font-bold text-white">{volumeIndicator}%</span>
+              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-white transition-all"
+                  style={{ width: `${volumeIndicator}%` }}
+                />
+              </div>
+              <span className="min-w-[2.5rem] text-right text-sm font-bold text-white">
+                {volumeIndicator}%
+              </span>
             </div>
           </div>
         )}
 
         {/* HW decode badge */}
         {Object.values(hwDecodeSupported).some((v) => v) && (
-          <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-1 rounded border border-green-500/30 bg-green-500/20 px-2 py-1 text-[10px] font-bold text-green-400 backdrop-blur-sm">
+          <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/15 px-2 py-1 text-[10px] font-bold text-green-400 backdrop-blur-sm">
             <Zap size={10} /> HW
           </div>
         )}
@@ -473,37 +532,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           )}
           style={{
             background:
-              'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 20%, transparent 75%, rgba(0,0,0,0.85) 100%)',
+              'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, transparent 18%, transparent 70%, rgba(0,0,0,0.9) 100%)',
           }}
         >
-          {/* Top bar */}
-          <div className="pointer-events-auto flex items-center justify-between px-4 pt-4">
+          {/* ───────────────── TOP BAR ───────────────── */}
+          <div className="pointer-events-auto flex items-center justify-between px-5 pt-4 md:px-6">
             <div className="flex items-center gap-3">
-              {onClose && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20"
-                      onClick={onClose}
-                    >
-                      <X size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Close</TooltipContent>
-                </Tooltip>
-              )}
-              <div>
-                <h2 className="text-sm font-bold text-white drop-shadow-lg">
+              {/* Back / Close */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20 active:scale-95"
+                    onClick={handleClose}
+                  >
+                    <ChevronLeft size={20} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Back</TooltipContent>
+              </Tooltip>
+
+              <div className="min-w-0">
+                <h2 className="max-w-xs truncate text-sm font-bold text-white drop-shadow-lg md:max-w-sm">
                   {currentFile?.title}
                 </h2>
-                {currentChapter && <p className="text-xs text-white/60">{currentChapter.title}</p>}
+                {currentChapter && (
+                  <p className="truncate text-xs text-white/55">{currentChapter.title}</p>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Playback speed */}
+            <div className="flex items-center gap-1.5">
+              {/* Speed */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -511,25 +572,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                     size="sm"
                     className="h-8 rounded-full bg-black/40 px-3 text-xs font-bold text-white backdrop-blur-md hover:bg-white/20"
                   >
+                    <Gauge size={13} className="mr-1" />
                     {playbackRate}×
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="border-white/10 bg-zinc-900/95 text-white backdrop-blur-xl">
-                  <DropdownMenuLabel className="text-xs text-zinc-400">Speed</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-zinc-400">
+                    Playback Speed
+                  </DropdownMenuLabel>
                   {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
                     <DropdownMenuItem
                       key={r}
                       onClick={() => setPlaybackRate(r)}
                       className={cn(playbackRate === r && 'bg-purple-500/20 text-purple-300')}
                     >
-                      {r}×
+                      {r === 1 ? 'Normal' : `${r}×`}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
 
               {/* Audio tracks */}
-              {audioTracks.length > 0 && (
+              {audioTracks.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -537,7 +601,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                       size="icon"
                       className="h-8 w-8 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20"
                     >
-                      <Headphones size={16} />
+                      <Headphones size={15} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="border-white/10 bg-zinc-900/95 text-white backdrop-blur-xl">
@@ -552,7 +616,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                           selectedAudioTrack === track.stream_index && 'text-purple-300',
                         )}
                       >
-                        {track.language || 'Unknown'} · {track.codec_name} ({track.channels}ch)
+                        {track.language || 'Track'} · {track.codec_name} ({track.channels}ch)
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -567,10 +631,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                     size="icon"
                     className="h-8 w-8 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20"
                   >
-                    <Subtitles size={16} />
+                    <Subtitles size={15} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Subtitles</TooltipContent>
+                <TooltipContent>Subtitles / CC</TooltipContent>
               </Tooltip>
 
               {/* Video settings */}
@@ -581,17 +645,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                     size="icon"
                     className="h-8 w-8 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20"
                   >
-                    <Settings size={16} />
+                    <Settings size={15} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-72 border-white/10 bg-zinc-900/95 p-4 text-white backdrop-blur-xl"
+                  className="w-76 border-white/10 bg-zinc-900/95 p-4 text-white backdrop-blur-xl"
                   side="bottom"
                   align="end"
                 >
                   <div className="space-y-4">
+                    {/* Aspect ratio */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                         Aspect Ratio
                       </p>
                       <div className="grid grid-cols-3 gap-1.5">
@@ -614,9 +679,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
 
                     <DropdownMenuSeparator className="border-white/10" />
 
+                    {/* Color controls */}
                     <div className="space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                        Enhancements
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        Picture Adjustments
                       </p>
                       {[
                         {
@@ -640,9 +706,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-zinc-400">{label}</span>
                             <span className="font-mono text-white">
-                              {typeof value === 'number' && label === 'Hue'
-                                ? `${value}°`
-                                : value.toFixed(1)}
+                              {label === 'Hue' ? `${value}°` : value.toFixed(1)}
                             </span>
                           </div>
                           <Slider
@@ -659,9 +723,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
 
                     <DropdownMenuSeparator className="border-white/10" />
 
+                    {/* Transform */}
                     <div className="flex gap-2">
                       <button
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
                         onClick={() => setRotation((r) => (r + 90) % 360)}
                       >
                         <RotateCcw size={12} /> Rotate
@@ -678,7 +743,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                         <FlipHorizontal size={12} /> Mirror
                       </button>
                       <button
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
                         onClick={() => {
                           setBrightness(1);
                           setContrast(1);
@@ -686,6 +751,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                           setHue(0);
                           setRotation(0);
                           setMirrorFlip(false);
+                          setScale(1);
                         }}
                       >
                         <RotateCcw size={12} /> Reset
@@ -694,11 +760,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Download */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href={`${API_BASE}/api/stream/${encodeURIComponent(currentFile?.id ?? '')}`}
+                    download={currentFile?.title}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-white/20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Download size={15} />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>Download</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
-          {/* Bottom controls */}
-          <div className="pointer-events-auto space-y-2 px-4 pb-4">
+          {/* ───────────────── BOTTOM CONTROLS ───────────────── */}
+          <div className="pointer-events-auto space-y-3 px-4 pb-5 md:px-6 md:pb-6">
             {/* Seek bar */}
             <div
               className="group/seek relative h-5 w-full cursor-pointer"
@@ -711,36 +792,37 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
               }}
               onMouseLeave={() => setShowHoverTime(false)}
               onClick={(e) => {
+                e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 handleSeek(pct * duration);
               }}
             >
               {/* Track */}
-              <div className="absolute bottom-2 left-0 right-0 h-1 overflow-visible rounded-full bg-white/20 transition-all duration-100 group-hover/seek:h-1.5">
-                {/* Buffer (mock) */}
+              <div className="absolute bottom-2 left-0 right-0 h-[3px] overflow-visible rounded-full bg-white/20 transition-all group-hover/seek:h-[5px]">
+                {/* Buffered */}
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-white/30"
-                  style={{ width: `${Math.min(100, progress + 10)}%` }}
+                  className="absolute left-0 top-0 h-full rounded-full bg-white/25"
+                  style={{ width: `${buffered}%` }}
                 />
                 {/* Progress */}
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-400 transition-none"
+                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400 transition-none"
                   style={{ width: `${progress}%` }}
                 />
                 {/* Chapter ticks */}
                 {chapters.map((ch) => (
                   <div
                     key={ch.id}
-                    className="absolute top-0 h-full w-0.5 bg-white/50"
+                    className="absolute top-0 h-full w-0.5 bg-white/60"
                     style={{ left: `${(ch.start_time_ms / (duration * 1000)) * 100}%` }}
                     title={ch.title}
                   />
                 ))}
-                {/* Hover indicator */}
+                {/* Hover ghost */}
                 {showHoverTime && (
                   <div
-                    className="absolute top-0 h-full w-0.5 bg-white/50"
+                    className="absolute top-0 h-full w-px bg-white/50"
                     style={{ left: `${hoverPercent}%` }}
                   />
                 )}
@@ -748,14 +830,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
 
               {/* Scrubber thumb */}
               <div
-                className="pointer-events-none absolute bottom-1.5 h-3 w-3 -translate-x-1/2 rounded-full bg-white opacity-0 shadow-lg transition-all group-hover/seek:opacity-100"
+                className="pointer-events-none absolute bottom-1.5 h-4 w-4 -translate-x-1/2 rounded-full bg-white opacity-0 shadow-lg shadow-purple-500/40 transition-all group-hover/seek:scale-110 group-hover/seek:opacity-100"
                 style={{ left: `${progress}%` }}
               />
 
               {/* Hover time tooltip */}
               {showHoverTime && duration > 0 && (
                 <div
-                  className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded bg-black/80 px-2 py-1 font-mono text-[10px] text-white backdrop-blur-sm"
+                  className="pointer-events-none absolute -top-9 -translate-x-1/2 rounded-md bg-zinc-900/90 px-2.5 py-1 font-mono text-[11px] font-semibold text-white shadow-xl ring-1 ring-white/10 backdrop-blur-sm"
                   style={{ left: `${hoverPercent}%` }}
                 >
                   {formatDuration(hoverTime)}
@@ -763,36 +845,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
               )}
             </div>
 
-            {/* Control buttons */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                {/* Prev chapter */}
+            {/* Control row */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Left cluster */}
+              <div className="flex items-center gap-0.5 md:gap-1">
+                {/* Prev chapter / prev track */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-full text-white hover:bg-white/15"
+                      className="h-9 w-9 rounded-full text-white hover:bg-white/15 active:scale-95"
                       onClick={prevChapter}
-                      disabled={chapters.length === 0}
                     >
                       <SkipBack size={18} fill="currentColor" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Previous chapter</TooltipContent>
+                  <TooltipContent>Previous</TooltipContent>
                 </Tooltip>
 
-                {/* Seek back 10s */}
+                {/* -10s */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                      onClick={() => {
-                        const video = videoRef.current;
-                        if (video) video.currentTime = Math.max(0, video.currentTime - 10);
-                        showSkip('backward');
+                      className="h-9 w-9 rounded-full text-white hover:bg-white/15 active:scale-95"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const v = videoRef.current;
+                        if (v) {
+                          v.currentTime = Math.max(0, v.currentTime - 10);
+                          showSkipIndicator('backward', 10);
+                        }
                       }}
                     >
                       <ChevronsLeft size={20} />
@@ -801,31 +886,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                   <TooltipContent>-10s</TooltipContent>
                 </Tooltip>
 
-                {/* Play/Pause */}
+                {/* Play/Pause — large */}
                 <Button
                   size="icon"
-                  className="h-12 w-12 rounded-full bg-white text-black shadow-2xl transition-transform hover:scale-105 hover:bg-white/90"
-                  onClick={togglePlayback}
+                  className="h-13 w-13 mx-1 h-[52px] w-[52px] rounded-full bg-white text-black shadow-2xl shadow-white/20 transition-all hover:scale-105 hover:bg-white/90 active:scale-95"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePlayback();
+                  }}
                 >
                   {isPlaying ? (
-                    <Pause size={22} fill="currentColor" />
+                    <Pause size={24} fill="currentColor" />
                   ) : (
-                    <Play size={22} fill="currentColor" className="ml-0.5" />
+                    <Play size={24} fill="currentColor" className="ml-0.5" />
                   )}
                 </Button>
 
-                {/* Seek forward 10s */}
+                {/* +10s */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                      onClick={() => {
-                        const video = videoRef.current;
-                        if (video)
-                          video.currentTime = Math.min(video.duration, video.currentTime + 10);
-                        showSkip('forward');
+                      className="h-9 w-9 rounded-full text-white hover:bg-white/15 active:scale-95"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const v = videoRef.current;
+                        if (v) {
+                          v.currentTime = Math.min(v.duration, v.currentTime + 10);
+                          showSkipIndicator('forward', 10);
+                        }
                       }}
                     >
                       <ChevronsRight size={20} />
@@ -834,45 +924,49 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                   <TooltipContent>+10s</TooltipContent>
                 </Tooltip>
 
-                {/* Next chapter */}
+                {/* Next chapter / next track */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-full text-white hover:bg-white/15"
+                      className="h-9 w-9 rounded-full text-white hover:bg-white/15 active:scale-95"
                       onClick={nextChapter}
-                      disabled={chapters.length === 0}
                     >
                       <SkipForward size={18} fill="currentColor" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Next chapter</TooltipContent>
+                  <TooltipContent>Next</TooltipContent>
                 </Tooltip>
 
-                {/* Time display */}
-                <span className="ml-2 font-mono text-xs text-white/80">
-                  {formatDuration(currentTime)} / {formatDuration(duration)}
+                {/* Time */}
+                <span className="ml-2 hidden whitespace-nowrap font-mono text-xs text-white/70 sm:inline">
+                  {formatDuration(currentTime)} <span className="text-white/30">/</span>{' '}
+                  {formatDuration(duration)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1">
+              {/* Right cluster */}
+              <div className="flex items-center gap-0.5 md:gap-1">
                 {/* Volume */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                        onClick={toggleMute}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleMute();
+                        }}
                       >
-                        <VolumeIcon size={18} />
+                        <VolumeIcon size={17} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Toggle mute</TooltipContent>
+                    <TooltipContent>Toggle mute (M)</TooltipContent>
                   </Tooltip>
-                  <div className="w-24">
+                  <div className="hidden w-20 sm:block" onClick={(e) => e.stopPropagation()}>
                     <Slider
                       value={[muted ? 0 : volume * 100]}
                       min={0}
@@ -884,7 +978,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                   </div>
                 </div>
 
-                {/* Chapter list */}
+                {/* Chapters */}
                 {chapters.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -895,14 +989,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                           'h-9 w-9 rounded-full text-white hover:bg-white/15',
                           showChapterList && 'bg-purple-500/30 text-purple-300',
                         )}
-                        onClick={() => setShowChapterList(!showChapterList)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowChapterList(!showChapterList);
+                        }}
                       >
-                        <List size={18} />
+                        <List size={17} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Chapters</TooltipContent>
                   </Tooltip>
                 )}
+
+                {/* Cast / AirPlay */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-full text-white hover:bg-white/15"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Cast size={17} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Cast to TV</TooltipContent>
+                </Tooltip>
 
                 {/* PiP */}
                 {document.pictureInPictureEnabled && (
@@ -912,9 +1024,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                        onClick={togglePiP}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePiP();
+                        }}
                       >
-                        <PictureInPicture size={18} />
+                        <PictureInPicture size={17} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Picture-in-picture</TooltipContent>
@@ -928,12 +1043,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                      onClick={toggleFullscreen}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFullscreen();
+                      }}
                     >
-                      {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                      {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</TooltipContent>
+                  <TooltipContent>
+                    {isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </div>
@@ -942,7 +1062,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
 
         {/* Chapter list sidebar */}
         {showChapterList && chapters.length > 0 && (
-          <div className="absolute right-0 top-0 z-20 flex h-full w-72 flex-col overflow-y-auto border-l border-white/10 bg-black/80 backdrop-blur-xl">
+          <div className="absolute right-0 top-0 z-20 flex h-full w-72 flex-col overflow-y-auto border-l border-white/10 bg-black/85 backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/10 p-4">
               <h3 className="flex items-center gap-2 text-sm font-bold text-white">
                 <List size={16} /> Chapters

@@ -4,7 +4,12 @@ import { MoodSlider } from '@/components/discovery/MoodSlider';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
 import { useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import VideoPlayer from '@/components/VideoPlayer';
+
+// ✅ ZovyraLayout no longer renders VideoPlayer directly.
+// VideoPlayer is managed exclusively by PlayerWrapper (inside MainLayout),
+// which correctly gates it behind a user-initiated open + file-id tracking.
+// Having two VideoPlayer instances caused both simultaneous playback and
+// the "video keeps appearing on other routes" bug.
 
 interface ZovyraLayoutProps {
   children: React.ReactNode;
@@ -12,7 +17,7 @@ interface ZovyraLayoutProps {
 
 export function ZovyraLayout({ children }: ZovyraLayoutProps) {
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
-  const { currentFile, closePlayer } = usePlayerStore();
+  const { currentFile } = usePlayerStore();
 
   const isVideo = currentFile?.type === 'video';
 
@@ -34,7 +39,7 @@ export function ZovyraLayout({ children }: ZovyraLayoutProps) {
         </main>
       </div>
 
-      {/* Persistent Player Bar - only for audio */}
+      {/* Persistent Player Bar — audio only */}
       {!isVideo && <PlaybackController />}
 
       {/* Mobile player tap target */}
@@ -49,13 +54,6 @@ export function ZovyraLayout({ children }: ZovyraLayoutProps) {
       {showMobilePlayer && (
         <div className="md:hidden">
           <MobilePlayer onClose={() => setShowMobilePlayer(false)} />
-        </div>
-      )}
-
-      {/* Video player modal */}
-      {isVideo && currentFile && (
-        <div className="fixed inset-0 z-[100] bg-black">
-          <VideoPlayer onClose={closePlayer} />
         </div>
       )}
     </div>
