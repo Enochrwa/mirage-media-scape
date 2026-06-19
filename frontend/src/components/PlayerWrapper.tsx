@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -11,6 +11,7 @@ const PlayerWrapper = () => {
   const {
     currentFile,
     isPlayerFullscreen,
+    setPlayerFullscreen,
     currentTime,
     playbackEngine: pe,
     closePlayer,
@@ -19,14 +20,10 @@ const PlayerWrapper = () => {
   const [showResume, setShowResume] = useState(false);
   const [hasCheckedResume, setHasCheckedResume] = useState(false);
 
-  // ✅ FIXED: video modal is only opened by explicit user action (clicking a video),
-  //  NOT by an effect that re-fires whenever type === 'video'.
-  //  We derive it purely from currentFile type, but wrap in a ref-based guard
-  //  so navigating away and coming back doesn't re-open it.
+  // video modal only opens for NEW video files — not on every re-render / navigation
   const [showVideoModal, setShowVideoModal] = useState(false);
   const prevFileId = useRef<string | null>(null);
 
-  // Only auto-open modal when a *new* video file is loaded
   useEffect(() => {
     if (!currentFile) {
       setShowVideoModal(false);
@@ -42,6 +39,7 @@ const PlayerWrapper = () => {
     }
   }, [currentFile?.id, currentFile?.type, currentFile]);
 
+  // Resume toast — only fires once per session
   useEffect(() => {
     if (currentFile && !hasCheckedResume) {
       const { isPlaying } = usePlayerStore.getState();
@@ -54,6 +52,24 @@ const PlayerWrapper = () => {
     }
   }, [currentFile, hasCheckedResume, currentTime]);
 
+  const handleCloseVideo = useCallback(() => {
+    pausePlayback();
+    setShowVideoModal(false);
+    prevFileId.current = null;
+    closePlayer();
+  }, [pausePlayback, closePlayer]);
+
+  // Close FullNowPlaying when navigating by ESC key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPlayerFullscreen) {
+        setPlayerFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isPlayerFullscreen, setPlayerFullscreen]);
+
   if (!currentFile) return null;
 
   const formatTime = (s: number) => {
@@ -62,23 +78,16 @@ const PlayerWrapper = () => {
     return `${m}:${rs < 10 ? '0' : ''}${rs}`;
   };
 
-  const handleCloseVideo = () => {
-    // ✅ Pause playback and clear file so video actually stops
-    pausePlayback();
-    setShowVideoModal(false);
-    prevFileId.current = null;
-    closePlayer();
-  };
-
   return (
     <>
-      {/* Resume toast — audio only */}
+      {/* Resume toast — audio only, dismisses automatically */}
       {showResume && currentFile.type !== 'video' && (
-        <div className="fixed bottom-24 left-4 right-4 z-[60] md:left-auto md:right-4 md:w-80">
+        <div className="fixed bottom-24 left-4 right-4 z-[60] md:left-auto md:right-4 md:w-80 animate-in slide-in-from-bottom-4">
           <Card className="flex items-center gap-4 border-primary/20 bg-background/95 p-4 shadow-2xl backdrop-blur">
             <img
               src={currentFile.cover || '/placeholder.svg'}
               className="h-12 w-12 rounded object-cover"
+              alt=""
             />
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-xs font-bold">Resume playback?</p>
@@ -110,18 +119,31 @@ const PlayerWrapper = () => {
         </div>
       )}
 
-      {/* ✅ Video fullscreen modal — only when explicitly opened */}
+      {/* Video fullscreen modal — only when explicitly opened for a NEW video */}
       {currentFile.type === 'video' && showVideoModal && (
         <div className="fixed inset-0 z-[200] bg-black">
           <VideoPlayer onClose={handleCloseVideo} />
         </div>
       )}
 
-      {/* Audio mini player */}
+      {/* Audio mini player — always visible when audio loaded, does NOT block navigation */}
       {currentFile.type === 'audio' && <MiniPlayer />}
 
-      {/* Full audio player overlay */}
-      {currentFile.type === 'audio' && isPlayerFullscreen && <FullNowPlaying />}
+      {/*
+        Full audio player overlay.
+        CRITICAL FIX: render as a portal-like overlay that has a backdrop click
+        so users can dismiss it if it ever gets stuck. Also ensure ESC closes it.
+      */}
+      {currentFile.type === 'audio' && isPlayerFullscreen && (
+        <>
+          {/* Invisible click-outside zone to close (only at very edge) */}
+          <div
+            className="fixed inset-0 z-[99]"
+            onClick={() => setPlayerFullscreen(false)}
+          />
+          <FullNowPlaying />
+        </>
+      )}
     </>
   );
 };

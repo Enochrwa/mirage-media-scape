@@ -98,6 +98,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
   const [volumeIndicator, setVolumeIndicator] = useState<number | null>(null);
   const [buffered, setBuffered] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
 
   // Visual settings
   const [aspectRatio, setAspectRatio] = useState('fit');
@@ -471,13 +472,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           playsInline
         />
 
-        {/* Subtitles */}
-        <SubtitleManager />
+        {/* Subtitles — only visible when panel is toggled */}
+        {showSubtitlePanel && <SubtitleManager />}
 
         {/* Loading spinner */}
         {isLoading && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-14 w-14 animate-spin rounded-full border-[3px] border-white/20 border-t-white/80" />
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40">
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-white/10 border-t-purple-400" />
+              <div className="absolute inset-2 animate-spin rounded-full border-[2px] border-white/5 border-t-fuchsia-400" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+            </div>
+            <p className="text-xs font-medium text-white/50 animate-pulse">Loading…</p>
           </div>
         )}
 
@@ -629,7 +634,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-white/20"
+                    className={cn(
+                      'h-8 w-8 rounded-full bg-black/40 backdrop-blur-md hover:bg-white/20',
+                      showSubtitlePanel ? 'text-purple-300' : 'text-white',
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSubtitlePanel((v) => !v);
+                    }}
                   >
                     <Subtitles size={15} />
                   </Button>
@@ -1008,7 +1020,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 rounded-full text-white hover:bg-white/15"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const video = videoRef.current;
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const remote = video && (video as any).remote;
+                        if (remote) {
+                          try { await remote.prompt(); } catch { /* user cancelled */ }
+                        } else {
+                          // Fallback: copy stream URL to clipboard
+                          const url = `${window.location.origin}/api/stream/${encodeURIComponent(currentFile?.id ?? '')}`;
+                          await navigator.clipboard.writeText(url).catch(() => {});
+                        }
+                      }}
                     >
                       <Cast size={17} />
                     </Button>
