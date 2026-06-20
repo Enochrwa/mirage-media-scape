@@ -480,9 +480,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40">
             <div className="relative h-16 w-16">
               <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-white/10 border-t-purple-400" />
-              <div className="absolute inset-2 animate-spin rounded-full border-[2px] border-white/5 border-t-fuchsia-400" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+              <div
+                className="absolute inset-2 animate-spin rounded-full border-[2px] border-white/5 border-t-fuchsia-400"
+                style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}
+              />
             </div>
-            <p className="text-xs font-medium text-white/50 animate-pulse">Loading…</p>
+            <p className="animate-pulse text-xs font-medium text-white/50">Loading…</p>
           </div>
         )}
 
@@ -1026,7 +1029,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const remote = video && (video as any).remote;
                         if (remote) {
-                          try { await remote.prompt(); } catch { /* user cancelled */ }
+                          try {
+                            await remote.prompt();
+                          } catch {
+                            /* user cancelled */
+                          }
                         } else {
                           // Fallback: copy stream URL to clipboard
                           const url = `${window.location.origin}/api/stream/${encodeURIComponent(currentFile?.id ?? '')}`;

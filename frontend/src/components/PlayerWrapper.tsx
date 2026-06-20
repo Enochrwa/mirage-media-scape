@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { X, Play } from 'lucide-react';
-import { MiniPlayer } from './player/MiniPlayer';
-import { FullNowPlaying } from './player/FullNowPlaying';
-import VideoPlayer from './VideoPlayer';
+
+const MiniPlayer = lazy(() =>
+  import('./player/MiniPlayer').then((m) => ({ default: m.MiniPlayer })),
+);
+const FullNowPlaying = lazy(() =>
+  import('./player/FullNowPlaying').then((m) => ({ default: m.FullNowPlaying })),
+);
+const VideoPlayer = lazy(() => import('./VideoPlayer'));
 
 const PlayerWrapper = () => {
   const {
@@ -82,7 +87,7 @@ const PlayerWrapper = () => {
     <>
       {/* Resume toast — audio only, dismisses automatically */}
       {showResume && currentFile.type !== 'video' && (
-        <div className="fixed bottom-24 left-4 right-4 z-[60] md:left-auto md:right-4 md:w-80 animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-24 left-4 right-4 z-[60] animate-in slide-in-from-bottom-4 md:left-auto md:right-4 md:w-80">
           <Card className="flex items-center gap-4 border-primary/20 bg-background/95 p-4 shadow-2xl backdrop-blur">
             <img
               src={currentFile.cover || '/placeholder.svg'}
@@ -122,12 +127,18 @@ const PlayerWrapper = () => {
       {/* Video fullscreen modal — only when explicitly opened for a NEW video */}
       {currentFile.type === 'video' && showVideoModal && (
         <div className="fixed inset-0 z-[200] bg-black">
-          <VideoPlayer onClose={handleCloseVideo} />
+          <Suspense fallback={null}>
+            <VideoPlayer onClose={handleCloseVideo} />
+          </Suspense>
         </div>
       )}
 
       {/* Audio mini player — always visible when audio loaded, does NOT block navigation */}
-      {currentFile.type === 'audio' && <MiniPlayer />}
+      {currentFile.type === 'audio' && (
+        <Suspense fallback={null}>
+          <MiniPlayer />
+        </Suspense>
+      )}
 
       {/*
         Full audio player overlay.
@@ -137,11 +148,10 @@ const PlayerWrapper = () => {
       {currentFile.type === 'audio' && isPlayerFullscreen && (
         <>
           {/* Invisible click-outside zone to close (only at very edge) */}
-          <div
-            className="fixed inset-0 z-[99]"
-            onClick={() => setPlayerFullscreen(false)}
-          />
-          <FullNowPlaying />
+          <div className="fixed inset-0 z-[99]" onClick={() => setPlayerFullscreen(false)} />
+          <Suspense fallback={null}>
+            <FullNowPlaying />
+          </Suspense>
         </>
       )}
     </>

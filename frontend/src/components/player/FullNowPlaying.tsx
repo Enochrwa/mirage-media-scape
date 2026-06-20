@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
   useLibraryStore,
@@ -33,6 +33,7 @@ import {
   ChevronsRight,
   X,
   Disc3,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -46,6 +47,7 @@ import SpatialAudioControls from '../SpatialAudioControls';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { queueManager } from '@/engines/QueueManager';
+import { toast } from '@/hooks/use-toast';
 
 type Tab = 'lyrics' | 'queue' | 'info';
 
@@ -71,13 +73,15 @@ export const FullNowPlaying: React.FC = () => {
     closePlayer,
   } = usePlayerStore();
 
-  const { files } = useLibraryStore();
+  const { files, playlists, addToPlaylist } = useLibraryStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const isRadio = Boolean(currentFile?.isStream) || currentFile?.album === 'Radio';
 
   // Auto-minimise when user navigates to another page
   useEffect(() => {
     setPlayerFullscreen(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
   const [recommendations, setRecommendations] = useState<MediaFile[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -89,6 +93,8 @@ export const FullNowPlaying: React.FC = () => {
   const [lyrics, setLyrics] = useState<{ time: number; text: string }[]>([]);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [showEQ, setShowEQ] = useState(false);
+  const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
+  const [addedToPlaylistId, setAddedToPlaylistId] = useState<string | null>(null);
   const lyricsRef = useRef<HTMLDivElement>(null);
 
   /* ── colour extraction ── */
@@ -123,14 +129,17 @@ export const FullNowPlaying: React.FC = () => {
     return () => unsub();
   }, []);
 
-  /* ── recommendations ── */
+  /* ── recommendations (skipped for radio — station ids have no track row) ── */
   useEffect(() => {
-    if (!currentFile?.id) return;
+    if (!currentFile?.id || isRadio) {
+      setRecommendations([]);
+      return;
+    }
     fetch(`${API_BASE}/api/recommendations/${currentFile.id}?limit=6`)
       .then((r) => r.json())
       .then((data: IncomingTrack[]) => setRecommendations(data.map(mapIncomingTrackToMediaFile)))
       .catch(() => {});
-  }, [currentFile?.id]);
+  }, [currentFile?.id, isRadio]);
 
   /* ── lyrics scroll ── */
   useEffect(() => {
@@ -142,10 +151,18 @@ export const FullNowPlaying: React.FC = () => {
     }
   }, [currentTime, activeTab, lyrics]);
 
-  /* ── playback rate sync ── */
+  /* ── lyrics tab isn't offered for radio; bail out of it if a station
+     starts playing while it's active so the tab content area isn't left
+     blank ── */
   useEffect(() => {
+    if (isRadio && activeTab === 'lyrics') setActiveTab('info');
+  }, [isRadio, activeTab]);
+
+  /* ── playback rate sync (no-op for radio — live streams ignore rate changes) ── */
+  useEffect(() => {
+    if (isRadio) return;
     pe.setPlaybackRate?.(playbackRate);
-  }, [playbackRate, pe]);
+  }, [playbackRate, pe, isRadio]);
 
   if (!currentFile) return null;
 
@@ -212,7 +229,11 @@ export const FullNowPlaying: React.FC = () => {
 
               <div className="flex items-center gap-1">
                 {/* More menu */}
-                <Popover>
+                <Popover
+                  onOpenChange={(open) => {
+                    if (!open) setShowPlaylistMenu(false);
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="ghost"
@@ -223,35 +244,117 @@ export const FullNowPlaying: React.FC = () => {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-52 border-white/10 bg-zinc-900/95 p-1.5 text-white backdrop-blur-xl"
+                    className="w-56 border-white/10 bg-zinc-900/95 p-1.5 text-white backdrop-blur-xl"
                     align="end"
                   >
-                    {[
-                      {
-                        icon: Download,
-                        label: 'Download',
-                        href: `${API_BASE}/api/stream/${currentFile.id}`,
-                      },
-                      { icon: Share2, label: 'Share' },
-                      { icon: Music2, label: 'Go to Album' },
-                      { icon: Headphones, label: 'Go to Artist' },
-                      { icon: Plus, label: 'Add to Playlist' },
-                    ].map(({ icon: Icon, label, href }) => (
-                      <button
-                        key={label}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-                        onClick={href ? () => window.open(href) : undefined}
-                      >
-                        <Icon size={15} /> {label}
-                      </button>
-                    ))}
-                    <div className="my-1.5 border-t border-white/10" />
-                    <button
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400/80 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                      onClick={closePlayer}
-                    >
-                      <X size={15} /> Close Player
-                    </button>
+                    {showPlaylistMenu ? (
+                      <div>
+                        <button
+                          className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                          onClick={() => setShowPlaylistMenu(false)}
+                        >
+                          <ChevronDown size={13} className="rotate-90" /> Back
+                        </button>
+                        {playlists.length === 0 ? (
+                          <p className="px-3 py-2.5 text-xs text-white/40">
+                            No playlists yet — create one from the Library page.
+                          </p>
+                        ) : (
+                          playlists.map((p) => (
+                            <button
+                              key={p.id}
+                              className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                              onClick={() => {
+                                addToPlaylist(p.id, currentFile.id);
+                                setAddedToPlaylistId(p.id);
+                                toast({
+                                  title: 'Added to playlist',
+                                  description: `"${currentFile.title}" was added to "${p.name}".`,
+                                });
+                                setTimeout(() => setAddedToPlaylistId(null), 1500);
+                              }}
+                            >
+                              <span className="truncate">{p.name}</span>
+                              {addedToPlaylistId === p.id && (
+                                <Check size={14} className="flex-shrink-0 text-emerald-400" />
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {!isRadio && (
+                          <button
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                            onClick={() => window.open(`${API_BASE}/api/stream/${currentFile.id}`)}
+                          >
+                            <Download size={15} /> Download
+                          </button>
+                        )}
+                        <button
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                          onClick={async () => {
+                            const shareData = {
+                              title: currentFile.title,
+                              text: isRadio
+                                ? `Listening to ${currentFile.title} on Zovyra Radio`
+                                : `Listening to "${currentFile.title}" by ${currentFile.artist || 'Unknown Artist'} on Zovyra`,
+                              url: window.location.href,
+                            };
+                            try {
+                              if (navigator.share) {
+                                await navigator.share(shareData);
+                              } else {
+                                await navigator.clipboard.writeText(
+                                  `${shareData.text} — ${shareData.url}`,
+                                );
+                                toast({ title: 'Link copied to clipboard' });
+                              }
+                            } catch {
+                              // Share cancelled by user — not an error
+                            }
+                          }}
+                        >
+                          <Share2 size={15} /> Share
+                        </button>
+                        {!isRadio && currentFile.album && (
+                          <button
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                            onClick={() =>
+                              navigate(`/album/${encodeURIComponent(currentFile.album!)}`)
+                            }
+                          >
+                            <Music2 size={15} /> Go to Album
+                          </button>
+                        )}
+                        {!isRadio && currentFile.artist && (
+                          <button
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                            onClick={() =>
+                              navigate(`/artist/${encodeURIComponent(currentFile.artist!)}`)
+                            }
+                          >
+                            <Headphones size={15} /> Go to Artist
+                          </button>
+                        )}
+                        {!isRadio && (
+                          <button
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                            onClick={() => setShowPlaylistMenu(true)}
+                          >
+                            <Plus size={15} /> Add to Playlist
+                          </button>
+                        )}
+                        <div className="my-1.5 border-t border-white/10" />
+                        <button
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400/80 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          onClick={closePlayer}
+                        >
+                          <X size={15} /> {isRadio ? 'Stop & Close' : 'Close Player'}
+                        </button>
+                      </>
+                    )}
                   </PopoverContent>
                 </Popover>
               </div>
@@ -361,75 +464,97 @@ export const FullNowPlaying: React.FC = () => {
             {/* Waveform + time */}
             <div className="mb-4 flex-shrink-0">
               <WaveformSeekBar trackId={currentFile.id} />
-              <div className="mt-1 flex justify-between font-mono text-[11px] text-white/35">
-                <span>{formatDuration(currentTime)}</span>
-                <span>-{formatDuration(Math.max(0, duration - currentTime))}</span>
-              </div>
+              {!isRadio && (
+                <div className="mt-1 flex justify-between font-mono text-[11px] text-white/35">
+                  <span>{formatDuration(currentTime)}</span>
+                  <span>-{formatDuration(Math.max(0, duration - currentTime))}</span>
+                </div>
+              )}
             </div>
 
             {/* Main controls */}
             <div className="flex-shrink-0">
-              {/* Speed selector */}
-              <div className="mb-3 flex items-center justify-center gap-1">
-                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
-                  <button
-                    key={r}
-                    className={cn(
-                      'rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors',
-                      playbackRate === r
-                        ? 'bg-white text-black'
-                        : 'bg-white/10 text-white/50 hover:bg-white/20 hover:text-white',
-                    )}
-                    onClick={() => setPlaybackRate(r)}
-                  >
-                    {r === 1 ? '1×' : `${r}×`}
-                  </button>
-                ))}
-              </div>
-
-              {/* Prev / -10 / Play / +10 / Next */}
-              <div className="flex items-center justify-center gap-2 md:gap-4">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
+              {/* Speed selector — hidden for radio: changing playback rate on
+                  a live stream just distorts pitch with no useful effect */}
+              {!isRadio && (
+                <div className="mb-3 flex items-center justify-center gap-1">
+                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
+                    <button
+                      key={r}
                       className={cn(
-                        'h-10 w-10 rounded-full text-white/60 hover:text-white',
-                        shuffle && 'text-purple-400',
+                        'rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors',
+                        playbackRate === r
+                          ? 'bg-white text-black'
+                          : 'bg-white/10 text-white/50 hover:bg-white/20 hover:text-white',
                       )}
-                      onClick={() => setShuffle(!shuffle)}
+                      onClick={() => setPlaybackRate(r)}
                     >
-                      <Shuffle size={19} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Shuffle</TooltipContent>
-                </Tooltip>
+                      {r === 1 ? '1×' : `${r}×`}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full text-white hover:bg-white/10"
-                  onClick={() => previousTrack()}
-                >
-                  <SkipBack size={26} fill="currentColor" />
-                </Button>
+              {isRadio && (
+                <div className="mb-3 flex items-center justify-center">
+                  <span className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-[11px] font-bold tracking-wide text-red-400">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                    LIVE BROADCAST
+                  </span>
+                </div>
+              )}
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full text-white/60 hover:bg-white/10 hover:text-white"
-                      onClick={() =>
-                        usePlayerStore.getState().seekTo(Math.max(0, currentTime - 10))
-                      }
-                    >
-                      <ChevronsLeft size={22} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>−10s</TooltipContent>
-                </Tooltip>
+              {/* Prev / -10 / Play / +10 / Next — radio only gets play/pause,
+                  since there's no queue position, no rewind, and no "next"
+                  on a live stream */}
+              <div className="flex items-center justify-center gap-2 md:gap-4">
+                {!isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'h-10 w-10 rounded-full text-white/60 hover:text-white',
+                          shuffle && 'text-purple-400',
+                        )}
+                        onClick={() => setShuffle(!shuffle)}
+                      >
+                        <Shuffle size={19} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Shuffle</TooltipContent>
+                  </Tooltip>
+                )}
+
+                {!isRadio && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-12 w-12 rounded-full text-white hover:bg-white/10"
+                    onClick={() => previousTrack()}
+                  >
+                    <SkipBack size={26} fill="currentColor" />
+                  </Button>
+                )}
+
+                {!isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-full text-white/60 hover:bg-white/10 hover:text-white"
+                        onClick={() =>
+                          usePlayerStore.getState().seekTo(Math.max(0, currentTime - 10))
+                        }
+                      >
+                        <ChevronsLeft size={22} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>−10s</TooltipContent>
+                  </Tooltip>
+                )}
 
                 {/* Big play button */}
                 <button
@@ -444,47 +569,69 @@ export const FullNowPlaying: React.FC = () => {
                   )}
                 </button>
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full text-white/60 hover:bg-white/10 hover:text-white"
-                      onClick={() =>
-                        usePlayerStore.getState().seekTo(Math.min(duration, currentTime + 10))
-                      }
-                    >
-                      <ChevronsRight size={22} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>+10s</TooltipContent>
-                </Tooltip>
+                {!isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-full text-white/60 hover:bg-white/10 hover:text-white"
+                        onClick={() =>
+                          usePlayerStore.getState().seekTo(Math.min(duration, currentTime + 10))
+                        }
+                      >
+                        <ChevronsRight size={22} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>+10s</TooltipContent>
+                  </Tooltip>
+                )}
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full text-white hover:bg-white/10"
-                  onClick={() => nextTrack()}
-                >
-                  <SkipForward size={26} fill="currentColor" />
-                </Button>
+                {!isRadio && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-12 w-12 rounded-full text-white hover:bg-white/10"
+                    onClick={() => nextTrack()}
+                  >
+                    <SkipForward size={26} fill="currentColor" />
+                  </Button>
+                )}
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'h-10 w-10 rounded-full text-white/60 hover:text-white',
-                        repeat && 'text-purple-400',
-                      )}
-                      onClick={() => setRepeat(!repeat)}
-                    >
-                      <Repeat size={19} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Repeat</TooltipContent>
-                </Tooltip>
+                {!isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'h-10 w-10 rounded-full text-white/60 hover:text-white',
+                          repeat && 'text-purple-400',
+                        )}
+                        onClick={() => setRepeat(!repeat)}
+                      >
+                        <Repeat size={19} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Repeat</TooltipContent>
+                  </Tooltip>
+                )}
+
+                {isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-full text-white/60 hover:text-red-400"
+                        onClick={closePlayer}
+                      >
+                        <X size={19} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Stop station</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
 
               {/* Volume + secondary tools */}
@@ -612,7 +759,10 @@ export const FullNowPlaying: React.FC = () => {
           <div className="border-white/8 hidden w-[300px] flex-shrink-0 flex-col border-l bg-black/20 backdrop-blur-sm lg:flex xl:w-[340px]">
             {/* Tabs */}
             <div className="border-white/8 flex flex-shrink-0 border-b">
-              {(['info', 'lyrics', 'queue'] as Tab[]).map((t) => (
+              {(isRadio
+                ? (['info', 'queue'] as Tab[])
+                : (['info', 'lyrics', 'queue'] as Tab[])
+              ).map((t) => (
                 <button
                   key={t}
                   className={cn(
@@ -646,11 +796,13 @@ export const FullNowPlaying: React.FC = () => {
                       ['Album', currentFile.album],
                       ['Genre', currentFile.genre],
                       ['Year', currentFile.year],
-                      ['Duration', formatDuration(duration)],
+                      isRadio ? null : ['Duration', formatDuration(duration)],
                       ['BPM', currentFile.bpm ? `${Math.round(currentFile.bpm)}` : null],
                       ['Key', currentFile.camelot_key],
                     ]
-                      .filter(([, v]) => v)
+                      .filter(
+                        (row): row is [string, string | number] => row !== null && Boolean(row[1]),
+                      )
                       .map(([k, v]) => (
                         <div key={k as string} className="flex items-start justify-between gap-2">
                           <span className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider text-white/30">

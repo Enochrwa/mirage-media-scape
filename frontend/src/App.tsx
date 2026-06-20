@@ -12,9 +12,11 @@ import { WifiOff, Loader2 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCapability } from './platform';
 import { useMediaSession } from './hooks/useMediaSession';
+import PlayerWrapper from '@/components/PlayerWrapper';
 
 const queryClient = new QueryClient();
 
+const MainLayout = lazy(() => import('@/components/MainLayout'));
 const Home = lazy(() => import('./pages/Home'));
 const Library = lazy(() => import('./pages/Library'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
@@ -34,9 +36,6 @@ const Discover = lazy(() => import('./pages/Discover'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const ArtistProfile = lazy(() =>
   import('./pages/ArtistProfile').then((m) => ({ default: m.ArtistProfile })),
-);
-const ZovyraLayout = lazy(() =>
-  import('./components/ZovyraLayout').then((m) => ({ default: m.ZovyraLayout })),
 );
 const AlbumView = lazy(() => import('./pages/AlbumView').then((m) => ({ default: m.AlbumView })));
 const Login = lazy(() => import('./pages/Auth/Login'));
@@ -128,17 +127,17 @@ const App = () => {
                   <Route
                     path="/"
                     element={
-                      <ZovyraLayout>
+                      <MainLayout>
                         <ArtistProfile />
-                      </ZovyraLayout>
+                      </MainLayout>
                     }
                   />
                   <Route
                     path="/artist"
                     element={
-                      <ZovyraLayout>
+                      <MainLayout>
                         <ArtistProfile />
-                      </ZovyraLayout>
+                      </MainLayout>
                     }
                   />
                   <Route path="/login" element={<Login />} />
@@ -156,7 +155,14 @@ const App = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/stats" element={<StatsPage />} />
                   <Route path="/album/:id" element={<AlbumView />} />
-                  <Route path="/artist/:name" element={<ArtistProfile />} />
+                  <Route
+                    path="/artist/:name"
+                    element={
+                      <MainLayout>
+                        <ArtistProfile />
+                      </MainLayout>
+                    }
+                  />
                   <Route path="/remote" element={<RemotePage />} />
                   <Route path="/duplicates" element={<DuplicateManagerPage />} />
                   <Route path="/radio" element={<RadioPage />} />
@@ -164,6 +170,17 @@ const App = () => {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              {/*
+                Mounted once at the router root — NOT inside MainLayout/each
+                page — so the player (mini bar, full now-playing overlay,
+                video modal) survives route changes instead of unmounting
+                and remounting on every navigation. Previously every page
+                wrapped itself in <MainLayout>, which rendered its own
+                <PlayerWrapper>; navigating tore down and rebuilt the whole
+                player tree on every click, which is what produced the
+                "player keeps reopening / blocks the UI" symptom.
+              */}
+              <PlayerWrapper />
             </BrowserRouter>
           </ErrorBoundary>
         </TooltipProvider>

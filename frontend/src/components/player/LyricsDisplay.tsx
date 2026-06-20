@@ -94,7 +94,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       <div
         ref={containerRef}
         className={cn(
-          'no-scrollbar h-full overflow-y-auto scroll-smooth px-4 py-[40vh]',
+          'h-full overflow-y-auto scroll-smooth px-4 py-[40vh] no-scrollbar',
           className,
         )}
       >

@@ -46,6 +46,13 @@ export interface MediaFile {
   cover_cache_path?: string;
   owner_id?: string;
   owner_name?: string;
+  /**
+   * True for internet radio / live streams. When set, the player treats
+   * `file` as an already-playable absolute stream URL (never rewritten to
+   * `/api/stream/:id`, since there is no library record for the id) and
+   * disables duration-based UI (seek bar, next/prev, shuffle, repeat).
+   */
+  isStream?: boolean;
 }
 
 export interface SmartPlaylistCondition {

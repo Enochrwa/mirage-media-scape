@@ -214,8 +214,26 @@ export class PlaybackEngine {
     return { element: el, source, replayGain, eq, fade };
   }
 
+  /**
+   * True when `track` is an internet-radio / live-stream entry rather than a
+   * library file. These have no row in the tracks DB, so `track.id` cannot
+   * be used to build `/api/stream/:id` — that always 404s, which is why
+   * radio stations used to "play" (UI state flips, no error surfaces) with
+   * total silence. Detection order: explicit flag set by the radio page,
+   * then the legacy `album === 'Radio'` convention used elsewhere in the
+   * player (MiniPlayer, WaveformSeekBar) for back-compat.
+   */
+  private isLiveStream(track: MediaFile): boolean {
+    return Boolean(track.isStream) || track.album === 'Radio';
+  }
+
   private async resolveTrackUrl(track: MediaFile): Promise<string> {
     const platform = this.capabilities;
+
+    if (this.isLiveStream(track)) {
+      return this.resolveStreamUrl(track);
+    }
+
     if (platform.host === 'mobile') {
       const { MobileMediaService } = await import('../services/mobileMedia/MobileMediaService');
       return MobileMediaService.getPlayableUri(track);
@@ -248,6 +266,38 @@ export class PlaybackEngine {
     }
 
     return baseUrl;
+  }
+
+  /**
+   * Radio stations carry their playable URL directly on `track.file` (set by
+   * RadioPage from the radio-browser API's `url_resolved`). On web we proxy
+   * it through the server's `/api/radio/stream` endpoint — most Icecast/
+   * Shoutcast stations don't send `Access-Control-Allow-Origin`, and this
+   * engine's <audio> elements are wired into a MediaElementAudioSourceNode
+   * (crossOrigin="anonymous") for EQ/visualizer/spatial processing. Without
+   * CORS, the browser plays the tagged-as-opaque response completely
+   * muted — `play()` resolves, the `playing` event fires, the UI shows
+   * "LIVE", but the Web Audio graph never receives audible samples. The
+   * server-side proxy avoids that entirely (same-origin response), and
+   * already validates the target URL against private/internal hosts.
+   * On native platforms (mobile/desktop) there's no Web Audio CORS
+   * restriction in the same way, so we play the stream URL directly.
+   */
+  private resolveStreamUrl(track: MediaFile): string {
+    const directUrl = track.file || track.file_path || '';
+    if (!directUrl) return directUrl;
+
+    if (this.capabilities.host === 'mobile' || this.capabilities.host === 'desktop') {
+      return directUrl;
+    }
+
+    // Already pointed at our own proxy (e.g. re-resolved after a restore) —
+    // don't double-wrap it.
+    if (directUrl.startsWith(`${API_BASE}/api/radio/stream`)) {
+      return directUrl;
+    }
+
+    return `${API_BASE}/api/radio/stream?url=${encodeURIComponent(directUrl)}`;
   }
 
   async load(file: MediaFile, startNext: boolean = false) {

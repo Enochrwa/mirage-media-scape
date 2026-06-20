@@ -21,7 +21,7 @@ export function ArtistProfile() {
   }, [name]);
 
   return (
-    <div className="no-scrollbar flex-1 overflow-y-auto bg-black">
+    <div className="flex-1 overflow-y-auto bg-black no-scrollbar">
       {/* Hero Section */}
       <div className="relative flex h-[40vh] min-h-[300px] flex-col justify-end overflow-hidden p-8">
         <div

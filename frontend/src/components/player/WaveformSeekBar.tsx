@@ -10,8 +10,15 @@ interface WaveformSeekBarProps {
 
 export const WaveformSeekBar: React.FC<WaveformSeekBarProps> = ({ className }) => {
   const { currentTime, duration, currentFile, playbackEngine: pe } = usePlayerStore();
+  // NOTE: do not check `currentFile.file.includes('stream')` here — every
+  // normal library track's URL is `${API_BASE}/api/stream/:id`, so that
+  // substring check matched ALL tracks and silently made the waveform
+  // seek bar non-interactive for everything, not just radio.
   const isStream =
-    (currentFile?.file ?? '').includes('stream') || !duration || duration === Infinity;
+    Boolean(currentFile?.isStream) ||
+    currentFile?.album === 'Radio' ||
+    !duration ||
+    duration === Infinity;
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [localABLoop, setLocalABLoop] = useState({
     pointA: null as number | null,
