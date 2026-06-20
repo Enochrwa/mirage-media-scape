@@ -47,9 +47,12 @@ router.get('/favorites', (req, res) => {
 });
 
 router.post('/favorites', async (req, res) => {
-  const { stationuuid } = req.body;
-  await radioService.toggleFavorite(stationuuid);
-  res.json({ data: { success: true } });
+  const { stationuuid, name, url, favicon } = req.body;
+  if (!stationuuid || typeof stationuuid !== 'string') {
+    return res.status(400).json({ error: 'stationuuid is required' });
+  }
+  const result = await radioService.toggleFavorite(stationuuid, { name, url, favicon });
+  res.json({ data: result });
 });
 
 export default router;

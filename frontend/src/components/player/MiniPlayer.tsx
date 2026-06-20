@@ -55,7 +55,7 @@ export const MiniPlayer: React.FC = () => {
 
   if (!currentFile) return null;
 
-  const isRadio = currentFile.album === 'Radio' || !duration;
+  const isRadio = currentFile.isStream || currentFile.album === 'Radio' || !duration;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const handleProgressMouseMove = (e: React.MouseEvent) => {
@@ -99,12 +99,13 @@ export const MiniPlayer: React.FC = () => {
           ref={progressRef}
           className={cn(
             'group relative w-full transition-all',
-            isRadio
-              ? 'h-0.5 cursor-default'
-              : 'h-1 cursor-pointer hover:h-[5px]',
+            isRadio ? 'h-0.5 cursor-default' : 'h-1 cursor-pointer hover:h-[5px]',
           )}
           onMouseEnter={() => setIsHoveringProgress(true)}
-          onMouseLeave={() => { setIsHoveringProgress(false); setTooltipTime(null); }}
+          onMouseLeave={() => {
+            setIsHoveringProgress(false);
+            setTooltipTime(null);
+          }}
           onMouseMove={handleProgressMouseMove}
           onClick={handleSeekClick}
         >

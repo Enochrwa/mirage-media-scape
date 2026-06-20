@@ -1,13 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { cn } from '@/lib/utils';
+import { cn, API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Radio, Search, Play, Globe, Zap, Moon, Heart, Smile,
-  Music2, Loader2, Pause, Star, TrendingUp, MapPin, RefreshCw,
-  Coffee, Waves, Flame, Headphones,
+  Radio,
+  Search,
+  Play,
+  Globe,
+  Zap,
+  Moon,
+  Heart,
+  Smile,
+  Music2,
+  Loader2,
+  Pause,
+  Star,
+  TrendingUp,
+  MapPin,
+  RefreshCw,
+  Coffee,
+  Waves,
+  Flame,
+  Headphones,
 } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
@@ -27,14 +43,46 @@ interface RadioStation {
 }
 
 const MOOD_TAGS: Record<string, { tags: string[]; icon: React.ReactNode; gradient: string }> = {
-  Focus: { tags: ['study', 'focus', 'classical', 'ambient', 'concentration'], icon: <Coffee size={28} />, gradient: 'from-blue-600/80 to-indigo-700/80' },
-  Chill: { tags: ['chill', 'lounge', 'smooth jazz', 'relaxing'], icon: <Waves size={28} />, gradient: 'from-teal-600/80 to-cyan-700/80' },
-  Workout: { tags: ['workout', 'electronic', 'dance', 'energy', 'edm'], icon: <Flame size={28} />, gradient: 'from-orange-600/80 to-red-700/80' },
-  Sleep: { tags: ['sleep', 'ambient', 'nature', 'meditation', 'calm'], icon: <Moon size={28} />, gradient: 'from-indigo-800/80 to-purple-900/80' },
-  Party: { tags: ['party', 'dance', 'pop', 'hits', 'top40'], icon: <Smile size={28} />, gradient: 'from-pink-600/80 to-fuchsia-700/80' },
-  Jazz: { tags: ['jazz', 'blues', 'soul', 'swing'], icon: <Music2 size={28} />, gradient: 'from-amber-700/80 to-yellow-700/80' },
-  Rock: { tags: ['rock', 'metal', 'alternative', 'indie'], icon: <Zap size={28} />, gradient: 'from-zinc-700/80 to-zinc-900/80' },
-  Latin: { tags: ['latin', 'salsa', 'reggaeton', 'bachata'], icon: <Heart size={28} />, gradient: 'from-red-600/80 to-orange-700/80' },
+  Focus: {
+    tags: ['study', 'focus', 'classical', 'ambient', 'concentration'],
+    icon: <Coffee size={28} />,
+    gradient: 'from-blue-600/80 to-indigo-700/80',
+  },
+  Chill: {
+    tags: ['chill', 'lounge', 'smooth jazz', 'relaxing'],
+    icon: <Waves size={28} />,
+    gradient: 'from-teal-600/80 to-cyan-700/80',
+  },
+  Workout: {
+    tags: ['workout', 'electronic', 'dance', 'energy', 'edm'],
+    icon: <Flame size={28} />,
+    gradient: 'from-orange-600/80 to-red-700/80',
+  },
+  Sleep: {
+    tags: ['sleep', 'ambient', 'nature', 'meditation', 'calm'],
+    icon: <Moon size={28} />,
+    gradient: 'from-indigo-800/80 to-purple-900/80',
+  },
+  Party: {
+    tags: ['party', 'dance', 'pop', 'hits', 'top40'],
+    icon: <Smile size={28} />,
+    gradient: 'from-pink-600/80 to-fuchsia-700/80',
+  },
+  Jazz: {
+    tags: ['jazz', 'blues', 'soul', 'swing'],
+    icon: <Music2 size={28} />,
+    gradient: 'from-amber-700/80 to-yellow-700/80',
+  },
+  Rock: {
+    tags: ['rock', 'metal', 'alternative', 'indie'],
+    icon: <Zap size={28} />,
+    gradient: 'from-zinc-700/80 to-zinc-900/80',
+  },
+  Latin: {
+    tags: ['latin', 'salsa', 'reggaeton', 'bachata'],
+    icon: <Heart size={28} />,
+    gradient: 'from-red-600/80 to-orange-700/80',
+  },
 };
 
 // Country list for "local stations" tab
@@ -69,7 +117,9 @@ async function radioBrowserFetch(path: string): Promise<RadioStation[]> {
         headers: { 'User-Agent': 'Zovyra/1.0' },
       });
       if (res.ok) return res.json();
-    } catch { /* try next */ }
+    } catch {
+      /* try next */
+    }
   }
   return [];
 }
@@ -77,8 +127,10 @@ async function radioBrowserFetch(path: string): Promise<RadioStation[]> {
 const StationCard: React.FC<{
   station: RadioStation;
   isPlaying: boolean;
+  isFavorite: boolean;
   onPlay: (s: RadioStation) => void;
-}> = ({ station, isPlaying, onPlay }) => (
+  onToggleFavorite: (s: RadioStation) => void;
+}> = ({ station, isPlaying, isFavorite, onPlay, onToggleFavorite }) => (
   <Card
     className={cn(
       'group relative overflow-hidden border transition-all duration-200 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10',
@@ -125,18 +177,18 @@ const StationCard: React.FC<{
 
       {/* Info */}
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-semibold text-white leading-tight">{station.name}</h3>
+        <h3 className="truncate text-sm font-semibold leading-tight text-white">{station.name}</h3>
         <p className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-400">
           <Globe size={9} /> {station.country || station.countrycode}
         </p>
-        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {station.bitrate ? (
             <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-zinc-500">
               {station.bitrate}k
             </span>
           ) : null}
           {station.codec ? (
-            <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-zinc-500 uppercase">
+            <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] uppercase text-zinc-500">
               {station.codec}
             </span>
           ) : null}
@@ -148,11 +200,25 @@ const StationCard: React.FC<{
         </div>
       </div>
 
+      {/* Favorite toggle */}
+      <button
+        onClick={() => onToggleFavorite(station)}
+        className={cn(
+          'flex-shrink-0 rounded-full p-1.5 transition-colors',
+          isFavorite ? 'text-red-400 hover:text-red-300' : 'text-zinc-600 hover:text-zinc-300',
+        )}
+        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      >
+        <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+      </button>
+
       {/* Vote count */}
       {station.votes != null && station.votes > 0 && (
         <div className="hidden flex-col items-center text-zinc-600 sm:flex">
           <Star size={11} className="text-yellow-600/50" />
-          <span className="text-[9px]">{station.votes > 999 ? `${(station.votes / 1000).toFixed(1)}k` : station.votes}</span>
+          <span className="text-[9px]">
+            {station.votes > 999 ? `${(station.votes / 1000).toFixed(1)}k` : station.votes}
+          </span>
         </div>
       )}
     </div>
@@ -161,10 +227,14 @@ const StationCard: React.FC<{
 
 const RadioPage = () => {
   const { currentFile, isPlaying, playFile } = usePlayerStore();
-  const [activeTab, setActiveTab] = useState<'local' | 'trending' | 'mood' | 'country' | 'search'>('local');
+  const [activeTab, setActiveTab] = useState<
+    'local' | 'trending' | 'mood' | 'country' | 'search' | 'favorites'
+  >('local');
   const [stations, setStations] = useState<RadioStation[]>([]);
   const [trendingStations, setTrendingStations] = useState<RadioStation[]>([]);
   const [moodStations, setMoodStations] = useState<RadioStation[]>([]);
+  const [favoriteStations, setFavoriteStations] = useState<RadioStation[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
@@ -177,11 +247,92 @@ const RadioPage = () => {
     else if (!isPlaying) setPlayingId(null);
   }, [currentFile?.id, isPlaying]);
 
-  // Load Rwanda (local) stations on mount
+  // Load Rwanda (local) stations and saved favorites on mount
   useEffect(() => {
     loadLocalStations('RW');
     loadTrending();
+    loadFavorites();
   }, []);
+
+  const loadFavorites = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/radio/favorites`);
+      const { data } = (await res.json()) as {
+        data: { stationuuid: string; name: string; url: string; favicon?: string }[];
+      };
+      setFavoriteIds(new Set(data.map((f) => f.stationuuid)));
+      setFavoriteStations(
+        data.map((f) => ({
+          stationuuid: f.stationuuid,
+          name: f.name,
+          country: '',
+          countrycode: '',
+          url_resolved: f.url,
+          favicon: f.favicon,
+        })),
+      );
+    } catch {
+      /* favorites are a nice-to-have; fail silently */
+    }
+  };
+
+  const toggleFavorite = useCallback(
+    async (station: RadioStation) => {
+      const wasFavorite = favoriteIds.has(station.stationuuid);
+      // Optimistic update
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (wasFavorite) next.delete(station.stationuuid);
+        else next.add(station.stationuuid);
+        return next;
+      });
+      setFavoriteStations((prev) =>
+        wasFavorite
+          ? prev.filter((s) => s.stationuuid !== station.stationuuid)
+          : [station, ...prev.filter((s) => s.stationuuid !== station.stationuuid)],
+      );
+      try {
+        const res = await fetch(`${API_BASE}/api/radio/favorites`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stationuuid: station.stationuuid,
+            name: station.name,
+            url: station.url_resolved,
+            favicon: station.favicon,
+          }),
+        });
+        if (!res.ok) throw new Error('favorite request failed');
+        const { data } = (await res.json()) as { data: { favorited: boolean } };
+        // Reconcile with the server's authoritative result in case it
+        // disagrees with our optimistic guess (e.g. two tabs toggling the
+        // same station, or the station had no playable URL to save).
+        if (data.favorited !== !wasFavorite) {
+          setFavoriteIds((prev) => {
+            const next = new Set(prev);
+            if (data.favorited) next.add(station.stationuuid);
+            else next.delete(station.stationuuid);
+            return next;
+          });
+          if (!data.favorited) {
+            setFavoriteStations((prev) =>
+              prev.filter((s) => s.stationuuid !== station.stationuuid),
+            );
+          }
+        }
+      } catch {
+        // Revert on failure
+        setFavoriteIds((prev) => {
+          const next = new Set(prev);
+          if (wasFavorite) next.add(station.stationuuid);
+          else next.delete(station.stationuuid);
+          return next;
+        });
+        loadFavorites();
+      }
+    },
+    [favoriteIds],
+  );
 
   const loadLocalStations = async (countryCode: string) => {
     setLoading(true);
@@ -190,8 +341,11 @@ const RadioPage = () => {
         `stations/bycountrycodeexact/${countryCode}?limit=50&order=votes&reverse=true&hidebroken=true`,
       );
       setStations(data);
-    } catch { setStations([]); }
-    finally { setLoading(false); }
+    } catch {
+      setStations([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadTrending = async () => {
@@ -200,7 +354,9 @@ const RadioPage = () => {
         'stations/topclick/60?hidebroken=true&order=clickcount&reverse=true',
       );
       setTrendingStations(data);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   };
 
   const loadMoodStations = async (mood: string) => {
@@ -208,16 +364,23 @@ const RadioPage = () => {
     const tags = MOOD_TAGS[mood]?.tags ?? [mood.toLowerCase()];
     try {
       const results = await Promise.all(
-        tags.slice(0, 2).map(tag =>
-          radioBrowserFetch(`stations/bytag/${encodeURIComponent(tag)}?limit=20&hidebroken=true&order=votes&reverse=true`),
-        ),
+        tags
+          .slice(0, 2)
+          .map((tag) =>
+            radioBrowserFetch(
+              `stations/bytag/${encodeURIComponent(tag)}?limit=20&hidebroken=true&order=votes&reverse=true`,
+            ),
+          ),
       );
       const combined = Array.from(
-        new Map(results.flat().map(s => [s.stationuuid, s])).values(),
+        new Map(results.flat().map((s) => [s.stationuuid, s])).values(),
       ).slice(0, 40);
       setMoodStations(combined);
-    } catch { setMoodStations([]); }
-    finally { setLoading(false); }
+    } catch {
+      setMoodStations([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const searchStations = async () => {
@@ -228,24 +391,31 @@ const RadioPage = () => {
         `stations/byname/${encodeURIComponent(query.trim())}?limit=40&hidebroken=true`,
       );
       setStations(data);
-    } catch { setStations([]); }
-    finally { setLoading(false); }
+    } catch {
+      setStations([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const playStation = useCallback((station: RadioStation) => {
-    playFile({
-      id: station.stationuuid,
-      title: station.name,
-      artist: `${station.country} Radio`,
-      file: station.url_resolved,
-      type: 'audio',
-      cover: station.favicon || '',
-      album: 'Radio',
-    });
-    setPlayingId(station.stationuuid);
-  }, [playFile]);
+  const playStation = useCallback(
+    (station: RadioStation) => {
+      playFile({
+        id: station.stationuuid,
+        title: station.name,
+        artist: `${station.country} Radio`,
+        file: station.url_resolved,
+        type: 'audio',
+        cover: station.favicon || '',
+        album: 'Radio',
+        isStream: true,
+      });
+      setPlayingId(station.stationuuid);
+    },
+    [playFile],
+  );
 
-  const handleCountryChange = (country: typeof COUNTRY_CODES[0]) => {
+  const handleCountryChange = (country: (typeof COUNTRY_CODES)[0]) => {
     setSelectedCountry(country);
     loadLocalStations(country.code);
   };
@@ -256,12 +426,8 @@ const RadioPage = () => {
     { id: 'mood', label: '🎭 Mood' },
     { id: 'country', label: '🌍 By Country' },
     { id: 'search', label: '🔍 Search' },
+    { id: 'favorites', label: '❤️ Favorites' },
   ] as const;
-
-  const displayedStations =
-    activeTab === 'trending' ? trendingStations
-    : activeTab === 'mood' ? moodStations
-    : stations;
 
   return (
     <MainLayout>
@@ -278,7 +444,7 @@ const RadioPage = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="text-zinc-400 hover:text-white gap-1.5"
+              className="gap-1.5 text-zinc-400 hover:text-white"
               onClick={() => loadLocalStations(selectedCountry.code)}
             >
               <RefreshCw size={13} /> Refresh
@@ -287,7 +453,7 @@ const RadioPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-white/8 overflow-x-auto pb-px no-scrollbar">
+        <div className="border-white/8 flex gap-1 overflow-x-auto border-b pb-px no-scrollbar">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -309,12 +475,12 @@ const RadioPage = () => {
 
         {/* LOCAL TAB */}
         {activeTab === 'local' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="space-y-4 duration-200 animate-in fade-in">
             {/* Country switcher within local */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
               <MapPin size={13} className="text-zinc-500" />
-              <span className="text-xs text-zinc-500 mr-1">Region:</span>
-              {COUNTRY_CODES.slice(0, 8).map(c => (
+              <span className="mr-1 text-xs text-zinc-500">Region:</span>
+              {COUNTRY_CODES.slice(0, 8).map((c) => (
                 <button
                   key={c.code}
                   onClick={() => handleCountryChange(c)}
@@ -338,12 +504,14 @@ const RadioPage = () => {
               <>
                 <p className="text-xs text-zinc-600">{stations.length} stations found</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {stations.map(s => (
+                  {stations.map((s) => (
                     <StationCard
                       key={s.stationuuid}
                       station={s}
                       isPlaying={playingId === s.stationuuid}
+                      isFavorite={favoriteIds.has(s.stationuuid)}
                       onPlay={playStation}
+                      onToggleFavorite={toggleFavorite}
                     />
                   ))}
                 </div>
@@ -354,21 +522,25 @@ const RadioPage = () => {
 
         {/* TRENDING TAB */}
         {activeTab === 'trending' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="space-y-4 duration-200 animate-in fade-in">
             <div className="flex items-center gap-2">
               <TrendingUp size={14} className="text-orange-400" />
-              <span className="text-sm text-zinc-400">Most-listened stations right now worldwide</span>
+              <span className="text-sm text-zinc-400">
+                Most-listened stations right now worldwide
+              </span>
             </div>
             {trendingStations.length === 0 ? (
               <LoadingGrid />
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {trendingStations.map(s => (
+                {trendingStations.map((s) => (
                   <StationCard
                     key={s.stationuuid}
                     station={s}
                     isPlaying={playingId === s.stationuuid}
+                    isFavorite={favoriteIds.has(s.stationuuid)}
                     onPlay={playStation}
+                    onToggleFavorite={toggleFavorite}
                   />
                 ))}
               </div>
@@ -378,7 +550,7 @@ const RadioPage = () => {
 
         {/* MOOD TAB */}
         {activeTab === 'mood' && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="space-y-6 duration-200 animate-in fade-in">
             {!selectedMood ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                 {Object.entries(MOOD_TAGS).map(([mood, cfg]) => (
@@ -404,7 +576,10 @@ const RadioPage = () => {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => { setSelectedMood(null); setMoodStations([]); }}
+                    onClick={() => {
+                      setSelectedMood(null);
+                      setMoodStations([]);
+                    }}
                     className="rounded-full bg-white/10 px-3 py-1 text-xs text-zinc-300 hover:bg-white/20"
                   >
                     ← Back to moods
@@ -417,12 +592,14 @@ const RadioPage = () => {
                   <EmptyStations label="No mood stations found" />
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {moodStations.map(s => (
+                    {moodStations.map((s) => (
                       <StationCard
                         key={s.stationuuid}
                         station={s}
                         isPlaying={playingId === s.stationuuid}
+                        isFavorite={favoriteIds.has(s.stationuuid)}
                         onPlay={playStation}
+                        onToggleFavorite={toggleFavorite}
                       />
                     ))}
                   </div>
@@ -434,19 +611,19 @@ const RadioPage = () => {
 
         {/* COUNTRY TAB */}
         {activeTab === 'country' && (
-          <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="space-y-5 duration-200 animate-in fade-in">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8">
-              {COUNTRY_CODES.map(c => (
+              {COUNTRY_CODES.map((c) => (
                 <button
                   key={c.code}
                   onClick={() => {
                     handleCountryChange(c);
                     setActiveTab('local');
                   }}
-                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 p-3 text-center transition-all hover:bg-purple-600/20 hover:scale-[1.04]"
+                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 p-3 text-center transition-all hover:scale-[1.04] hover:bg-purple-600/20"
                 >
                   <span className="text-2xl">{c.flag}</span>
-                  <span className="text-[10px] text-zinc-400 leading-tight">{c.name}</span>
+                  <span className="text-[10px] leading-tight text-zinc-400">{c.name}</span>
                 </button>
               ))}
             </div>
@@ -455,7 +632,7 @@ const RadioPage = () => {
 
         {/* SEARCH TAB */}
         {activeTab === 'search' && (
-          <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="space-y-5 duration-200 animate-in fade-in">
             <div className="flex max-w-lg gap-2">
               <Input
                 placeholder="Search station name, genre, country…"
@@ -477,12 +654,14 @@ const RadioPage = () => {
               <LoadingGrid />
             ) : stations.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {stations.map(s => (
+                {stations.map((s) => (
                   <StationCard
                     key={s.stationuuid}
                     station={s}
                     isPlaying={playingId === s.stationuuid}
+                    isFavorite={favoriteIds.has(s.stationuuid)}
                     onPlay={playStation}
+                    onToggleFavorite={toggleFavorite}
                   />
                 ))}
               </div>
@@ -492,6 +671,32 @@ const RadioPage = () => {
               <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
                 <Headphones size={42} className="mb-3 opacity-30" />
                 <p className="text-sm">Type a station name, genre or country above</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* FAVORITES TAB */}
+        {activeTab === 'favorites' && (
+          <div className="space-y-4 duration-200 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <Heart size={14} className="text-red-400" fill="currentColor" />
+              <span className="text-sm text-zinc-400">Stations you've saved</span>
+            </div>
+            {favoriteStations.length === 0 ? (
+              <EmptyStations label="No favorite stations yet — tap the heart on any station to save it" />
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {favoriteStations.map((s) => (
+                  <StationCard
+                    key={s.stationuuid}
+                    station={s}
+                    isPlaying={playingId === s.stationuuid}
+                    isFavorite
+                    onPlay={playStation}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
               </div>
             )}
           </div>
