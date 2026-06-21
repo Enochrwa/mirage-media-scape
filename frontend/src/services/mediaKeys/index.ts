@@ -1,6 +1,7 @@
 import { getPlatform } from '../../platform';
 import { WebMediaKeyService } from './WebMediaKeyService';
 import { TauriMediaKeyService } from './TauriMediaKeyService';
+import { CapacitorMediaKeyService } from './CapacitorMediaKeyService';
 import type { IMediaKeyService } from './IMediaKeyService';
 
 export type { IMediaKeyService };
@@ -13,9 +14,10 @@ export function getMediaKeyService(): IMediaKeyService {
   if (host === 'desktop') {
     _instance = new TauriMediaKeyService();
   } else if (host === 'mobile') {
-    // On mobile Capacitor, we use the standard Media Session API
-    // which is already implemented in WebMediaKeyService.
-    _instance = new WebMediaKeyService();
+    // The Android WebView does not implement navigator.mediaSession, so the
+    // Web Media Session API silently does nothing there. Use the native
+    // Capacitor plugin instead for real lock-screen / notification controls.
+    _instance = new CapacitorMediaKeyService();
   } else {
     _instance = new WebMediaKeyService();
   }

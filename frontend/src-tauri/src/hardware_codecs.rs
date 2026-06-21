@@ -1,0 +1,79 @@
+use ffmpeg_next as ffmpeg;
+
+/// Hardware codec availability, probed via FFmpeg.
+///
+/// This is intentionally a standalone, napi-free module rather than a dependency
+/// on the `zovyra-native` crate (which is built for the Node.js NAPI addon).
+/// Linking a napi-rs crate into a non-Node host process is unsupported — napi-rs
+/// generates code that expects to resolve symbols against a live Node-API
+/// runtime, which the Tauri desktop binary does not provide. See
+/// native/src/decoding.rs for the Node-facing equivalent (kept in sync manually;
+/// this is intentionally a small, infrequently-changed probe).
+pub struct HardwareCodecSupport {
+    pub h264: bool,
+    pub hevc: bool,
+    pub av1: bool,
+    pub vp9: bool,
+}
+
+/// Probe for hardware-accelerated decoder availability by checking known
+/// platform-specific codec names via `avcodec_find_decoder_by_name`.
+///
+/// Hardware decoder naming conventions:
+///   macOS  : h264_videotoolbox, hevc_videotoolbox
+///   Windows: h264_d3d11va, hevc_d3d11va, h264_dxva2, av1_d3d11va
+///   Linux  : h264_vaapi, hevc_vaapi, av1_vaapi, vp9_vaapi,
+///             h264_nvdec, hevc_nvdec, av1_nvdec, vp9_nvdec,
+///             h264_vdpau, hevc_vdpau
+///
+/// `find_all()` does not exist in ffmpeg-next; we probe by name instead.
+pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, String> {
+    ffmpeg::init().map_err(|e| format!("FFmpeg init error: {}", e))?;
+
+    // Each tuple: (codec_name, affects_h264, affects_hevc, affects_av1, affects_vp9)
+    let hw_decoders: &[(&str, bool, bool, bool, bool)] = &[
+        // macOS – VideoToolbox
+        ("h264_videotoolbox",  true,  false, false, false),
+        ("hevc_videotoolbox",  false, true,  false, false),
+        // Windows – D3D11VA / DXVA2
+        ("h264_d3d11va",       true,  false, false, false),
+        ("h264_d3d11va2",      true,  false, false, false),
+        ("h264_dxva2",         true,  false, false, false),
+        ("hevc_d3d11va",       false, true,  false, false),
+        ("hevc_d3d11va2",      false, true,  false, false),
+        ("av1_d3d11va",        false, false, true,  false),
+        ("av1_d3d11va2",       false, false, true,  false),
+        ("vp9_d3d11va",        false, false, false, true),
+        // Linux – VAAPI
+        ("h264_vaapi",         true,  false, false, false),
+        ("hevc_vaapi",         false, true,  false, false),
+        ("av1_vaapi",          false, false, true,  false),
+        ("vp9_vaapi",          false, false, false, true),
+        // Linux – NVDEC (NVIDIA)
+        ("h264_nvdec",         true,  false, false, false),
+        ("hevc_nvdec",         false, true,  false, false),
+        ("av1_nvdec",          false, false, true,  false),
+        ("vp9_nvdec",          false, false, false, true),
+        // Linux – VDPAU
+        ("h264_vdpau",         true,  false, false, false),
+        ("hevc_vdpau",         false, true,  false, false),
+    ];
+
+    let mut support = HardwareCodecSupport {
+        h264: false,
+        hevc: false,
+        av1: false,
+        vp9: false,
+    };
+
+    for &(name, h264, hevc, av1, vp9) in hw_decoders {
+        if ffmpeg::decoder::find_by_name(name).is_some() {
+            if h264 { support.h264 = true; }
+            if hevc { support.hevc = true; }
+            if av1  { support.av1  = true; }
+            if vp9  { support.vp9  = true; }
+        }
+    }
+
+    Ok(support)
+}

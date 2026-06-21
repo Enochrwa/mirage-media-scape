@@ -17,6 +17,19 @@
 *.md text eol=lf
 *.sh text eol=lf
 
+# Windows batch files genuinely require CRLF to run via cmd.exe (e.g. gradlew.bat)
+*.bat text eol=crlf
+
+# Java/Kotlin (Android native shell)
+*.java text eol=lf
+*.kt text eol=lf
+*.gradle text eol=lf
+gradlew text eol=lf
+
+# Swift (iOS native shell)
+*.swift text eol=lf
+*.plist text eol=lf
+
 # Rust code
 *.rs text eol=lf
 Cargo.toml text eol=lf
@@ -63,3 +76,11 @@ node_modules export-ignore
 dist export-ignore
 build export-ignore
 target export-ignore
+
+# Android / iOS binary artifacts (in case any are ever committed intentionally)
+*.keystore binary
+*.jks binary
+*.apk binary
+*.aab binary
+*.ipa binary
+*.p12 binary
