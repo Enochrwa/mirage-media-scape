@@ -60,9 +60,21 @@ pub fn run() -> tauri::Result<()> {
                 &[&show_i, &play_i, &next_i, &prev_i, &quit_i],
             )?;
 
-            let _tray = TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
+            let mut tray_builder = TrayIconBuilder::with_id("main").menu(&menu);
+
+            // `default_window_icon()` can return None for an unbundled dev
+            // binary on some platforms (notably `tauri dev` on macOS, where
+            // the icon isn't attached the way it would be in a finished
+            // .app bundle or via Windows' PE resource embedding). Falling
+            // back to no icon avoids an unwrap panic that previously
+            // aborted startup before the window ever appeared.
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            } else {
+                log::warn!("no default window icon available; tray icon will use the platform default");
+            }
+
+            let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
                         app.exit(0);
