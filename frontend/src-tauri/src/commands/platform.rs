@@ -1,5 +1,5 @@
 use serde::Serialize;
-use zovyra_native::decoding::probe_hardware_codecs;
+use crate::hardware_codecs::probe_hardware_codecs;
 
 #[derive(Serialize)]
 pub struct HardwareCodecs {
@@ -19,8 +19,7 @@ pub struct PlatformProbeResult {
 /// Called once at startup by the frontend via invoke('probe_platform').
 #[tauri::command]
 pub async fn probe_platform() -> Result<PlatformProbeResult, String> {
-    let codecs = probe_hardware_codecs()
-        .map_err(|e| e.to_string())?;
+    let codecs = probe_hardware_codecs()?;
 
     let os_type = if cfg!(target_os = "macos") { "macos" }
                   else if cfg!(target_os = "windows") { "windows" }

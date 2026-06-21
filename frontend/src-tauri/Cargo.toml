@@ -28,4 +28,9 @@ tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-os = "2"
-zovyra-native = { path = "../../native" }
+# Hardware codec probing is implemented locally in src/hardware_codecs.rs rather
+# than depending on the zovyra-native crate, which is built for the Node.js NAPI
+# addon and is not safe to link into a non-Node host process (napi-rs requires
+# its generated code to resolve against a live Node-API runtime). See that
+# module's doc comment for details.
+ffmpeg-next = { version = "6.1.1", features = ["build"] }

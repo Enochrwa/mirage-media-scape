@@ -1,33 +1,19 @@
-use napi_derive::napi;
 use ffmpeg_next as ffmpeg;
 
-/// Plain-Rust hardware codec support result — no napi types involved.
-/// This is what non-Node consumers (e.g. the Tauri desktop shell) should use.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct HardwareCodecSupportPlain {
-    pub h264: bool,
-    pub hevc: bool,
-    pub av1: bool,
-    pub vp9: bool,
-}
-
-#[napi(object)]
+/// Hardware codec availability, probed via FFmpeg.
+///
+/// This is intentionally a standalone, napi-free module rather than a dependency
+/// on the `zovyra-native` crate (which is built for the Node.js NAPI addon).
+/// Linking a napi-rs crate into a non-Node host process is unsupported — napi-rs
+/// generates code that expects to resolve symbols against a live Node-API
+/// runtime, which the Tauri desktop binary does not provide. See
+/// native/src/decoding.rs for the Node-facing equivalent (kept in sync manually;
+/// this is intentionally a small, infrequently-changed probe).
 pub struct HardwareCodecSupport {
     pub h264: bool,
     pub hevc: bool,
     pub av1: bool,
     pub vp9: bool,
-}
-
-impl From<HardwareCodecSupportPlain> for HardwareCodecSupport {
-    fn from(p: HardwareCodecSupportPlain) -> Self {
-        HardwareCodecSupport {
-            h264: p.h264,
-            hevc: p.hevc,
-            av1: p.av1,
-            vp9: p.vp9,
-        }
-    }
 }
 
 /// Probe for hardware-accelerated decoder availability by checking known
@@ -41,12 +27,7 @@ impl From<HardwareCodecSupportPlain> for HardwareCodecSupport {
 ///             h264_vdpau, hevc_vdpau
 ///
 /// `find_all()` does not exist in ffmpeg-next; we probe by name instead.
-///
-/// This is the napi-free core implementation. Use this directly from plain Rust
-/// consumers (e.g. the Tauri desktop shell) — calling into napi-derived functions
-/// or napi::Error from a non-Node host process is unsupported, since napi-rs
-/// requires symbols to resolve against a live Node-API host.
-pub fn probe_hardware_codecs_plain() -> Result<HardwareCodecSupportPlain, String> {
+pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, String> {
     ffmpeg::init().map_err(|e| format!("FFmpeg init error: {}", e))?;
 
     // Each tuple: (codec_name, affects_h264, affects_hevc, affects_av1, affects_vp9)
@@ -78,7 +59,12 @@ pub fn probe_hardware_codecs_plain() -> Result<HardwareCodecSupportPlain, String
         ("hevc_vdpau",         false, true,  false, false),
     ];
 
-    let mut support = HardwareCodecSupportPlain::default();
+    let mut support = HardwareCodecSupport {
+        h264: false,
+        hevc: false,
+        av1: false,
+        vp9: false,
+    };
 
     for &(name, h264, hevc, av1, vp9) in hw_decoders {
         if ffmpeg::decoder::find_by_name(name).is_some() {
@@ -90,14 +76,4 @@ pub fn probe_hardware_codecs_plain() -> Result<HardwareCodecSupportPlain, String
     }
 
     Ok(support)
-}
-
-/// Node/napi-facing wrapper. Only call this from the compiled .node addon —
-/// it converts napi::Error, which requires a live Node-API host to construct
-/// and propagate correctly.
-#[napi]
-pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, napi::Error> {
-    probe_hardware_codecs_plain()
-        .map(HardwareCodecSupport::from)
-        .map_err(napi::Error::from_reason)
 }

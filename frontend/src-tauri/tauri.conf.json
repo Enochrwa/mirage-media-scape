@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "zovyra",
+  "productName": "Zovyra",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.zovyra.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:8080",
@@ -12,15 +12,19 @@
   "app": {
     "windows": [
       {
-        "title": "zovyra Media Player",
-        "width": 800,
-        "height": 600,
+        "label": "main",
+        "title": "Zovyra",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 880,
+        "minHeight": 560,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "center": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: http: https:; media-src 'self' asset: http://asset.localhost data: blob: http: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost http: https: ws: wss:"
     }
   },
   "bundle": {
