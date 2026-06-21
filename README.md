@@ -42,3 +42,9 @@ To create a media player that feels instantaneous and adapts to the user's mood.
 ### Running
 - Frontend: `npm run dev`
 - Backend: `cd server && npm run dev`
+
+### Desktop & Mobile
+
+Zovyra also ships as a native desktop app (Windows/macOS/Linux, via Tauri) and
+mobile app (Android/iOS, via Capacitor). See **[NATIVE_SETUP.md](./NATIVE_SETUP.md)**
+for dev-mode and production build instructions on all five platforms.

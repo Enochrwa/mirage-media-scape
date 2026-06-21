@@ -191,3 +191,15 @@ server/dist
 *.db-wal
 *.db-shm
 node_modules
+
+# Tauri (desktop)
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+
+# Android / iOS (Capacitor): most build artifacts are already covered by the
+# generated android/.gitignore and ios/.gitignore. These two are commented out
+# in Capacitor's defaults but we want them enforced — never commit signing keys.
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
