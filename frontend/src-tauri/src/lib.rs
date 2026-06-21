@@ -1,34 +1,16 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
-    Manager, Runtime,
+    Emitter, Manager,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, Shortcut, ShortcutState};
 
 pub mod commands;
 pub mod hardware_codecs;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> tauri::Result<()> {
-    let play_pause_shortcut = Shortcut::new(None, Code::MediaPlayPause);
-    let next_shortcut = Shortcut::new(None, Code::MediaTrackNext);
-    let prev_shortcut = Shortcut::new(None, Code::MediaTrackPrevious);
-
     tauri::Builder::default()
-        .plugin(tauri_plugin_global_shortcut::Builder::new()
-            .with_shortcuts([play_pause_shortcut, next_shortcut, prev_shortcut])?
-            .with_handler(move |app, shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    if shortcut == &play_pause_shortcut {
-                        let _ = app.emit("tray-play-pause", ());
-                    } else if shortcut == &next_shortcut {
-                        let _ = app.emit("tray-next", ());
-                    } else if shortcut == &prev_shortcut {
-                        let _ = app.emit("tray-prev", ());
-                    }
-                }
-            })
-            .build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -45,6 +27,27 @@ pub fn run() -> tauri::Result<()> {
                         .build(),
                 )?;
             }
+
+            let play_pause_shortcut = Shortcut::new(None, Code::MediaPlayPause);
+            let next_shortcut = Shortcut::new(None, Code::MediaTrackNext);
+            let prev_shortcut = Shortcut::new(None, Code::MediaTrackPrevious);
+
+            app.handle().plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_shortcuts([play_pause_shortcut, next_shortcut, prev_shortcut])?
+                    .with_handler(move |app, shortcut, event| {
+                        if event.state == ShortcutState::Pressed {
+                            if shortcut == &play_pause_shortcut {
+                                let _ = app.emit("tray-play-pause", ());
+                            } else if shortcut == &next_shortcut {
+                                let _ = app.emit("tray-next", ());
+                            } else if shortcut == &prev_shortcut {
+                                let _ = app.emit("tray-prev", ());
+                            }
+                        }
+                    })
+                    .build(),
+            )?;
 
             let quit_i = MenuItem::with_id(app, "quit", "Quit Zovyra", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
