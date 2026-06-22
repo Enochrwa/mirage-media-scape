@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
   Play,
@@ -17,9 +17,10 @@ import {
   Shuffle,
   Radio,
   Disc3,
-  Mic2,
 } from 'lucide-react';
 import { useLowPowerMode } from '@/hooks/useLowPowerMode';
+import { useTrackFavorite } from '@/hooks/useTrackFavorite';
+import { useRadioNowPlaying } from '@/hooks/useRadioNowPlaying';
 import { Button } from '@/components/ui/button';
 import { cn, formatDuration } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -28,7 +29,6 @@ import { Slider } from '@/components/ui/slider';
 export const MiniPlayer: React.FC = () => {
   const [tooltipTime, setTooltipTime] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(0.8);
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
@@ -48,14 +48,20 @@ export const MiniPlayer: React.FC = () => {
     closePlayer,
     shuffle,
     setShuffle,
-    repeat,
-    setRepeat,
+    repeatMode,
+    cycleRepeat,
   } = usePlayerStore();
   const lowPowerMode = useLowPowerMode();
 
+  const isRadioFile = Boolean(currentFile?.isStream) || currentFile?.album === 'Radio';
+  const { isFavorite, toggle: toggleFavorite } = useTrackFavorite(
+    currentFile && !isRadioFile ? currentFile.id : undefined,
+  );
+  const { nowPlayingTitle, isReconnecting } = useRadioNowPlaying(currentFile);
+
   if (!currentFile) return null;
 
-  const isRadio = currentFile.isStream || currentFile.album === 'Radio' || !duration;
+  const isRadio = isRadioFile || !duration;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const handleProgressMouseMove = (e: React.MouseEvent) => {
@@ -83,10 +89,6 @@ export const MiniPlayer: React.FC = () => {
       setIsMuted(true);
       setVolume(0);
     }
-  };
-
-  const cycleRepeat = () => {
-    setRepeat(!repeat);
   };
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
@@ -179,7 +181,7 @@ export const MiniPlayer: React.FC = () => {
             <div className="min-w-0 overflow-hidden">
               <div className="flex items-center gap-1.5">
                 <h4 className="truncate text-sm font-semibold leading-tight text-foreground">
-                  {currentFile.title}
+                  {isRadio && nowPlayingTitle ? nowPlayingTitle : currentFile.title}
                 </h4>
                 {!isRadio && (
                   <ChevronUp
@@ -189,10 +191,19 @@ export const MiniPlayer: React.FC = () => {
                 )}
               </div>
               <p className="truncate text-xs text-muted-foreground/70">
-                {currentFile.artist || currentFile.album}
+                {isRadio && nowPlayingTitle
+                  ? currentFile.title
+                  : currentFile.artist || currentFile.album}
                 {isRadio && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-px text-[9px] font-bold text-red-400">
-                    ● LIVE
+                  <span
+                    className={cn(
+                      'ml-2 inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[9px] font-bold',
+                      isReconnecting
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-red-500/20 text-red-400',
+                    )}
+                  >
+                    {isReconnecting ? '◌ RECONNECTING' : '● LIVE'}
                   </span>
                 )}
               </p>
@@ -223,25 +234,30 @@ export const MiniPlayer: React.FC = () => {
               </Tooltip>
             )}
 
-            {/* Favorite */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'hidden h-8 w-8 sm:inline-flex',
-                    isFavorite
-                      ? 'text-red-400 hover:text-red-300'
-                      : 'text-muted-foreground/60 hover:text-foreground',
-                  )}
-                  onClick={() => setIsFavorite(!isFavorite)}
-                >
-                  <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isFavorite ? 'Unfavorite' : 'Favourite'}</TooltipContent>
-            </Tooltip>
+            {/* Favorite — persisted via track_likes; not shown for radio,
+                which has its own separate station-favorites system on the
+                Radio page (different table, different identity: stationuuid
+                vs trackId) */}
+            {!isRadio && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'hidden h-8 w-8 sm:inline-flex',
+                      isFavorite
+                        ? 'text-red-400 hover:text-red-300'
+                        : 'text-muted-foreground/60 hover:text-foreground',
+                    )}
+                    onClick={() => void toggleFavorite()}
+                  >
+                    <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isFavorite ? 'Unfavorite' : 'Favourite'}</TooltipContent>
+              </Tooltip>
+            )}
 
             {/* Prev */}
             {!isRadio && (
@@ -280,7 +296,8 @@ export const MiniPlayer: React.FC = () => {
               </Button>
             )}
 
-            {/* Repeat */}
+            {/* Repeat — 3-state cycle: off → all → one, matching the
+                convention every mainstream player uses */}
             {!isRadio && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -289,16 +306,20 @@ export const MiniPlayer: React.FC = () => {
                     size="icon"
                     className={cn(
                       'hidden h-8 w-8 sm:inline-flex',
-                      repeat
+                      repeatMode !== 'off'
                         ? 'text-purple-400 hover:text-purple-300'
                         : 'text-muted-foreground/60 hover:text-foreground',
                     )}
                     onClick={cycleRepeat}
                   >
-                    <Repeat size={14} />
+                    {repeatMode === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Repeat {repeat ? 'On' : 'Off'}</TooltipContent>
+                <TooltipContent>
+                  {repeatMode === 'off' && 'Repeat off'}
+                  {repeatMode === 'all' && 'Repeat all'}
+                  {repeatMode === 'one' && 'Repeat one'}
+                </TooltipContent>
               </Tooltip>
             )}
           </div>

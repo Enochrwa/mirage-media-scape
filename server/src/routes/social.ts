@@ -30,6 +30,41 @@ router.post('/tracks/:trackId/like', authMiddleware, (req: AuthRequest, res) => 
   res.json({ liked: !existing, count });
 });
 
+// Whether the current user has liked a specific track. Used by the player
+// UI (MiniPlayer/FullNowPlaying favorite button) to render the correct
+// heart state for the track currently loaded — previously there was no way
+// to check this without toggling the like itself, so the UI used local
+// component state that reset on every reload/track change.
+router.get('/tracks/:trackId/liked', authMiddleware, (req: AuthRequest, res) => {
+  const { trackId } = req.params;
+  const userId = req.user!.id;
+  const existing = db
+    .prepare('SELECT 1 FROM track_likes WHERE user_id = ? AND track_id = ?')
+    .get(userId, trackId);
+  res.json({ liked: !!existing });
+});
+
+// All tracks the current user has liked, most-recently-liked first. Backs
+// a personal "Favorites" view for the library (distinct from the public
+// like-count used by /discover/*).
+router.get('/tracks/liked', authMiddleware, (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const limit = Math.min(parseInt(req.query.limit as string) || 200, 500);
+  const tracks = db
+    .prepare(
+      `
+        SELECT t.*, tl.liked_at
+        FROM track_likes tl
+        JOIN tracks t ON t.id = tl.track_id
+        WHERE tl.user_id = ?
+        ORDER BY tl.liked_at DESC
+        LIMIT ?
+    `,
+    )
+    .all(userId, limit);
+  res.json({ data: tracks });
+});
+
 router.get('/tracks/:trackId/comments', optionalAuth, (req: AuthRequest, res) => {
   const { trackId } = req.params;
   const page = parseInt(req.query.page as string) || 1;
