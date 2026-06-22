@@ -51,6 +51,7 @@ import { useCapability } from '@/platform';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { VideoDecodeEngine } from '@/engines/VideoDecodeEngine';
 import axios from 'axios';
+import MobileTopBar from '@/components/MobileTopBar';
 
 const Settings = () => {
   const { i18n } = useTranslation();
@@ -134,9 +135,10 @@ const Settings = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Settings" />
       <div className="animate-fade-in space-y-6">
         <div>
-          <h1 className="mb-1 text-4xl font-bold uppercase tracking-tight">Settings</h1>
+          <h1 className="mb-1 text-2xl font-bold uppercase tracking-tight md:text-4xl">Settings</h1>
           <p className="text-muted-foreground">Customize your zovyra experience.</p>
         </div>
 

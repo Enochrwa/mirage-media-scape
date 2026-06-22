@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { API_BASE, formatDuration } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,10 +68,13 @@ const DuplicateManagerPage = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Duplicate Finder" />
       <div className="space-y-8 duration-500 animate-in slide-in-from-bottom-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="mb-2 text-4xl font-bold tracking-tight text-white">Duplicate Finder</h1>
+            <h1 className="mb-2 text-2xl font-bold tracking-tight text-white md:text-4xl">
+              Duplicate Finder
+            </h1>
             <p className="text-lg text-zinc-400">
               Clean up your library by removing identical tracks.
             </p>

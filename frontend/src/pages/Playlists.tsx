@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { Playlist } from '@/types/media';
@@ -113,6 +114,7 @@ const Playlists = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Playlists" />
       <div className="space-y-12">
         <div className="space-y-6">
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">

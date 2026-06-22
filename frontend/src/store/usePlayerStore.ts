@@ -73,14 +73,18 @@ const store = create<PlayerState>((set, get) => ({
 
   init: async () => {
     const { playFile } = get();
+    const { getPlatform } = await import('../platform');
+    const isMobile = getPlatform().host === 'mobile';
 
-    // Load all settings from server if authenticated
+    // Load all settings from server if authenticated (web/desktop only)
     let settings: Record<string, string> = {};
-    try {
-      const res = await axios.get(`${API_BASE}/api/settings/user`);
-      settings = res.data.settings;
-    } catch (e) {
-      console.error(e);
+    if (!isMobile) {
+      try {
+        const res = await axios.get(`${API_BASE}/api/settings/user`);
+        settings = res.data.settings;
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     const getS = (key: string, def: string) =>
@@ -92,7 +96,7 @@ const store = create<PlayerState>((set, get) => ({
 
     queueManager.load();
     set({ repeatMode: queueManager.getRepeatMode() });
-    get().restoreSession();
+    if (!isMobile) get().restoreSession();
 
     // Restore EQ settings
     const savedEQ = getS('eq_bands', '');
@@ -151,22 +155,24 @@ const store = create<PlayerState>((set, get) => ({
     playbackEngine.setTimeUpdateCallback((time, duration) => {
       set({ currentTime: time, duration });
 
-      // Persist state every 5 seconds
-      const lastSave = parseInt(localStorage.getItem('ZOVYRA_last_save') || '0');
-      if (Date.now() - lastSave > 5000) {
-        const { currentFile, currentTime } = get();
-        if (currentFile && currentTime > 5) {
-          fetch(`${API_BASE}/api/stats/state`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              trackId: currentFile.id,
-              position: currentTime,
-              queueSnapshot: queueManager.getQueue().map((f) => f.id),
-              queueIndex: queueManager.getCurrentIndex(),
-            }),
-          }).catch(console.error);
-          localStorage.setItem('ZOVYRA_last_save', Date.now().toString());
+      // Persist state every 5 seconds (web/desktop only — server not reachable on mobile)
+      if (!isMobile) {
+        const lastSave = parseInt(localStorage.getItem('ZOVYRA_last_save') || '0');
+        if (Date.now() - lastSave > 5000) {
+          const { currentFile, currentTime } = get();
+          if (currentFile && currentTime > 5) {
+            fetch(`${API_BASE}/api/stats/state`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trackId: currentFile.id,
+                position: currentTime,
+                queueSnapshot: queueManager.getQueue().map((f) => f.id),
+                queueIndex: queueManager.getCurrentIndex(),
+              }),
+            }).catch(console.error);
+            localStorage.setItem('ZOVYRA_last_save', Date.now().toString());
+          }
         }
       }
     });
@@ -287,8 +293,14 @@ const store = create<PlayerState>((set, get) => ({
 
   setVolume: (v: number) => {
     playbackEngine.setVolume(v);
-    axios.put(`${API_BASE}/api/settings/user`, { key: 'volume', value: String(v) }).catch(() => {
-      localStorage.setItem('ZOVYRA_volume', String(v));
+    localStorage.setItem('ZOVYRA_volume', String(v));
+    // Sync to server on web/desktop only
+    import('../platform').then(({ getPlatform }) => {
+      if (getPlatform().host !== 'mobile') {
+        axios
+          .put(`${API_BASE}/api/settings/user`, { key: 'volume', value: String(v) })
+          .catch(() => {});
+      }
     });
     set({ volume: v });
   },
@@ -307,11 +319,14 @@ const store = create<PlayerState>((set, get) => ({
   setPlayerFullscreen: (isPlayerFullscreen: boolean) => set({ isPlayerFullscreen }),
   setShowMobilePlayer: (showMobilePlayer: boolean) => set({ showMobilePlayer }),
   setAutoPiP: (autoPiP: boolean) => {
-    axios
-      .put(`${API_BASE}/api/settings/user`, { key: 'auto_pip', value: autoPiP.toString() })
-      .catch(() => {
-        localStorage.setItem('ZOVYRA_auto_pip', autoPiP.toString());
-      });
+    localStorage.setItem('ZOVYRA_auto_pip', autoPiP.toString());
+    import('../platform').then(({ getPlatform }) => {
+      if (getPlatform().host !== 'mobile') {
+        axios
+          .put(`${API_BASE}/api/settings/user`, { key: 'auto_pip', value: autoPiP.toString() })
+          .catch(() => {});
+      }
+    });
     set({ autoPiP });
   },
   setCurrentTime: (currentTime: number) => set({ currentTime }),

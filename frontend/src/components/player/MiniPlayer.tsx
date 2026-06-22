@@ -95,13 +95,13 @@ export const MiniPlayer: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="bg-background/92 fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 backdrop-blur-2xl">
+      <div className="bg-background/92 fixed bottom-14 left-0 right-0 z-40 border-t border-border/40 backdrop-blur-2xl md:bottom-0">
         {/* ── Seek / Live bar ── */}
         <div
           ref={progressRef}
           className={cn(
             'group relative w-full transition-all',
-            isRadio ? 'h-0.5 cursor-default' : 'h-1 cursor-pointer hover:h-[5px]',
+            isRadio ? 'h-0.5 cursor-default' : 'h-1 cursor-pointer hover:h-[5px] active:h-[5px]',
           )}
           onMouseEnter={() => setIsHoveringProgress(true)}
           onMouseLeave={() => {
@@ -110,6 +110,25 @@ export const MiniPlayer: React.FC = () => {
           }}
           onMouseMove={handleProgressMouseMove}
           onClick={handleSeekClick}
+          onTouchStart={(e) => {
+            if (isRadio || !progressRef.current) return;
+            const rect = progressRef.current.getBoundingClientRect();
+            const percent = Math.max(
+              0,
+              Math.min(1, (e.touches[0].clientX - rect.left) / rect.width),
+            );
+            usePlayerStore.getState().seekTo(percent * duration);
+          }}
+          onTouchMove={(e) => {
+            if (isRadio || !progressRef.current) return;
+            e.preventDefault();
+            const rect = progressRef.current.getBoundingClientRect();
+            const percent = Math.max(
+              0,
+              Math.min(1, (e.touches[0].clientX - rect.left) / rect.width),
+            );
+            usePlayerStore.getState().seekTo(percent * duration);
+          }}
         >
           {isRadio ? (
             /* Animated live bar for radio */
@@ -264,7 +283,7 @@ export const MiniPlayer: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden h-8 w-8 text-foreground/80 hover:text-foreground sm:inline-flex"
+                className="h-8 w-8 text-foreground/80 hover:text-foreground"
                 onClick={() => previousTrack()}
               >
                 <SkipBack size={17} fill="currentColor" />

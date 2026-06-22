@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { cn, API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -459,11 +460,12 @@ const RadioPage = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Radio" />
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="mb-1 text-3xl font-bold tracking-tight text-white">Radio</h1>
+            <h1 className="mb-1 text-2xl font-bold tracking-tight text-white md:text-3xl">Radio</h1>
             <p className="text-sm text-zinc-400">
               Live stations from around the world — local, trending, by mood or country.
             </p>

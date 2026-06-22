@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { API_BASE } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -90,10 +91,11 @@ const PodcastsPage = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Podcasts" />
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-white">Podcasts</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white md:text-4xl">Podcasts</h1>
             <p className="text-zinc-400">Subscribe to your favorite RSS feeds.</p>
           </div>
           <div className="flex max-w-sm gap-2">

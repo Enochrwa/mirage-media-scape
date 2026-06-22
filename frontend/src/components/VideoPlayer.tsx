@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { cn, formatDuration, API_BASE } from '@/lib/utils';
+import { getPlatform } from '@/platform';
 import {
   Play,
   Pause,
@@ -117,9 +118,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     if (!video || !currentFile) return;
 
     setIsLoading(true);
-    const url = `${API_BASE}/api/stream/${encodeURIComponent(currentFile.id)}`;
-    video.src = url;
-    video.load();
+
+    // On mobile (Capacitor), use the native file URI directly via convertFileSrc.
+    // The API_BASE server URL is not reachable from the device in production.
+    const resolveVideoUrl = async (): Promise<string> => {
+      const platform = getPlatform();
+      if (platform.host === 'mobile') {
+        try {
+          const { Capacitor } = await import('@capacitor/core');
+          const filePath = currentFile.file_path || currentFile.file || '';
+          if (filePath) return Capacitor.convertFileSrc(filePath);
+        } catch (_e) {
+          // fall through to API URL
+        }
+      }
+      return `${API_BASE}/api/stream/${encodeURIComponent(currentFile.id)}`;
+    };
+
+    // Pre-seed duration from library metadata so the UI shows it immediately
+    // even before loadedmetadata fires (which can be delayed on large files).
+    if (currentFile.duration && currentFile.duration > 0) {
+      updateStoreDuration(currentFile.duration);
+      setDuration(currentFile.duration);
+    }
+
+    resolveVideoUrl().then((url) => {
+      video.src = url;
+      video.load();
+    });
 
     const onLoadedMetadata = () => {
       updateStoreDuration(video.duration);
@@ -249,6 +275,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     if (!video) return;
     const handleError = async () => {
       if (!currentFile) return;
+      // On mobile, we can't transcode through the server — skip the fallback
+      // to avoid replacing the native convertFileSrc URI with an unreachable
+      // server URL.
+      const platform = getPlatform();
+      if (platform.host === 'mobile') return;
       if (!video.src.includes('transcode=1')) {
         video.src = `${API_BASE}/api/stream/${currentFile.id}?transcode=1`;
         video.load();
@@ -450,6 +481,41 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
     onClose?.();
   };
 
+  // Touch gesture state for mobile swipe-to-seek and tap-to-show-controls
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = Date.now() - (touchStartTime.current ?? 0);
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (absDx < 10 && absDy < 10 && dt < 250) {
+      // Tap — show/hide controls
+      resetControlsTimeout();
+    } else if (absDx > 30 && absDx > absDy * 1.5) {
+      // Horizontal swipe — seek ±10s
+      const video = videoRef.current;
+      if (video && duration > 0) {
+        const seekDelta = dx > 0 ? 10 : -10;
+        video.currentTime = Math.max(0, Math.min(duration, video.currentTime + seekDelta));
+        showSkipIndicator(dx > 0 ? 'forward' : 'backward', 10);
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -457,6 +523,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
         className="group relative flex h-full w-full select-none overflow-hidden bg-black"
         onMouseMove={resetControlsTimeout}
         onDoubleClick={toggleFullscreen}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         onClick={(e) => {
           // Only toggle if clicking the container itself, not controls
           if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'VIDEO') {

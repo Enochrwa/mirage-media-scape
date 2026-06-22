@@ -177,6 +177,11 @@ export class PlaybackEngine {
   private createChain(): TrackChain {
     const el = document.createElement('audio');
     el.crossOrigin = 'anonymous';
+    // Attach to the document body (hidden) so mobile WebViews (Capacitor/Android)
+    // correctly fire `timeupdate`, `loadedmetadata`, and `canplay` events.
+    // Without DOM attachment, many Android WebViews silently discard the element.
+    el.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(el);
 
     const source = this.ctx.createMediaElementSource(el);
     const replayGain = this.ctx.createGain();
@@ -206,6 +211,13 @@ export class PlaybackEngine {
     el.addEventListener('error', (e) => this.handleError(e));
     el.addEventListener('waiting', () => this.handleWaiting());
     el.addEventListener('playing', () => this.handlePlaying());
+    el.addEventListener('loadedmetadata', () => {
+      // Update duration in the store as soon as the browser reports it.
+      const d = el.duration;
+      if (d && isFinite(d) && d > 0) {
+        usePlayerStore.setState({ duration: d });
+      }
+    });
     el.addEventListener('timeupdate', () => {
       const currentTime = el.currentTime;
       const duration = el.duration || 0;
@@ -342,6 +354,12 @@ export class PlaybackEngine {
     const url = await this.resolveTrackUrl(file);
     chain.element.src = url;
     chain.element.load();
+    // Pre-seed duration in the store from MediaFile metadata so the UI
+    // shows a duration immediately on mobile (where loadedmetadata can
+    // be delayed or never fire for certain codecs).
+    if (file.duration && file.duration > 0) {
+      usePlayerStore.setState({ duration: file.duration });
+    }
     let gainDb = 0;
     const mode = localStorage.getItem('ZOVYRA_replaygain_mode') || 'track';
     if (mode === 'track') gainDb = file.replaygain_track_gain ?? 0;
@@ -393,6 +411,9 @@ export class PlaybackEngine {
   }
 
   async preloadNextForGapless(file: MediaFile) {
+    // Gapless bridge uses fetch()+decodeAudioData() which doesn't work for
+    // content:// or capacitor:// URIs on Android. Skip silently on mobile.
+    if (this.capabilities.host === 'mobile') return;
     this._preloadedFile = file;
     try {
       const url = await this.resolveTrackUrl(file);
@@ -559,6 +580,8 @@ export class PlaybackEngine {
   private async handlePlay() {
     this.setState('PLAYING');
     if (!this.currentTrackId || this.currentEventId) return;
+    // Stats tracking requires the server — skip on mobile
+    if (this.capabilities.host === 'mobile') return;
     try {
       const res = await fetch(`${API_BASE}/api/stats/event/start`, {
         method: 'POST',
@@ -623,6 +646,11 @@ export class PlaybackEngine {
 
   private async reportPlaybackEnd(completed: boolean, skipped: boolean) {
     if (!this.currentEventId || !this.currentTrackId) return;
+    if (this.capabilities.host === 'mobile') {
+      this.currentEventId = null;
+      this.currentTrackId = null;
+      return;
+    }
     try {
       const secondsPlayed = (Date.now() - this.playbackStartTime) / 1000;
       await fetch(`${API_BASE}/api/stats/event/end`, {

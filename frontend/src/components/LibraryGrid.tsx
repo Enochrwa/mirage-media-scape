@@ -102,7 +102,8 @@ const GridCell = memo(function GridCell({
     >
       <Card
         className={cn(
-          'group relative flex h-64 flex-col overflow-hidden bg-card transition-colors hover:bg-card/80',
+          'group relative flex flex-col overflow-hidden bg-card transition-colors hover:bg-card/80',
+          'h-48 sm:h-56 md:h-64',
           isSelected && 'bg-primary/5 ring-2 ring-primary',
           isMissing && 'opacity-60',
         )}
@@ -285,7 +286,7 @@ const LibraryGrid: React.FC<LibraryGridProps> = ({ files }) => {
 
   return (
     <div className="relative">
-      <div className="grid grid-cols-2 gap-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
         {files.map((file) => (
           <GridCell
             key={file.id}
