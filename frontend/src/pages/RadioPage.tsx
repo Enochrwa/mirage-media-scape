@@ -26,6 +26,7 @@ import {
   Headphones,
 } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { useRadioNowPlaying } from '@/hooks/useRadioNowPlaying';
 
 interface RadioStation {
   stationuuid: string;
@@ -33,6 +34,10 @@ interface RadioStation {
   country: string;
   countrycode: string;
   url_resolved: string;
+  /** Raw, unresolved URL from radio-browser.info — often a mirror/redirect
+   * target distinct from url_resolved; used as a fallback by the stream
+   * proxy when the resolved URL's connection can't be (re)established. */
+  url?: string;
   favicon?: string;
   tags?: string;
   bitrate?: number;
@@ -127,10 +132,11 @@ async function radioBrowserFetch(path: string): Promise<RadioStation[]> {
 const StationCard: React.FC<{
   station: RadioStation;
   isPlaying: boolean;
+  isReconnecting: boolean;
   isFavorite: boolean;
   onPlay: (s: RadioStation) => void;
   onToggleFavorite: (s: RadioStation) => void;
-}> = ({ station, isPlaying, isFavorite, onPlay, onToggleFavorite }) => (
+}> = ({ station, isPlaying, isReconnecting, isFavorite, onPlay, onToggleFavorite }) => (
   <Card
     className={cn(
       'group relative overflow-hidden border transition-all duration-200 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10',
@@ -169,8 +175,20 @@ const StationCard: React.FC<{
         </button>
         {/* Live pulse */}
         {isPlaying && (
-          <span className="absolute bottom-1 right-1 h-2 w-2 rounded-full bg-green-400 shadow-sm shadow-green-400/80">
-            <span className="absolute inset-0 animate-ping rounded-full bg-green-400/60" />
+          <span
+            className={cn(
+              'absolute bottom-1 right-1 h-2 w-2 rounded-full shadow-sm',
+              isReconnecting
+                ? 'bg-amber-400 shadow-amber-400/80'
+                : 'bg-green-400 shadow-green-400/80',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute inset-0 animate-ping rounded-full',
+                isReconnecting ? 'bg-amber-400/60' : 'bg-green-400/60',
+              )}
+            />
           </span>
         )}
       </div>
@@ -193,8 +211,15 @@ const StationCard: React.FC<{
             </span>
           ) : null}
           {isPlaying && (
-            <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-bold text-green-400">
-              ● LIVE
+            <span
+              className={cn(
+                'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+                isReconnecting
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-green-500/20 text-green-400',
+              )}
+            >
+              {isReconnecting ? '◌ RECONNECTING' : '● LIVE'}
             </span>
           )}
         </div>
@@ -227,6 +252,7 @@ const StationCard: React.FC<{
 
 const RadioPage = () => {
   const { currentFile, isPlaying, playFile } = usePlayerStore();
+  const { isReconnecting } = useRadioNowPlaying(currentFile);
   const [activeTab, setActiveTab] = useState<
     'local' | 'trending' | 'mood' | 'country' | 'search' | 'favorites'
   >('local');
@@ -409,6 +435,8 @@ const RadioPage = () => {
         cover: station.favicon || '',
         album: 'Radio',
         isStream: true,
+        streamFallbackUrl:
+          station.url && station.url !== station.url_resolved ? station.url : undefined,
       });
       setPlayingId(station.stationuuid);
     },
@@ -509,6 +537,7 @@ const RadioPage = () => {
                       key={s.stationuuid}
                       station={s}
                       isPlaying={playingId === s.stationuuid}
+                      isReconnecting={isReconnecting && playingId === s.stationuuid}
                       isFavorite={favoriteIds.has(s.stationuuid)}
                       onPlay={playStation}
                       onToggleFavorite={toggleFavorite}
@@ -538,6 +567,7 @@ const RadioPage = () => {
                     key={s.stationuuid}
                     station={s}
                     isPlaying={playingId === s.stationuuid}
+                    isReconnecting={isReconnecting && playingId === s.stationuuid}
                     isFavorite={favoriteIds.has(s.stationuuid)}
                     onPlay={playStation}
                     onToggleFavorite={toggleFavorite}
@@ -597,6 +627,7 @@ const RadioPage = () => {
                         key={s.stationuuid}
                         station={s}
                         isPlaying={playingId === s.stationuuid}
+                        isReconnecting={isReconnecting && playingId === s.stationuuid}
                         isFavorite={favoriteIds.has(s.stationuuid)}
                         onPlay={playStation}
                         onToggleFavorite={toggleFavorite}
@@ -659,6 +690,7 @@ const RadioPage = () => {
                     key={s.stationuuid}
                     station={s}
                     isPlaying={playingId === s.stationuuid}
+                    isReconnecting={isReconnecting && playingId === s.stationuuid}
                     isFavorite={favoriteIds.has(s.stationuuid)}
                     onPlay={playStation}
                     onToggleFavorite={toggleFavorite}
@@ -692,6 +724,7 @@ const RadioPage = () => {
                     key={s.stationuuid}
                     station={s}
                     isPlaying={playingId === s.stationuuid}
+                    isReconnecting={isReconnecting && playingId === s.stationuuid}
                     isFavorite
                     onPlay={playStation}
                     onToggleFavorite={toggleFavorite}

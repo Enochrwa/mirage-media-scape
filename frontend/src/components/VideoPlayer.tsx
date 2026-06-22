@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { toast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AudioTrack {
@@ -390,7 +391,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
 
   const nextChapter = () => {
     const next = chapters.find((c) => c.start_time_ms > currentTime * 1000 + 500);
-    if (next) handleSeek(next.start_time_ms / 1000);
+    if (next) {
+      handleSeek(next.start_time_ms / 1000);
+    } else {
+      // No chapter ahead (either this video has no chapters at all, or
+      // we're already in the last one) — advance to the actual next item
+      // in the queue instead of doing nothing, matching how the audio
+      // player's "next" button behaves.
+      usePlayerStore.getState().nextTrack();
+    }
   };
 
   const prevChapter = () => {
@@ -405,10 +414,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
       } else if (actualIdx > 0) {
         handleSeek(chapters[actualIdx - 1].start_time_ms / 1000);
       } else {
-        handleSeek(0);
+        // Already at/before the first chapter — fall through to real
+        // previous-track navigation rather than re-seeking to 0 forever.
+        usePlayerStore.getState().previousTrack();
       }
     } else {
-      handleSeek(0);
+      // This video has no chapters at all: same convention as the audio
+      // player (and as YouTube/Spotify) — restart if we're a few seconds
+      // in, otherwise go back to whatever played before this.
+      usePlayerStore.getState().previousTrack();
     }
   };
 
@@ -450,27 +464,58 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
           }
         }}
       >
-        {/* Video element — fills full container */}
-        <video
-          ref={videoRef}
-          className={cn(
-            'absolute inset-0 h-full w-full',
-            aspectRatio === 'fill' || aspectRatio === 'stretch'
-              ? 'object-fill'
-              : aspectRatio === '16:9'
-                ? 'object-contain'
+        {/* Video element — fills full container.
+            'fit' and 'fill' only ever need object-fit on the element
+            itself, since they respect (or stretch into) whatever the
+            container's own shape is. '16:9' and '4:3', however, are meant
+            to force the visible frame into THAT ratio regardless of the
+            source video's or container's actual shape (classic
+            letterboxing/pillarboxing) — object-fit alone can never do
+            that, since it only ever preserves the video's OWN native
+            ratio. That requires a wrapper box whose CSS aspect-ratio is
+            explicitly locked, which is what actually changes when you
+            switch between these modes; previously all three resolved to
+            the same object-contain and looked visually identical
+            regardless of which was selected.
+
+            Deliberately a SINGLE <video> element that's always mounted —
+            videoRef.current.src/.load()/.currentTime are all set
+            imperatively elsewhere in this component, so conditionally
+            rendering two separate <video> tags (one per ratio mode) would
+            unmount/remount the element on every toggle and restart
+            playback from scratch. Only the wrapper's box changes. */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className={cn(
+              'relative',
+              aspectRatio === '16:9' || aspectRatio === '4:3' ? 'h-full bg-black' : 'h-full w-full',
+            )}
+            style={
+              aspectRatio === '16:9'
+                ? { aspectRatio: '16 / 9', width: 'auto', maxWidth: '100%', maxHeight: '100%' }
                 : aspectRatio === '4:3'
-                  ? 'object-contain'
+                  ? { aspectRatio: '4 / 3', width: 'auto', maxWidth: '100%', maxHeight: '100%' }
+                  : undefined
+            }
+          >
+            <video
+              ref={videoRef}
+              className={cn(
+                'absolute inset-0 h-full w-full',
+                aspectRatio === 'fill' || aspectRatio === 'stretch'
+                  ? 'object-fill'
                   : 'object-contain',
-          )}
-          style={{
-            filter: videoFilter,
-            transform: `rotate(${rotation}deg) scaleX(${mirrorFlip ? -1 : 1}) scale(${scale})`,
-          }}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          playsInline
-        />
+              )}
+              style={{
+                filter: videoFilter,
+                transform: `rotate(${rotation}deg) scaleX(${mirrorFlip ? -1 : 1}) scale(${scale})`,
+              }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              playsInline
+            />
+          </div>
+        </div>
 
         {/* Subtitles — only visible when panel is toggled */}
         {showSubtitlePanel && <SubtitleManager />}
@@ -1032,12 +1077,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ onClose }) => {
                           try {
                             await remote.prompt();
                           } catch {
-                            /* user cancelled */
+                            // User dismissed the native cast picker — not an
+                            // error, no toast needed (matches the native
+                            // picker's own silence on cancel).
                           }
-                        } else {
-                          // Fallback: copy stream URL to clipboard
-                          const url = `${window.location.origin}/api/stream/${encodeURIComponent(currentFile?.id ?? '')}`;
-                          await navigator.clipboard.writeText(url).catch(() => {});
+                          return;
+                        }
+
+                        // This browser doesn't expose the Remote Playback
+                        // API (most don't outside Chrome/Edge desktop), so
+                        // there's no native cast target to hand off to.
+                        // Copy the stream URL so the user can still cast it
+                        // manually from a TV app/Chromecast-aware browser —
+                        // but say so explicitly, since a clipboard write
+                        // with no confirmation is indistinguishable from the
+                        // button doing nothing at all.
+                        const url = `${window.location.origin}/api/stream/${encodeURIComponent(currentFile?.id ?? '')}`;
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          toast({
+                            title: 'Casting not supported in this browser',
+                            description: 'Stream link copied — paste it into your TV or cast app.',
+                          });
+                        } catch {
+                          toast({
+                            title: 'Casting not supported in this browser',
+                            description:
+                              "Couldn't copy the stream link either — try Chrome or Edge on desktop.",
+                          });
                         }
                       }}
                     >

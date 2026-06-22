@@ -49,6 +49,15 @@ export class PlaybackEngine {
   private state: PlaybackState = 'IDLE';
   private currentTrackId: string | null = null;
   private currentEventId: string | null = null;
+  /** Whether the currently loaded track is a live radio stream — gates
+   * whether `waiting`/`playing` events get surfaced as a "reconnecting"
+   * UI signal (see zovyra-stream-buffering/-recovered below). Momentary
+   * buffering on a normal track is unremarkable; on a live stream it
+   * usually means the server-side proxy is mid-reconnect. */
+  private currentIsStream: boolean = false;
+  /** Debounce for the "reconnecting" UI signal — see handleWaiting. */
+  private stallAnnounceTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isStalled = false;
   private playbackStartTime: number = 0;
   public sleepTimer: SleepTimer | null = null;
   private _capabilities: PlatformCapabilities | null = null;
@@ -195,6 +204,8 @@ export class PlaybackEngine {
     el.addEventListener('pause', () => this.handlePause());
     el.addEventListener('ended', () => this.handleEnded());
     el.addEventListener('error', (e) => this.handleError(e));
+    el.addEventListener('waiting', () => this.handleWaiting());
+    el.addEventListener('playing', () => this.handlePlaying());
     el.addEventListener('timeupdate', () => {
       const currentTime = el.currentTime;
       const duration = el.duration || 0;
@@ -297,7 +308,11 @@ export class PlaybackEngine {
       return directUrl;
     }
 
-    return `${API_BASE}/api/radio/stream?url=${encodeURIComponent(directUrl)}`;
+    const params = new URLSearchParams({ url: directUrl });
+    if (track.streamFallbackUrl && track.streamFallbackUrl !== directUrl) {
+      params.set('fallbackUrl', track.streamFallbackUrl);
+    }
+    return `${API_BASE}/api/radio/stream?${params.toString()}`;
   }
 
   async load(file: MediaFile, startNext: boolean = false) {
@@ -322,6 +337,7 @@ export class PlaybackEngine {
     const index = startNext ? (this.activeIndex + 1) % 2 : this.activeIndex;
     const chain = this.chains[index];
     this.currentTrackId = file.id;
+    this.currentIsStream = this.isLiveStream(file);
     this.setState('LOADING');
     const url = await this.resolveTrackUrl(file);
     chain.element.src = url;
@@ -559,6 +575,38 @@ export class PlaybackEngine {
 
   private handlePause() {
     this.setState('PAUSED');
+  }
+
+  /**
+   * Fires when playback stalls for lack of buffered data. For a normal
+   * track this is unremarkable (a brief network hiccup the browser
+   * recovers from on its own); for a live radio stream it's usually the
+   * audible gap while the server-side proxy is mid-reconnect after the
+   * upstream Icecast/Shoutcast connection dropped. Debounced by 800ms so
+   * a sub-second blip doesn't flash a "reconnecting" indicator the user
+   * never really needed to see.
+   */
+  private handleWaiting() {
+    if (!this.currentIsStream) return;
+    if (this.stallAnnounceTimeout) return;
+    this.stallAnnounceTimeout = setTimeout(() => {
+      this.stallAnnounceTimeout = null;
+      if (!this.isStalled) {
+        this.isStalled = true;
+        window.dispatchEvent(new CustomEvent('zovyra-stream-buffering'));
+      }
+    }, 800);
+  }
+
+  private handlePlaying() {
+    if (this.stallAnnounceTimeout) {
+      clearTimeout(this.stallAnnounceTimeout);
+      this.stallAnnounceTimeout = null;
+    }
+    if (this.isStalled) {
+      this.isStalled = false;
+      window.dispatchEvent(new CustomEvent('zovyra-stream-recovered'));
+    }
   }
 
   private async handleEnded() {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { playbackEngine } from '@/lib/PlaybackEngine';
-import { queueManager } from '@/engines/QueueManager';
+import { queueManager, type RepeatMode } from '@/engines/QueueManager';
 import { mapIncomingTrackToMediaFile } from '@/store/useLibraryStore';
 import { MediaFile } from '@/types/media';
 import { API_BASE } from '@/lib/utils';
@@ -16,6 +16,8 @@ export interface ABLoop {
   toggle: () => void;
 }
 
+export type { RepeatMode };
+
 export interface PlayerState {
   currentFile: MediaFile | null;
   isPlaying: boolean;
@@ -23,7 +25,7 @@ export interface PlayerState {
   currentTime: number;
   duration: number;
   shuffle: boolean;
-  repeat: boolean;
+  repeatMode: RepeatMode;
   isPlayerFullscreen: boolean;
   showMobilePlayer: boolean;
   aiDjEnabled: boolean;
@@ -33,7 +35,7 @@ export interface PlayerState {
 
   // Actions
   init: () => Promise<void>;
-  playFile: (file: MediaFile) => Promise<void>;
+  playFile: (file: MediaFile, opts?: { recordHistory?: boolean }) => Promise<void>;
   pausePlayback: () => void;
   resumePlayback: () => void;
   togglePlayback: () => void;
@@ -43,7 +45,8 @@ export interface PlayerState {
   setVolume: (v: number) => void;
   setAiDjEnabled: (enabled: boolean) => void;
   setShuffle: (shuffle: boolean) => void;
-  setRepeat: (repeat: boolean) => void;
+  setRepeatMode: (mode: RepeatMode) => void;
+  cycleRepeat: () => RepeatMode;
   setPlayerFullscreen: (fullscreen: boolean) => void;
   setShowMobilePlayer: (show: boolean) => void;
   setAutoPiP: (enabled: boolean) => void;
@@ -60,7 +63,7 @@ const store = create<PlayerState>((set, get) => ({
   currentTime: 0,
   duration: 0,
   shuffle: false,
-  repeat: false,
+  repeatMode: 'off',
   isPlayerFullscreen: false,
   showMobilePlayer: false,
   aiDjEnabled: false,
@@ -88,6 +91,7 @@ const store = create<PlayerState>((set, get) => ({
     set({ volume: savedVolume, autoPiP: getS('auto_pip', 'false') === 'true' });
 
     queueManager.load();
+    set({ repeatMode: queueManager.getRepeatMode() });
     get().restoreSession();
 
     // Restore EQ settings
@@ -177,7 +181,19 @@ const store = create<PlayerState>((set, get) => ({
     });
   },
 
-  playFile: async (file: MediaFile) => {
+  playFile: async (file: MediaFile, opts) => {
+    const recordHistory = opts?.recordHistory ?? true;
+    const previous = get().currentFile;
+    // Record what we're navigating away FROM, so previousTrack() can walk
+    // back to it later. Skipped for radio streams (no meaningful "queue
+    // position" to return to) and for the initial play with nothing
+    // loaded yet, and suppressed when this call IS the result of
+    // previousTrack() itself (recordHistory: false) so going back doesn't
+    // immediately push the track we just left forward from.
+    if (recordHistory && previous && previous.id !== file.id && !previous.isStream) {
+      queueManager.pushHistory(previous);
+    }
+
     set({ currentFile: file, isPlaying: true });
 
     // For video files, the VideoPlayer component owns the <video> element
@@ -248,14 +264,24 @@ const store = create<PlayerState>((set, get) => ({
   },
 
   previousTrack: () => {
-    // Implement basic previous logic
+    // Mainstream-player convention (Spotify, Apple Music, YouTube Music):
+    // if we're more than a few seconds into the track, "previous" restarts
+    // it; only a press near the very start actually navigates back.
     const { currentTime } = get();
     if (currentTime > 3) {
       playbackEngine.seek(0);
+      set({ currentTime: 0 });
+      return;
+    }
+
+    const prevFile = queueManager.popHistory();
+    if (prevFile) {
+      get().playFile(prevFile, { recordHistory: false });
     } else {
-      // In a real app, this would get the previous track from the queue
-      // For now, we just restart the current track
+      // No history to go back to — restart the current track instead of
+      // doing nothing, matching prior behavior for the very first track.
       playbackEngine.seek(0);
+      set({ currentTime: 0 });
     }
   },
 
@@ -269,7 +295,15 @@ const store = create<PlayerState>((set, get) => ({
 
   setAiDjEnabled: (enabled: boolean) => set({ aiDjEnabled: enabled }),
   setShuffle: (shuffle: boolean) => set({ shuffle }),
-  setRepeat: (repeat: boolean) => set({ repeat }),
+  setRepeatMode: (repeatMode: RepeatMode) => {
+    queueManager.setRepeatMode(repeatMode);
+    set({ repeatMode });
+  },
+  cycleRepeat: () => {
+    const next = queueManager.cycleRepeatMode();
+    set({ repeatMode: next });
+    return next;
+  },
   setPlayerFullscreen: (isPlayerFullscreen: boolean) => set({ isPlayerFullscreen }),
   setShowMobilePlayer: (showMobilePlayer: boolean) => set({ showMobilePlayer }),
   setAutoPiP: (autoPiP: boolean) => {
@@ -320,9 +354,13 @@ const store = create<PlayerState>((set, get) => ({
 // Listen for end of track
 if (typeof window !== 'undefined') {
   window.addEventListener('zovyra-track-ended', () => {
-    const { repeat, currentFile } = store.getState();
-    if (repeat && currentFile) {
-      // Repeat current track
+    const { repeatMode, currentFile } = store.getState();
+    if (repeatMode === 'one' && currentFile) {
+      // Repeat current track — a natural end-of-track should replay it,
+      // but this does NOT apply when the user manually presses skip (see
+      // QueueManager.smartNext, which intentionally has no repeat-one
+      // special case so "skip" always advances, matching every
+      // mainstream player's convention).
       playbackEngine.seek(0);
       playbackEngine.play();
       return;

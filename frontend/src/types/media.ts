@@ -53,6 +53,15 @@ export interface MediaFile {
    * disables duration-based UI (seek bar, next/prev, shuffle, repeat).
    */
   isStream?: boolean;
+  /**
+   * Secondary/mirror URL for a live stream, used by the server-side radio
+   * proxy as a fallback when the primary URL's upstream connection can't
+   * be (re)established. Radio-browser.info entries often carry both a raw
+   * `url` and a resolved `url_resolved`; when they differ, the one not
+   * used as `file` goes here so a dead/redirecting primary doesn't strand
+   * playback when a working mirror was available all along.
+   */
+  streamFallbackUrl?: string;
 }
 
 export interface SmartPlaylistCondition {

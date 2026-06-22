@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Shuffle,
   Repeat,
+  Repeat1,
   ListMusic,
   Mic,
   Volume2,
@@ -34,6 +35,7 @@ import {
   X,
   Disc3,
   Check,
+  GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -47,6 +49,8 @@ import SpatialAudioControls from '../SpatialAudioControls';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { queueManager } from '@/engines/QueueManager';
+import { useTrackFavorite } from '@/hooks/useTrackFavorite';
+import { useRadioNowPlaying } from '@/hooks/useRadioNowPlaying';
 import { toast } from '@/hooks/use-toast';
 
 type Tab = 'lyrics' | 'queue' | 'info';
@@ -60,8 +64,8 @@ export const FullNowPlaying: React.FC = () => {
     duration,
     shuffle,
     setShuffle,
-    repeat,
-    setRepeat,
+    repeatMode,
+    cycleRepeat,
     nextTrack,
     previousTrack,
     setPlayerFullscreen,
@@ -77,6 +81,10 @@ export const FullNowPlaying: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isRadio = Boolean(currentFile?.isStream) || currentFile?.album === 'Radio';
+  const { isFavorite, toggle: toggleFavorite } = useTrackFavorite(
+    currentFile && !isRadio ? currentFile.id : undefined,
+  );
+  const { nowPlayingTitle, isReconnecting } = useRadioNowPlaying(currentFile);
 
   // Auto-minimise when user navigates to another page
   useEffect(() => {
@@ -84,12 +92,13 @@ export const FullNowPlaying: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
   const [recommendations, setRecommendations] = useState<MediaFile[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [queue, setQueue] = useState<MediaFile[]>([]);
   const [queueIdx, setQueueIdx] = useState(0);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [lyrics, setLyrics] = useState<{ time: number; text: string }[]>([]);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [showEQ, setShowEQ] = useState(false);
@@ -186,7 +195,7 @@ export const FullNowPlaying: React.FC = () => {
         {/* ── Ambient background ── */}
         <div className="absolute inset-0 z-0">
           <div
-            className="[transition-duration:3000ms] absolute inset-[-80px] scale-110 bg-cover bg-center transition-all"
+            className="absolute inset-[-80px] scale-110 bg-cover bg-center transition-all [transition-duration:3000ms]"
             style={{
               backgroundImage: `url(${currentFile.cover || '/placeholder.svg'})`,
               filter: 'blur(90px) saturate(2)',
@@ -403,11 +412,25 @@ export const FullNowPlaying: React.FC = () => {
             <div className="mb-5 flex flex-shrink-0 items-start justify-between">
               <div className="min-w-0 flex-1">
                 <h2 className="mb-0.5 truncate text-2xl font-extrabold tracking-tight text-white md:text-[1.7rem]">
-                  {currentFile.title}
+                  {isRadio && nowPlayingTitle ? nowPlayingTitle : currentFile.title}
                 </h2>
                 <button className="truncate text-base font-medium text-white/55 transition-colors hover:text-white">
-                  {currentFile.artist}
+                  {isRadio && nowPlayingTitle ? currentFile.title : currentFile.artist}
                 </button>
+                {isRadio && (
+                  <div className="mt-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide',
+                        isReconnecting
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'bg-red-500/20 text-red-400',
+                      )}
+                    >
+                      {isReconnecting ? '◌ RECONNECTING' : '● LIVE'}
+                    </span>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {currentFile.camelot_key && (
                     <span className="rounded-full border border-purple-400/30 bg-purple-500/20 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-purple-300">
@@ -428,24 +451,28 @@ export const FullNowPlaying: React.FC = () => {
               </div>
 
               <div className="ml-4 flex items-center gap-1.5">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'h-11 w-11 rounded-full transition-colors',
-                        isFavorite
-                          ? 'text-red-400 hover:text-red-300'
-                          : 'text-white/40 hover:text-white',
-                      )}
-                      onClick={() => setIsFavorite(!isFavorite)}
-                    >
-                      <Heart size={22} fill={isFavorite ? 'currentColor' : 'none'} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{isFavorite ? 'Unfavorite' : 'Add to favourites'}</TooltipContent>
-                </Tooltip>
+                {!isRadio && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'h-11 w-11 rounded-full transition-colors',
+                          isFavorite
+                            ? 'text-red-400 hover:text-red-300'
+                            : 'text-white/40 hover:text-white',
+                        )}
+                        onClick={() => void toggleFavorite()}
+                      >
+                        <Heart size={22} fill={isFavorite ? 'currentColor' : 'none'} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {isFavorite ? 'Unfavorite' : 'Add to favourites'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -606,14 +633,18 @@ export const FullNowPlaying: React.FC = () => {
                         size="icon"
                         className={cn(
                           'h-10 w-10 rounded-full text-white/60 hover:text-white',
-                          repeat && 'text-purple-400',
+                          repeatMode !== 'off' && 'text-purple-400',
                         )}
-                        onClick={() => setRepeat(!repeat)}
+                        onClick={cycleRepeat}
                       >
-                        <Repeat size={19} />
+                        {repeatMode === 'one' ? <Repeat1 size={19} /> : <Repeat size={19} />}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Repeat</TooltipContent>
+                    <TooltipContent>
+                      {repeatMode === 'off' && 'Repeat off'}
+                      {repeatMode === 'all' && 'Repeat all'}
+                      {repeatMode === 'one' && 'Repeat one'}
+                    </TooltipContent>
                   </Tooltip>
                 )}
 
@@ -895,45 +926,103 @@ export const FullNowPlaying: React.FC = () => {
                     queue.map((track, i) => (
                       <div
                         key={`${track.id}-${i}`}
-                        className={cn(
-                          'group flex cursor-pointer items-center gap-3 rounded-xl p-2.5 transition-colors',
-                          i === queueIdx ? 'bg-white/12' : 'hover:bg-white/8',
-                        )}
-                        onClick={() => {
-                          queueManager.setCurrentIndex(i);
-                          usePlayerStore.getState().playFile(track);
+                        draggable
+                        onDragStart={(e) => {
+                          setDragIndex(i);
+                          // Required for Firefox to actually initiate the drag.
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', String(i));
                         }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          if (dragIndex !== null && dragIndex !== i) setDragOverIndex(i);
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDragEnd={() => {
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragIndex !== null && dragIndex !== i) {
+                            queueManager.reorder(dragIndex, i);
+                          }
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        className={cn(
+                          'group flex items-center gap-2 rounded-xl p-2.5 transition-colors',
+                          i === queueIdx ? 'bg-white/12' : 'hover:bg-white/8',
+                          dragOverIndex === i && 'ring-1 ring-purple-400/60',
+                          dragIndex === i && 'opacity-40',
+                        )}
                       >
-                        <div className="relative h-10 w-10 flex-shrink-0">
-                          <img
-                            src={track.cover || '/placeholder.svg'}
-                            alt={track.title}
-                            className="h-full w-full rounded-lg object-cover"
-                          />
-                          {i === queueIdx && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
-                              {isPlaying ? (
-                                <Pause size={13} fill="currentColor" className="text-white" />
-                              ) : (
-                                <Play size={13} fill="currentColor" className="ml-0.5 text-white" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              'truncate text-xs font-semibold',
-                              i === queueIdx ? 'text-purple-300' : 'text-white',
+                        <button
+                          type="button"
+                          className="flex-shrink-0 cursor-grab touch-none text-white/20 hover:text-white/50 active:cursor-grabbing"
+                          aria-label="Drag to reorder"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GripVertical size={14} />
+                        </button>
+                        <div
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
+                          onClick={() => {
+                            queueManager.setCurrentIndex(i);
+                            usePlayerStore.getState().playFile(track);
+                          }}
+                        >
+                          <div className="relative h-10 w-10 flex-shrink-0">
+                            <img
+                              src={track.cover || '/placeholder.svg'}
+                              alt={track.title}
+                              className="h-full w-full rounded-lg object-cover"
+                            />
+                            {i === queueIdx && (
+                              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                                {isPlaying ? (
+                                  <Pause size={13} fill="currentColor" className="text-white" />
+                                ) : (
+                                  <Play
+                                    size={13}
+                                    fill="currentColor"
+                                    className="ml-0.5 text-white"
+                                  />
+                                )}
+                              </div>
                             )}
-                          >
-                            {track.title}
-                          </p>
-                          <p className="truncate text-[10px] text-white/40">{track.artist}</p>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={cn(
+                                'truncate text-xs font-semibold',
+                                i === queueIdx ? 'text-purple-300' : 'text-white',
+                              )}
+                            >
+                              {track.title}
+                            </p>
+                            <p className="truncate text-[10px] text-white/40">{track.artist}</p>
+                          </div>
+                          <span className="font-mono text-[10px] text-white/25">
+                            {formatDuration(track.duration ?? 0)}
+                          </span>
                         </div>
-                        <span className="font-mono text-[10px] text-white/25">
-                          {formatDuration(track.duration ?? 0)}
-                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex-shrink-0 rounded-full p-1 text-white/20 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                              aria-label="Remove from queue"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                queueManager.remove(i);
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove from queue</TooltipContent>
+                        </Tooltip>
                       </div>
                     ))
                   )}
