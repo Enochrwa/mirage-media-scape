@@ -32,9 +32,13 @@ pub fn run() -> tauri::Result<()> {
             let next_shortcut = Shortcut::new(None, Code::MediaTrackNext);
             let prev_shortcut = Shortcut::new(None, Code::MediaTrackPrevious);
 
-            app.handle().plugin(
-                tauri_plugin_global_shortcut::Builder::new()
-                    .with_shortcuts([play_pause_shortcut, next_shortcut, prev_shortcut])?
+            // Best-effort media-key shortcut registration.
+            // If the OS denies/blocks media-key event watching, we log and continue startup
+            // (tray/menu still works, and the app won't crash).
+            let shortcut_plugin_result: Result<_, tauri::Error> = (|| {
+                let plugin = tauri_plugin_global_shortcut::Builder::new()
+                    .with_shortcuts([play_pause_shortcut, next_shortcut, prev_shortcut])
+                    .map_err(|e| tauri::Error::from(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?
                     .with_handler(move |app, shortcut, event| {
                         if event.state == ShortcutState::Pressed {
                             if shortcut == &play_pause_shortcut {
@@ -46,8 +50,17 @@ pub fn run() -> tauri::Result<()> {
                             }
                         }
                     })
-                    .build(),
-            )?;
+                    .build();
+
+                Ok::<_, tauri::Error>(app.handle().plugin(plugin)?)
+            })();
+
+            if let Err(e) = shortcut_plugin_result {
+                log::warn!(
+                    "global-shortcut plugin failed to initialize (media key watching disabled): {e}"
+                );
+            }
+
 
             let quit_i = MenuItem::with_id(app, "quit", "Quit Zovyra", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;

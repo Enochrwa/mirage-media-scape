@@ -11,8 +11,11 @@ export default defineConfig({
   server: { host: '0.0.0.0', port: 8080 },
   plugins: [
     react(),
-    viteCompression({ algorithm: 'gzip', ext: '.gz' }),
-    viteCompression({ algorithm: 'brotliCompress', ext: '.br' }),
+    // Disable generating pre-compressed web assets (.gz/.br) for Capacitor Android.
+    // Android's asset/resource merger can fail with "Duplicate resources" when both
+    // compressed and uncompressed variants are packaged.
+    // WebView will request the normal files; transport-level compression (if any)
+    // is handled by the OS/network stack when served over HTTP.
   ],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   build: {
