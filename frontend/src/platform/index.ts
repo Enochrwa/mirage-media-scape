@@ -50,7 +50,20 @@ export async function initPlatform(): Promise<PlatformCapabilities> {
 
   if (host === 'desktop') {
     const { invoke } = await import('@tauri-apps/api/core');
-    const probe = await invoke<TauriProbeResult>('probe_platform');
+    // probe_platform is best-effort: if the Rust command errors (e.g. FFmpeg
+    // unavailable, IPC race during dev), fall back to a safe set of capabilities
+    // so bootstrap() always reaches createRoot() and the window is never blank.
+    let probe: TauriProbeResult;
+    try {
+      probe = await invoke<TauriProbeResult>('probe_platform');
+    } catch (e) {
+      console.warn('[Zovyra Platform] probe_platform failed — using safe fallback caps:', e);
+      probe = {
+        hardware_codecs: { h264: false, hevc: false, av1: false, vp9: false },
+        can_hdr: false,
+        os_type: 'macos', // safest default; no DRM restriction on macOS
+      };
+    }
     _cached = detectDesktopCapabilities(probe);
   } else if (host === 'mobile') {
     _cached = detectMobileCapabilities();

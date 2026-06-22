@@ -1,5 +1,3 @@
-use ffmpeg_next as ffmpeg;
-
 /// Hardware codec availability, probed via FFmpeg.
 ///
 /// This is intentionally a standalone, napi-free module rather than a dependency
@@ -9,6 +7,13 @@ use ffmpeg_next as ffmpeg;
 /// runtime, which the Tauri desktop binary does not provide. See
 /// native/src/decoding.rs for the Node-facing equivalent (kept in sync manually;
 /// this is intentionally a small, infrequently-changed probe).
+///
+/// IMPORTANT: This probe NEVER returns Err. If FFmpeg is unavailable or fails to
+/// initialize for any reason, it returns all-false capabilities so the rest of
+/// the app can start normally without hardware-decode acceleration.
+
+// ffmpeg-next is an optional system-FFmpeg binding. We use it only for codec
+// probing and gracefully degrade if the library is absent at runtime.
 pub struct HardwareCodecSupport {
     pub h264: bool,
     pub hevc: bool,
@@ -27,8 +32,21 @@ pub struct HardwareCodecSupport {
 ///             h264_vdpau, hevc_vdpau
 ///
 /// `find_all()` does not exist in ffmpeg-next; we probe by name instead.
+///
+/// Returns `Ok(all-false)` if FFmpeg is not installed / fails to initialize,
+/// so the app can always start regardless of the system FFmpeg state.
 pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, String> {
-    ffmpeg::init().map_err(|e| format!("FFmpeg init error: {}", e))?;
+    // If FFmpeg isn't installed or fails to init, return a safe all-false
+    // result rather than propagating an error that would abort app startup.
+    if ffmpeg_next::init().is_err() {
+        log::warn!("FFmpeg unavailable — hardware codec probe skipped; software decoding only.");
+        return Ok(HardwareCodecSupport {
+            h264: false,
+            hevc: false,
+            av1: false,
+            vp9: false,
+        });
+    }
 
     // Each tuple: (codec_name, affects_h264, affects_hevc, affects_av1, affects_vp9)
     let hw_decoders: &[(&str, bool, bool, bool, bool)] = &[
@@ -67,7 +85,7 @@ pub fn probe_hardware_codecs() -> Result<HardwareCodecSupport, String> {
     };
 
     for &(name, h264, hevc, av1, vp9) in hw_decoders {
-        if ffmpeg::decoder::find_by_name(name).is_some() {
+        if ffmpeg_next::decoder::find_by_name(name).is_some() {
             if h264 { support.h264 = true; }
             if hevc { support.hevc = true; }
             if av1  { support.av1  = true; }

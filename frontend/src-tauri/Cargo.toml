@@ -33,4 +33,11 @@ tauri-plugin-os = "2"
 # addon and is not safe to link into a non-Node host process (napi-rs requires
 # its generated code to resolve against a live Node-API runtime). See that
 # module's doc comment for details.
-ffmpeg-next = { version = "6.1.1", features = ["build"] }
+# ffmpeg-next links against the system libav* libraries (e.g. installed via
+# `brew install ffmpeg` on macOS or `apt install libavcodec-dev` on Linux).
+# The "build" feature was removed because it triggers a full FFmpeg source
+# compilation on every `cargo build`, which takes many minutes, frequently
+# fails in CI, and is unnecessary when system FFmpeg is available.
+# If system FFmpeg is not installed, hardware_codecs::probe_hardware_codecs()
+# gracefully returns all-false so the app always starts successfully.
+ffmpeg-next = { version = "6.1.1" }

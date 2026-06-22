@@ -120,6 +120,15 @@ pub fn run() -> tauri::Result<()> {
                 })
                 .build(app)?;
 
+            // Explicitly show and focus the main window after setup is done.
+            // On macOS in `tauri dev` the webview window can exist in a
+            // created-but-not-yet-visible state; calling show() here ensures
+            // the user sees content instead of a blank/invisible window.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {

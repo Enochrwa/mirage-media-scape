@@ -186,7 +186,7 @@ export const FullNowPlaying: React.FC = () => {
         {/* ── Ambient background ── */}
         <div className="absolute inset-0 z-0">
           <div
-            className="duration-[3s] absolute inset-[-80px] scale-110 bg-cover bg-center transition-all"
+            className="[transition-duration:3000ms] absolute inset-[-80px] scale-110 bg-cover bg-center transition-all"
             style={{
               backgroundImage: `url(${currentFile.cover || '/placeholder.svg'})`,
               filter: 'blur(90px) saturate(2)',

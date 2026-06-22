@@ -124,14 +124,7 @@ const App = () => {
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Suspense fallback={<PageSkeleton />}>
                 <Routes>
-                  <Route
-                    path="/"
-                    element={
-                      <MainLayout>
-                        <ArtistProfile />
-                      </MainLayout>
-                    }
-                  />
+                  <Route path="/" element={<Navigate to="/home" replace />} />
                   <Route
                     path="/artist"
                     element={
