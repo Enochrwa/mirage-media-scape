@@ -33,4 +33,9 @@ tauri-plugin-os = "2"
 # addon and is not safe to link into a non-Node host process (napi-rs requires
 # its generated code to resolve against a live Node-API runtime). See that
 # module's doc comment for details.
+# ffmpeg-next is built from source (bundled) so end users don't need to install
+# FFmpeg system-wide. The "build" feature drives the ffmpeg-sys-next build script
+# that compiles libav* from vendored sources and statically links them into the
+# Tauri binary.  hardware_codecs::probe_hardware_codecs() gracefully degrades to
+# all-false if ffmpeg::init() fails at runtime, so the app always starts.
 ffmpeg-next = { version = "6.1.1", features = ["build"] }

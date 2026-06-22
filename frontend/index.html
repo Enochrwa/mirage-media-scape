@@ -69,7 +69,11 @@
     <meta name="twitter:image" content="https://zovyra.com/og-cover.png" />
 
     <!-- Security -->
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+    <!-- NOTE: Do NOT add a Content-Security-Policy <meta> tag here.
+         Tauri injects its own CSP header (configured in tauri.conf.json).
+         Having both a meta-tag CSP and a header CSP causes the browser to
+         apply the more restrictive intersection of both, which in practice
+         blocks module scripts in the Tauri WebView and produces a blank window. -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
   </head>
 
