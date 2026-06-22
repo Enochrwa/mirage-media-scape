@@ -236,6 +236,12 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       }
     }
 
+    // Socket.IO is only useful on web/desktop where the Express server is
+    // reachable. On mobile the API_BASE server runs on a different machine
+    // (or doesn't exist at all), so connecting would just produce a flood
+    // of connection-refused errors and waste battery.
+    if (host === 'mobile') return;
+
     let socket = get().socket;
     if (!socket) {
       socket = io(API_BASE.replace('/api', ''));

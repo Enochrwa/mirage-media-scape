@@ -90,10 +90,13 @@ const Home = () => {
 
   return (
     <MainLayout>
-      <div className="animate-fade-in space-y-8">
-        <div>
-          <h1 className="mb-1 text-4xl font-bold tracking-tight">Welcome to Mirage</h1>
-          <p className="text-muted-foreground">Your beautiful all-in-one media player</p>
+      {/* Mobile top bar (hamburger already floated top-left by Sidebar) */}
+      <div className="animate-fade-in space-y-6">
+        <div className="pt-10 md:pt-0">
+          <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-4xl">Welcome to Mirage</h1>
+          <p className="text-sm text-muted-foreground md:text-base">
+            Your beautiful all-in-one media player
+          </p>
         </div>
 
         <div className="mb-8">

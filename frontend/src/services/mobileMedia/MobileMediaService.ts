@@ -103,6 +103,16 @@ export class MobileMediaService {
   }
 
   static getPlayableUri(track: MediaFile): string {
-    return Capacitor.convertFileSrc(track.file_path || track.file);
+    const raw = track.file_path || track.file || '';
+    if (!raw) return '';
+    // content:// URIs (Android MediaStore) must be converted to a Capacitor
+    // web-accessible URL via convertFileSrc. Plain file:// URIs also need it.
+    // http(s):// stream URLs can be returned as-is.
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    try {
+      return Capacitor.convertFileSrc(raw);
+    } catch (_e) {
+      return raw;
+    }
   }
 }

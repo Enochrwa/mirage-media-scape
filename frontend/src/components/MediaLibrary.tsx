@@ -240,8 +240,8 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
 
   return (
     <div className={cn('space-y-6', className)}>
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Your Library</h1>
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <h1 className="text-xl font-bold tracking-tight sm:text-3xl">Your Library</h1>
         <div className="w-full sm:w-auto">
           <Input
             placeholder="Search by title, artist or album..."
@@ -270,10 +270,19 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ className, mediaType: initi
           className="w-full"
           onValueChange={(value) => setMediaType(value as MediaType | 'all')}
         >
-          <TabsList>
-            <TabsTrigger value="all">All Media ({safeFiles.length})</TabsTrigger>
-            <TabsTrigger value="audio">Music ({audioFiles.length})</TabsTrigger>
-            <TabsTrigger value="video">Videos ({videoFiles.length})</TabsTrigger>
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="all" className="flex-1 sm:flex-none">
+              <span className="sm:hidden">All ({safeFiles.length})</span>
+              <span className="hidden sm:inline">All Media ({safeFiles.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="audio" className="flex-1 sm:flex-none">
+              <span className="sm:hidden">Music ({audioFiles.length})</span>
+              <span className="hidden sm:inline">Music ({audioFiles.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="video" className="flex-1 sm:flex-none">
+              <span className="sm:hidden">Videos ({videoFiles.length})</span>
+              <span className="hidden sm:inline">Videos ({videoFiles.length})</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-6">

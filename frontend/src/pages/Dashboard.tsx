@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaFile } from '@/types/media';
@@ -161,6 +162,7 @@ const Dashboard = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Dashboard" />
       <div className="animate-fade-in space-y-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>

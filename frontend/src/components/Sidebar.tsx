@@ -779,10 +779,47 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         </TooltipProvider>
       </div>
 
-      {/* Mobile menu trigger */}
+      {/* Mobile menu trigger — hamburger floating top-left on mobile */}
       <div className="fixed left-4 top-4 z-50 md:hidden">
         <MobileMenu />
       </div>
+
+      {/* Mobile bottom nav bar — visible only on mobile (hidden md+) */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-border bg-background/95 backdrop-blur-xl md:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {[
+          { icon: <Home size={22} />, label: 'Home', to: '/home' },
+          { icon: <Music size={22} />, label: 'Music', to: '/music' },
+          { icon: <Film size={22} />, label: 'Videos', to: '/videos' },
+          { icon: <ListMusic size={22} />, label: 'Playlists', to: '/playlists' },
+          { icon: <Settings size={22} />, label: 'Settings', to: '/settings' },
+        ].map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2"
+          >
+            <span
+              className={cn(
+                'transition-colors',
+                location.pathname === item.to ? 'text-primary' : 'text-muted-foreground',
+              )}
+            >
+              {item.icon}
+            </span>
+            <span
+              className={cn(
+                'text-[10px] font-medium',
+                location.pathname === item.to ? 'text-primary' : 'text-muted-foreground',
+              )}
+            >
+              {item.label}
+            </span>
+          </Link>
+        ))}
+      </nav>
 
       <SmartPlaylistModal
         isOpen={isSmartPlaylistModalOpen}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
+import MobileTopBar from '@/components/MobileTopBar';
 import { API_BASE, formatDuration } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Music, Clock, User, BarChart3, History } from 'lucide-react';
@@ -117,9 +118,10 @@ const StatsPage = () => {
 
   return (
     <MainLayout>
+      <MobileTopBar title="Stats" />
       <div className="space-y-8 duration-500 animate-in fade-in">
         <div>
-          <h1 className="mb-2 text-4xl font-bold tracking-tight">Listening Stats</h1>
+          <h1 className="mb-2 text-2xl font-bold tracking-tight md:text-4xl">Listening Stats</h1>
           <p className="text-muted-foreground">Your musical journey in numbers.</p>
         </div>
 
