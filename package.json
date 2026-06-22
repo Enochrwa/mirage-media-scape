@@ -30,7 +30,7 @@
     "reinstall": "npm run clean && npm run install:all"
   },
   "devDependencies": {
-    "@types/node": "25.8.0",
+    "@types/node": "26.0.0",
     "concurrently": "^8.2.2",
     "tsx": "^4.19.2",
     "typescript": "^5.4.5"
